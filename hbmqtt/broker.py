@@ -36,12 +36,9 @@ class Broker:
         self.machine.add_transition(trigger='start', source='new', dest='starting')
         self.machine.add_transition(trigger='starting_fail', source='starting', dest='not_started')
         self.machine.add_transition(trigger='starting_success', source='starting', dest='started')
-        self.machine.add_transition(trigger='restart', source='not_started', dest='starting')
         self.machine.add_transition(trigger='shutdown', source='started', dest='stopping')
         self.machine.add_transition(trigger='stopping_success', source='stopping', dest='stopped')
         self.machine.add_transition(trigger='stopping_failure', source='stopping', dest='not_stopped')
-        self.machine.add_transition(trigger='abort', source='not_stopped', dest='stopped')
-        self.machine.add_transition(trigger='abort', source='not_started', dest='stopped')
         self.machine.add_transition(trigger='start', source='stopped', dest='starting')
 
     def start(self):
