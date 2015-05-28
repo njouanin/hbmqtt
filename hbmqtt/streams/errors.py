@@ -2,5 +2,9 @@
 #
 # See the file license.txt for copying permission.
 
-class BrokerException(BaseException):
+class StreamException(BaseException):
+    pass
+
+
+class FixedHeaderException(StreamException):
     pass
