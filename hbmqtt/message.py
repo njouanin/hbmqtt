@@ -33,6 +33,6 @@ class FixedHeader:
             enum_type = get_message_type(msg_type)
         self.message_type = enum_type
         self.remainingLength = length
-        self.dupFlag = dup_flag
+        self.dup_flag = dup_flag
         self.qos = qos
-        self.retain = retain_flag
+        self.retain_flag = retain_flag
