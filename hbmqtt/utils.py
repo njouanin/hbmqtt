@@ -15,6 +15,7 @@ def read_or_raise(reader, n=-1):
     data = yield from reader.read(n)
     if not data:
         raise NoDataException
+    return data
 
 @asyncio.coroutine
 def read_string(reader):
