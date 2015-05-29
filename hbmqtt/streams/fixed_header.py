@@ -5,6 +5,7 @@ import asyncio
 from hbmqtt.utils import (
     bytes_to_hex_str,
     hex_to_int,
+    read_or_raise,
 )
 from hbmqtt.message import FixedHeader, MessageType
 from hbmqtt.streams.errors import StreamException, NoDataException
@@ -17,9 +18,7 @@ class FixedHeaderStream:
         pass
 
     def decode(self, reader) -> FixedHeader:
-        b1 = yield from reader.read(1)
-        if not b1:
-            raise NoDataException
+        b1 = yield from read_or_raise(reader, 1)
         msg_type = FixedHeaderStream.get_message_type(b1)
         if msg_type is MessageType.RESERVED_0 or msg_type is MessageType.RESERVED_15:
             raise FixedHeaderException("Usage of control packet type %s is forbidden" % msg_type)
@@ -44,9 +43,7 @@ class FixedHeaderStream:
         value = 0
         length_bytes = b''
         while True:
-            encoded_byte = yield from reader.read(1)
-            if not encoded_byte:
-                raise NoDataException
+            encoded_byte = yield from read_or_raise(reader, 1)
             length_bytes += encoded_byte
             int_byte = hex_to_int(encoded_byte)
             value += (int_byte & 0x7f) * multiplier
