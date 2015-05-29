@@ -17,7 +17,13 @@ class FixedHeaderStream:
     def __init__(self):
         pass
 
+    @asyncio.coroutine
     def decode(self, reader) -> FixedHeader:
+        """
+        Decode MQTT message fixed header from stream
+        :param reader: Stream to read
+        :return: FixedHeader instance
+        """
         b1 = yield from read_or_raise(reader, 1)
         msg_type = FixedHeaderStream.get_message_type(b1)
         if msg_type is MessageType.RESERVED_0 or msg_type is MessageType.RESERVED_15:
@@ -39,6 +45,11 @@ class FixedHeaderStream:
 
     @asyncio.coroutine
     def decode_remaining_length(self, reader):
+        """
+        Decode message length according to MQTT specifications
+        :param reader:
+        :return:
+        """
         multiplier = 1
         value = 0
         length_bytes = b''
