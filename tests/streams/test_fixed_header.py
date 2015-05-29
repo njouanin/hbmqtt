@@ -5,6 +5,7 @@ import unittest
 import asyncio
 from hbmqtt.streams.fixed_header import FixedHeaderStream
 from hbmqtt.streams.errors import FixedHeaderException
+from hbmqtt.message import MessageType
 
 class TestFixedHeader(unittest.TestCase):
     def setUp(self):
@@ -12,7 +13,7 @@ class TestFixedHeader(unittest.TestCase):
 
     def test_get_message_type(self):
         m_type = FixedHeaderStream.get_message_type(b'\x10')
-        self.assertEqual(m_type, 1)
+        self.assertEqual(m_type, MessageType.CONNECT)
 
     def test_get_flags(self):
         (dup_flag, qos, retain_flag) = FixedHeaderStream.get_flags(b'\x1f')
@@ -54,3 +55,20 @@ class TestFixedHeader(unittest.TestCase):
         s = FixedHeaderStream()
         with self.assertRaises(FixedHeaderException):
             self.loop.run_until_complete(s.decode_remaining_length(stream))
+
+    def test_decode_ok(self):
+        stream = asyncio.StreamReader(loop=self.loop)
+        stream.feed_data(b'\x10\x7f')
+        s = FixedHeaderStream()
+        header = self.loop.run_until_complete(s.decode(stream))
+        self.assertEqual(header.message_type, MessageType.CONNECT)
+        self.assertFalse(header.dup_flag)
+        self.assertEqual(header.qos, 0)
+        self.assertFalse(header.retain_flag)
+
+    def test_decode_ko(self):
+        stream = asyncio.StreamReader(loop=self.loop)
+        stream.feed_data(b'\x0f\x7f')
+        s = FixedHeaderStream()
+        with self.assertRaises(FixedHeaderException):
+            self.loop.run_until_complete(s.decode(stream))
