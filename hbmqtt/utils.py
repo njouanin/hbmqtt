@@ -5,13 +5,29 @@ import asyncio
 from hbmqtt.streams.errors import NoDataException
 
 def bytes_to_hex_str(data):
+    """
+    converts a sequence of bytes into its displayable hex representation, ie: 0x??????
+    :param data: byte sequence
+    :return: Hexadecimal displayable representation
+    """
     return '0x' + ''.join(format(b, '02x') for b in data)
 
 def bytes_to_int(data):
+    """
+    converts a seauence of bytes to an integer using big endian byte ordering
+    :param data: byte sequence
+    :return: integer value
+    """
     return int.from_bytes(data, byteorder='big')
 
 @asyncio.coroutine
 def read_or_raise(reader, n=-1):
+    """
+    Read a given byte number from Stream. NoDataException is raised if read gives no data
+    :param reader: Stream reader
+    :param n: number of bytes to read
+    :return: bytes read
+    """
     data = yield from reader.read(n)
     if not data:
         raise NoDataException
@@ -19,6 +35,11 @@ def read_or_raise(reader, n=-1):
 
 @asyncio.coroutine
 def read_string(reader):
+    """
+    Read a string from a reader according to MQTT string specification
+    :param reader: Stream reader
+    :return: UTF-8 string read from stream
+    """
     length_bytes = yield from read_or_raise(reader, 2)
     str_length = bytes_to_int(length_bytes)
     byte_str = yield from read_or_raise(reader, str_length)
