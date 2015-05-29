@@ -25,7 +25,7 @@ class MessageType(Enum):
 def get_message_type(byte):
     return MessageType(byte)
 
-class Message:
+class FixedHeader:
     def __init__(self, msg_type, length, dup_flag=False, qos=0, retain_flag=False):
         if isinstance(msg_type, int):
             enum_type = msg_type

@@ -6,19 +6,19 @@ from hbmqtt.utils import (
     bytes_to_hex_str,
     hex_to_int,
 )
-from hbmqtt.message import Message
+from hbmqtt.fixedheader import FixedHeader
 from hbmqtt.streams.errors import FixedHeaderException
 
-class BaseStream:
+class FixedHeaderStream:
     def __init__(self):
         pass
 
     def decode(self, reader):
         b1 = yield from reader.read(1)
-        msg_type = BaseStream.get_message_type(b1)
-        (dup_flag, qos, retain_flag) = BaseStream.get_flags(b1)
+        msg_type = FixedHeaderStream.get_message_type(b1)
+        (dup_flag, qos, retain_flag) = FixedHeaderStream.get_flags(b1)
         remain_length = yield from self.decode_remaining_length(b1, reader)
-        return Message(msg_type, remain_length, dup_flag, qos, retain_flag)
+        return FixedHeader(msg_type, remain_length, dup_flag, qos, retain_flag)
 
     @staticmethod
     def get_message_type(byte):
