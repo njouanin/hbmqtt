@@ -4,7 +4,7 @@
 import asyncio
 from hbmqtt.utils import (
     bytes_to_hex_str,
-    hex_to_int,
+    bytes_to_int,
     read_or_raise,
 )
 from hbmqtt.message import FixedHeader, MessageType
@@ -29,12 +29,12 @@ class FixedHeaderStream:
 
     @staticmethod
     def get_message_type(byte):
-        byte_type = (hex_to_int(byte) & 0xf0) >> 4
+        byte_type = (bytes_to_int(byte) & 0xf0) >> 4
         return MessageType(byte_type)
 
     @staticmethod
     def get_flags(data):
-        byte = hex_to_int(data)
+        byte = bytes_to_int(data)
         return byte & 0x0f
 
     @asyncio.coroutine
@@ -45,7 +45,7 @@ class FixedHeaderStream:
         while True:
             encoded_byte = yield from read_or_raise(reader, 1)
             length_bytes += encoded_byte
-            int_byte = hex_to_int(encoded_byte)
+            int_byte = bytes_to_int(encoded_byte)
             value += (int_byte & 0x7f) * multiplier
             if (int_byte & 0x80) == 0:
                 break
