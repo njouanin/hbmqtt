@@ -7,7 +7,10 @@ from hbmqtt.utils import (
     hex_to_int,
 )
 from hbmqtt.message import FixedHeader, MessageType
-from hbmqtt.streams.errors import FixedHeaderException
+from hbmqtt.streams.errors import StreamException, NoDataException
+
+class FixedHeaderException(StreamException):
+    pass
 
 class FixedHeaderStream:
     def __init__(self):
@@ -15,12 +18,15 @@ class FixedHeaderStream:
 
     def decode(self, reader) -> FixedHeader:
         b1 = yield from reader.read(1)
+        if not b1:
+            raise NoDataException
         msg_type = FixedHeaderStream.get_message_type(b1)
         if msg_type is MessageType.RESERVED_0 or msg_type is MessageType.RESERVED_15:
             raise FixedHeaderException("Usage of control packet type %s is forbidden" % msg_type)
-        (dup_flag, qos, retain_flag) = FixedHeaderStream.get_flags(b1)
+        flags = FixedHeaderStream.get_flags(b1)
+
         remain_length = yield from self.decode_remaining_length(reader)
-        return FixedHeader(msg_type, remain_length, dup_flag, qos, retain_flag)
+        return FixedHeader(msg_type, flags, remain_length)
 
     @staticmethod
     def get_message_type(byte):
@@ -30,10 +36,7 @@ class FixedHeaderStream:
     @staticmethod
     def get_flags(data):
         byte = hex_to_int(data)
-        b3 = True if (byte & 0x08) >> 3 else False
-        b21 = (byte & 0x06) >> 1
-        b0 = True if (byte & 0x01) else False
-        return b3, b21, b0
+        return byte & 0x0f
 
     @asyncio.coroutine
     def decode_remaining_length(self, reader):
@@ -42,6 +45,8 @@ class FixedHeaderStream:
         length_bytes = b''
         while True:
             encoded_byte = yield from reader.read(1)
+            if not encoded_byte:
+                raise NoDataException
             length_bytes += encoded_byte
             int_byte = hex_to_int(encoded_byte)
             value += (int_byte & 0x7f) * multiplier

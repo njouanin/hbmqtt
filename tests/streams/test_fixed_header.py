@@ -3,8 +3,7 @@
 # See the file license.txt for copying permission.
 import unittest
 import asyncio
-from hbmqtt.streams.fixed_header import FixedHeaderStream
-from hbmqtt.streams.errors import FixedHeaderException
+from hbmqtt.streams.fixed_header import FixedHeaderStream, FixedHeaderException
 from hbmqtt.message import MessageType
 
 class TestFixedHeader(unittest.TestCase):
@@ -16,10 +15,12 @@ class TestFixedHeader(unittest.TestCase):
         self.assertEqual(m_type, MessageType.CONNECT)
 
     def test_get_flags(self):
-        (dup_flag, qos, retain_flag) = FixedHeaderStream.get_flags(b'\x1f')
-        self.assertTrue(dup_flag)
-        self.assertEqual(qos, 3)
-        self.assertTrue(retain_flag)
+        flags = FixedHeaderStream.get_flags(b'\x1f')
+        self.assertTrue(flags & 0x08)
+        self.assertTrue(flags & 0x04)
+        self.assertTrue(flags & 0x02)
+        self.assertTrue(flags & 0x01)
+        self.assertFalse(flags & 0x10)
 
     def test_decode_remaining_length1(self):
         stream = asyncio.StreamReader(loop=self.loop)
@@ -62,9 +63,9 @@ class TestFixedHeader(unittest.TestCase):
         s = FixedHeaderStream()
         header = self.loop.run_until_complete(s.decode(stream))
         self.assertEqual(header.message_type, MessageType.CONNECT)
-        self.assertFalse(header.dup_flag)
-        self.assertEqual(header.qos, 0)
-        self.assertFalse(header.retain_flag)
+        self.assertFalse(header.flags & 0x08)
+        self.assertEqual((header.flags & 0x06) >> 1 , 0)
+        self.assertFalse(header.flags & 0x01)
 
     def test_decode_ko(self):
         stream = asyncio.StreamReader(loop=self.loop)
