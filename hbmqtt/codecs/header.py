@@ -2,18 +2,20 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from hbmqtt.utils import (
+
+from hbmqtt.codecs.utils import (
     bytes_to_hex_str,
     bytes_to_int,
     read_or_raise,
 )
 from hbmqtt.message import FixedHeader, MessageType
-from hbmqtt.streams.errors import StreamException, NoDataException
+from hbmqtt.codecs.errors import CodecException
 
-class FixedHeaderException(StreamException):
+
+class FixedHeaderException(CodecException):
     pass
 
-class FixedHeaderStream:
+class FixedHeaderCodec:
     def __init__(self):
         pass
 
@@ -25,10 +27,10 @@ class FixedHeaderStream:
         :return: FixedHeader instance
         """
         b1 = yield from read_or_raise(reader, 1)
-        msg_type = FixedHeaderStream.get_message_type(b1)
+        msg_type = FixedHeaderCodec.get_message_type(b1)
         if msg_type is MessageType.RESERVED_0 or msg_type is MessageType.RESERVED_15:
             raise FixedHeaderException("Usage of control packet type %s is forbidden" % msg_type)
-        flags = FixedHeaderStream.get_flags(b1)
+        flags = FixedHeaderCodec.get_flags(b1)
 
         remain_length = yield from self.decode_remaining_length(reader)
         return FixedHeader(msg_type, flags, remain_length)

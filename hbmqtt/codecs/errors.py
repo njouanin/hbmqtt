@@ -2,9 +2,8 @@
 #
 # See the file license.txt for copying permission.
 
-class StreamException(BaseException):
+class CodecException(BaseException):
     pass
 
-
-class FixedHeaderException(StreamException):
+class NoDataException(CodecException):
     pass
