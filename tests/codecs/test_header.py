@@ -3,17 +3,17 @@
 # See the file license.txt for copying permission.
 import unittest
 import asyncio
-from hbmqtt.codecs.header import FixedHeaderCodec, FixedHeaderException
+from hbmqtt.codecs.header import MQTTHeaderCodec, MQTTHeaderException
 from hbmqtt.message import MessageType
 
-class TestFixedHeader(unittest.TestCase):
+class TestMQTTHeaderCodec(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
 
     def test_decode_ok(self):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x10\x7f')
-        header = self.loop.run_until_complete(FixedHeaderCodec.decode(stream))
+        header = self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))
         self.assertEqual(header.message_type, MessageType.CONNECT)
         self.assertFalse(header.flags & 0x08)
         self.assertEqual((header.flags & 0x06) >> 1, 0)
@@ -23,7 +23,7 @@ class TestFixedHeader(unittest.TestCase):
     def test_decode_ok_with_length(self):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x10\xff\xff\xff\x7f')
-        header = self.loop.run_until_complete(FixedHeaderCodec.decode(stream))
+        header = self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))
         self.assertEqual(header.message_type, MessageType.CONNECT)
         self.assertFalse(header.flags & 0x08)
         self.assertEqual((header.flags & 0x06) >> 1, 0)
@@ -33,11 +33,11 @@ class TestFixedHeader(unittest.TestCase):
     def test_decode_reserved(self):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x0f\x7f')
-        with self.assertRaises(FixedHeaderException):
-            self.loop.run_until_complete(FixedHeaderCodec.decode(stream))
+        with self.assertRaises(MQTTHeaderException):
+            self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))
 
     def test_decode_ko_with_length(self):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x10\xff\xff\xff\xff\x7f')
-        with self.assertRaises(FixedHeaderException):
-            self.loop.run_until_complete(FixedHeaderCodec.decode(stream))
+        with self.assertRaises(MQTTHeaderException):
+            self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))

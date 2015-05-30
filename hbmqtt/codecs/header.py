@@ -8,17 +8,17 @@ from hbmqtt.codecs.utils import (
     bytes_to_int,
     read_or_raise,
 )
-from hbmqtt.message import FixedHeader, MessageType
+from hbmqtt.message import MQTTHeader, MessageType
 from hbmqtt.codecs.errors import CodecException
 
 
-class FixedHeaderException(CodecException):
+class MQTTHeaderException(CodecException):
     pass
 
-class FixedHeaderCodec:
+class MQTTHeaderCodec:
     @staticmethod
     @asyncio.coroutine
-    def decode(reader) -> FixedHeader:
+    def decode(reader) -> MQTTHeader:
         """
         Decode MQTT message fixed header from stream
         :param reader: Stream to read
@@ -51,20 +51,20 @@ class FixedHeaderCodec:
                 else:
                     multiplier *= 128
                     if multiplier > 128*128*128:
-                        raise FixedHeaderException("Invalid remaining length bytes:%s" % bytes_to_hex_str(length_bytes))
+                        raise MQTTHeaderException("Invalid remaining length bytes:%s" % bytes_to_hex_str(length_bytes))
             return value
 
         b1 = yield from read_or_raise(reader, 1)
         msg_type = get_message_type(b1)
         if msg_type is MessageType.RESERVED_0 or msg_type is MessageType.RESERVED_15:
-            raise FixedHeaderException("Usage of control packet type %s is forbidden" % msg_type)
+            raise MQTTHeaderException("Usage of control packet type %s is forbidden" % msg_type)
         flags = get_flags(b1)
 
         remain_length = yield from decode_remaining_length()
-        return FixedHeader(msg_type, flags, remain_length)
+        return MQTTHeader(msg_type, flags, remain_length)
 
     @staticmethod
     @asyncio.coroutine
-    def encode(header: FixedHeader, writer):
+    def encode(header: MQTTHeader, writer):
         # To be done
         pass
