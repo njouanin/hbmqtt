@@ -6,6 +6,10 @@ import threading
 import logging
 from hbmqtt.errors import BrokerException
 from transitions import Machine, MachineError
+from hbmqtt.codecs.header import MQTTHeaderCodec
+from hbmqtt.codecs.errors import CodecException
+from hbmqtt.codecs.connect import ConnectMessage
+from hbmqtt.message import MessageType
 
 
 class BrokerProtocol(asyncio.Protocol):
@@ -74,9 +78,35 @@ class Broker:
 
     def _run_server_loop(self, loop):
         asyncio.set_event_loop(loop)
-        coro = loop.create_server(BrokerProtocol, self.host, self.port)
+        coro = asyncio.start_server(client_connected, self.host, self.port)
         self._server = loop.run_until_complete(coro)
         self.logger.debug("Broker listening %s:%s" % (self.host, self.port))
         self.machine.starting_success()
         self.logger.debug("Broker started, ready to serve")
         loop.run_forever()
+
+
+def init_message_codecs():
+    """
+    Init dict of MQTT message encoders/decoders
+    :return:
+    """
+    codecs = {
+        MessageType.CONNECT, ConnectMessage
+    }
+    return codecs
+
+@asyncio.coroutine
+def client_connected(reader, writer):
+    (remote_address, remote_port) = writer.get_extra_info('peername')
+    codecs = init_message_codecs()
+    while True:
+        try:
+            # Read fixed header
+            fixed_header = yield from MQTTHeaderCodec.decode(reader)
+            # Find message decoder and decode
+            codec = codecs[fixed_header.message_type]
+            message = yield from codec.decode(fixed_header, reader)
+        except CodecException:
+            #End connection
+            break
