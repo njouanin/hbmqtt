@@ -2,7 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from hbmqtt.streams.errors import NoDataException
+from hbmqtt.codecs.errors import NoDataException
 
 def bytes_to_hex_str(data):
     """

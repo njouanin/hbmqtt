@@ -3,12 +3,13 @@
 # See the file license.txt for copying permission.
 import unittest
 import asyncio
-from hbmqtt.utils import (
+
+from hbmqtt.codecs.utils import (
     bytes_to_hex_str,
     bytes_to_int,
     read_string,
 )
-from hbmqtt.message import MessageType
+
 
 class TestUtils(unittest.TestCase):
     def setUp(self):
