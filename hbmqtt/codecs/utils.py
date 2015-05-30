@@ -2,6 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
+from asyncio import IncompleteReadError
 from hbmqtt.codecs.errors import NoDataException
 
 def bytes_to_hex_str(data):
@@ -28,7 +29,10 @@ def read_or_raise(reader, n=-1):
     :param n: number of bytes to read
     :return: bytes read
     """
-    data = yield from reader.read(n)
+    try:
+        data = yield from reader.readexactly(n)
+    except IncompleteReadError:
+        raise NoDataException("Incomplete read")
     if not data:
         raise NoDataException
     return data
@@ -43,4 +47,4 @@ def read_string(reader):
     length_bytes = yield from read_or_raise(reader, 2)
     str_length = bytes_to_int(length_bytes)
     byte_str = yield from read_or_raise(reader, str_length)
-    return byte_str.decode()
+    return byte_str.decode(encoding='utf-8')
