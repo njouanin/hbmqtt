@@ -22,16 +22,18 @@ def bytes_to_int(data):
     """
     return int.from_bytes(data, byteorder='big')
 
-def int_to_bytes(int_value: int) -> bytes:
+def int_to_bytes(int_value: int, length=-1) -> bytes:
     """
     convert an integer to a sequence of bytes using big endian byte ordering
     :param int_value: integer value to convert
+    :param length: (optional) byte length
     :return: byte sequence
     """
-    byte_length = ceil(int_value.bit_length()//8)
-    if byte_length == 0:
-        byte_length = 1
-    return int_value.to_bytes(byte_length, byteorder='big')
+    if length == -1:
+        length = ceil(int_value.bit_length()//8)
+        if length == 0:
+            length = 1
+    return int_value.to_bytes(length, byteorder='big')
 
 
 @asyncio.coroutine
@@ -51,7 +53,7 @@ def read_or_raise(reader, n=-1):
     return data
 
 @asyncio.coroutine
-def decode_string(reader):
+def decode_string(reader) -> bytes:
     """
     Read a string from a reader and decode it according to MQTT string specification
     :param reader: Stream reader
@@ -61,3 +63,8 @@ def decode_string(reader):
     str_length = bytes_to_int(length_bytes)
     byte_str = yield from read_or_raise(reader, str_length)
     return byte_str.decode(encoding='utf-8')
+
+def encode_string(string: str) -> bytes:
+    data = string.encode(encoding='utf-8')
+    data_length = len(data)
+    return int_to_bytes(data_length, 2) + data

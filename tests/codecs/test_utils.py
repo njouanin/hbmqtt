@@ -8,6 +8,7 @@ from hbmqtt.codecs.utils import (
     bytes_to_hex_str,
     bytes_to_int,
     decode_string,
+    encode_string,
 )
 
 
@@ -25,8 +26,12 @@ class TestUtils(unittest.TestCase):
         ret = bytes_to_int(b'\xff\xff')
         self.assertEqual(ret, 65535)
 
-    def test_read_string(self):
+    def test_decode_string(self):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x00\x02AA')
         ret = self.loop.run_until_complete(decode_string(stream))
         self.assertEqual(ret, 'AA')
+
+    def test_encode_string(self):
+        encoded = encode_string('AA')
+        self.assertEqual(b'\x00\x02AA', encoded)
