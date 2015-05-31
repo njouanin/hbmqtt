@@ -65,7 +65,6 @@ class MQTTHeaderCodec:
         return MQTTHeader(msg_type, flags, remain_length)
 
     @staticmethod
-    @asyncio.coroutine
     def encode(header: MQTTHeader) -> bytes:
         def encode_remaining_length(length: int):
             encoded = b''
