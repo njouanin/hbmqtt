@@ -21,14 +21,13 @@ def bytes_to_int(data):
     """
     return int.from_bytes(data, byteorder='big')
 
-def int_to_bytes(int_value:int, length) -> bytes:
+def int_to_bytes(int_value:int) -> bytes:
     """
     convert an integer to a sequence of bytes using big endian byte ordering
     :param int_value: integer value to convert
-    :param length: byte sequence length
     :return: byte sequence
     """
-    int_value.to_bytes(length, byteorder='big')
+    int_value.to_bytes(int_value.bit_length(), byteorder='big')
 
 
 @asyncio.coroutine

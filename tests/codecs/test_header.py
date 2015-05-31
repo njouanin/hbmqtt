@@ -4,7 +4,9 @@
 import unittest
 import asyncio
 from hbmqtt.codecs.header import MQTTHeaderCodec, MQTTHeaderException
-from hbmqtt.message import MessageType
+from hbmqtt.message import MessageType, MQTTHeader
+from hbmqtt.codecs.utils import bytes_to_hex_str
+
 
 class TestMQTTHeaderCodec(unittest.TestCase):
     def setUp(self):
@@ -41,3 +43,13 @@ class TestMQTTHeaderCodec(unittest.TestCase):
         stream.feed_data(b'\x10\xff\xff\xff\xff\x7f')
         with self.assertRaises(MQTTHeaderException):
             self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))
+
+    def test_encode(self):
+        header = MQTTHeader(MessageType.CONNECT, 0x00, 0)
+        data = self.loop.run_until_complete(MQTTHeaderCodec.encode(header))
+        self.assertEqual(data, b'\x10\x00')
+
+    def test_encode_2(self):
+        header = MQTTHeader(MessageType.CONNECT, 0x00, 268435455)
+        data = self.loop.run_until_complete(MQTTHeaderCodec.encode(header))
+        self.assertEqual(data, b'\x10\xff\xff\xff\x7f')

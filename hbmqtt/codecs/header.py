@@ -66,29 +66,31 @@ class MQTTHeaderCodec:
 
     @staticmethod
     @asyncio.coroutine
-    def encode(header: MQTTHeader, writer):
-        def encode_remaining_length(length:int):
+    def encode(header: MQTTHeader) -> bytes:
+        def encode_remaining_length(length: int):
             encoded = b''
             while True:
                 length_byte = length % 0x80
-                length /= 0x80
+                length //= 0x80
                 if length > 0:
                     length_byte |= 0x80
-                encoded += int_to_bytes(length_byte, 1)
+                encoded += int_to_bytes(length_byte)
                 if length <= 0:
                     break
             return encoded
 
+        out = b''
         packet_type = 0
         try:
-            packet_type = (header.message_type.value << 4) & header.flags
-            encoded_type = int_to_bytes(packet_type, 1)
-            writer.write(encoded_type)
+            packet_type = (header.message_type.value << 4) | header.flags
+            out += int_to_bytes(packet_type)
         except OverflowError:
             raise CodecException('packet_size encoding exceed 1 byte length: value=%d', packet_type)
 
         try:
             encoded_length = encode_remaining_length(header.remaining_length)
-            writer.write(encoded_length)
+            out += encoded_length
         except OverflowError:
             raise CodecException('message length encoding exceed 1 byte length: value=%d', header.remaining_length)
+
+        return out
