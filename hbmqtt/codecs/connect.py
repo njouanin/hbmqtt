@@ -8,9 +8,12 @@ from hbmqtt.codecs.utils import (
     bytes_to_int,
     decode_string,
     read_or_raise,
+    encode_string,
+    int_to_bytes,
 )
 from hbmqtt.message import MQTTHeader, ConnectMessage
 from hbmqtt.codecs.errors import CodecException, NoDataException
+from hbmqtt.codecs.header import MQTTHeaderCodec
 
 
 class ConnectException(CodecException):
@@ -47,7 +50,7 @@ class ConnectCodec:
         keep_alive_byte = yield from read_or_raise(reader, 2)
         keep_alive = bytes_to_int(keep_alive_byte)
 
-        message = ConnectMessage(header, protocol_name, protocol_level, flags, keep_alive)
+        message = ConnectMessage(header, flags, keep_alive, protocol_name, protocol_level)
 
         # Read Payload
         #  Client identifier
@@ -77,3 +80,36 @@ class ConnectCodec:
                 raise ConnectException('password flag set, but password not present in payload')
 
         return message
+
+    @staticmethod
+    def encode(message: ConnectMessage, with_header=False) -> bytes:
+        out = b''
+
+        # Write CONNECT variable header
+        # Protocol name
+        out += encode_string(message.proto_name)
+        # Protocol level
+        out += int_to_bytes(message.proto_level)
+        # flags
+        out += int_to_bytes(message.flags)
+        # keep alive
+        out += int_to_bytes(message.keep_alive, 2)
+
+        # Write payload
+        # Client identifier
+        out += encode_string(message.client_id)
+        # Will topic / message
+        if message.is_will_flag():
+            out += encode_string(message.will_topic)
+            out += encode_string(message.will_message)
+        # username
+        if message.is_user_name_flag():
+            out += encode_string(message.user_name)
+        # password
+        if message.is_password_flag():
+            out += encode_string(message.password)
+
+        message.mqtt_header.remaining_length = len(out)
+        if with_header:
+            out = MQTTHeaderCodec.encode(message.mqtt_header) + out
+        return out

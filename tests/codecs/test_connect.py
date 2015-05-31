@@ -4,7 +4,7 @@
 import unittest
 import asyncio
 from hbmqtt.codecs.connect import ConnectCodec, ConnectException
-from hbmqtt.message import MessageType, MQTTHeader
+from hbmqtt.message import MessageType, MQTTHeader, ConnectMessage
 
 class TestConnectCodec(unittest.TestCase):
     def setUp(self):
@@ -85,3 +85,14 @@ class TestConnectCodec(unittest.TestCase):
         stream.feed_eof()
         with self.assertRaises(ConnectException):
             self.loop.run_until_complete(ConnectCodec.decode(header, stream))
+
+    def test_encode(self):
+        header = MQTTHeader(MessageType.CONNECT, 0x00, 0)
+        message = ConnectMessage(header, 0xce, 0, 'MQTT', 4)
+        message.client_id = '0123456789'
+        message.will_topic = 'WillTopic'
+        message.will_message = 'WillMessage'
+        message.user_name = 'user'
+        message.password = 'password'
+        encoded = ConnectCodec.encode(message)
+        self.assertEqual(encoded, b'\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password')
