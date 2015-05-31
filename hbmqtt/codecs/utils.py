@@ -4,6 +4,7 @@
 import asyncio
 from asyncio import IncompleteReadError
 from hbmqtt.codecs.errors import NoDataException
+from math import ceil
 
 def bytes_to_hex_str(data):
     """
@@ -21,13 +22,16 @@ def bytes_to_int(data):
     """
     return int.from_bytes(data, byteorder='big')
 
-def int_to_bytes(int_value:int) -> bytes:
+def int_to_bytes(int_value: int) -> bytes:
     """
     convert an integer to a sequence of bytes using big endian byte ordering
     :param int_value: integer value to convert
     :return: byte sequence
     """
-    int_value.to_bytes(int_value.bit_length(), byteorder='big')
+    byte_length = ceil(int_value.bit_length()/8)
+    if byte_length == 0:
+        byte_length = 1
+    return int_value.to_bytes(byte_length, byteorder='big')
 
 
 @asyncio.coroutine
