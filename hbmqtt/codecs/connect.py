@@ -82,7 +82,7 @@ class ConnectCodec:
         return message
 
     @staticmethod
-    def encode(message: ConnectMessage, with_header=False) -> bytes:
+    def encode(message: ConnectMessage, with_header=True) -> bytes:
         out = b''
 
         # Write CONNECT variable header

@@ -95,4 +95,4 @@ class TestConnectCodec(unittest.TestCase):
         message.user_name = 'user'
         message.password = 'password'
         encoded = ConnectCodec.encode(message)
-        self.assertEqual(encoded, b'\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password')
+        self.assertEqual(encoded, b'\x10\x3e\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password')
