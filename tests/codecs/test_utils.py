@@ -7,7 +7,7 @@ import asyncio
 from hbmqtt.codecs.utils import (
     bytes_to_hex_str,
     bytes_to_int,
-    read_string,
+    decode_string,
 )
 
 
@@ -28,5 +28,5 @@ class TestUtils(unittest.TestCase):
     def test_read_string(self):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x00\x02AA')
-        ret = self.loop.run_until_complete(read_string(stream))
+        ret = self.loop.run_until_complete(decode_string(stream))
         self.assertEqual(ret, 'AA')

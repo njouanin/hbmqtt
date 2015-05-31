@@ -51,9 +51,9 @@ def read_or_raise(reader, n=-1):
     return data
 
 @asyncio.coroutine
-def read_string(reader):
+def decode_string(reader):
     """
-    Read a string from a reader according to MQTT string specification
+    Read a string from a reader and decode it according to MQTT string specification
     :param reader: Stream reader
     :return: UTF-8 string read from stream
     """

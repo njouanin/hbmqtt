@@ -6,7 +6,7 @@ import asyncio
 from hbmqtt.codecs.utils import (
     bytes_to_hex_str,
     bytes_to_int,
-    read_string,
+    decode_string,
     read_or_raise,
 )
 from hbmqtt.message import MQTTHeader, ConnectMessage
@@ -26,7 +26,7 @@ class ConnectCodec:
 
         # Read CONNECT header
         #  protocol name
-        protocol_name = yield from read_string(reader)
+        protocol_name = yield from decode_string(reader)
         if protocol_name != "MQTT":
             raise ConnectException('[MQTT-3.1.2-1] Incorrect protocol name: "%s"' % protocol_name)
 
@@ -52,27 +52,27 @@ class ConnectCodec:
         # Read Payload
         #  Client identifier
         try:
-            message.client_id = yield from read_string(reader)
+            message.client_id = yield from decode_string(reader)
         except NoDataException:
             raise ConnectException('[[MQTT-3.1.3-3]] Client identifier must be present')
 
         # Read will topic, username and password
         if message.is_will_flag():
             try:
-                message.will_topic = yield from read_string(reader)
-                message.will_message = yield from read_string(reader)
+                message.will_topic = yield from decode_string(reader)
+                message.will_message = yield from decode_string(reader)
             except NoDataException:
                 raise ConnectException('will flag set, but will topic/message not present in payload')
 
         if message.is_user_name_flag():
             try:
-                message.user_name = yield from read_string(reader)
+                message.user_name = yield from decode_string(reader)
             except NoDataException:
                 raise ConnectException('username flag set, but username not present in payload')
 
         if message.is_password_flag():
             try:
-                message.password = yield from read_string(reader)
+                message.password = yield from decode_string(reader)
             except NoDataException:
                 raise ConnectException('password flag set, but password not present in payload')
 
