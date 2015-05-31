@@ -46,10 +46,10 @@ class TestMQTTHeaderCodec(unittest.TestCase):
 
     def test_encode(self):
         header = MQTTHeader(MessageType.CONNECT, 0x00, 0)
-        data = self.loop.run_until_complete(MQTTHeaderCodec.encode(header))
+        data = MQTTHeaderCodec.encode(header)
         self.assertEqual(data, b'\x10\x00')
 
     def test_encode_2(self):
         header = MQTTHeader(MessageType.CONNECT, 0x00, 268435455)
-        data = self.loop.run_until_complete(MQTTHeaderCodec.encode(header))
+        data = MQTTHeaderCodec.encode(header)
         self.assertEqual(data, b'\x10\xff\xff\xff\x7f')
