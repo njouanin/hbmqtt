@@ -6,6 +6,7 @@ import asyncio
 from hbmqtt.codecs.utils import (
     bytes_to_hex_str,
     bytes_to_int,
+    int_to_bytes,
     read_or_raise,
 )
 from hbmqtt.message import MQTTHeader, MessageType
@@ -24,11 +25,11 @@ class MQTTHeaderCodec:
         :param reader: Stream to read
         :return: FixedHeader instance
         """
-        def get_message_type(byte):
+        def decode_message_type(byte):
             byte_type = (bytes_to_int(byte) & 0xf0) >> 4
             return MessageType(byte_type)
 
-        def get_flags(data):
+        def decode_flags(data):
             byte = bytes_to_int(data)
             return byte & 0x0f
 
@@ -55,10 +56,10 @@ class MQTTHeaderCodec:
             return value
 
         b1 = yield from read_or_raise(reader, 1)
-        msg_type = get_message_type(b1)
+        msg_type = decode_message_type(b1)
         if msg_type is MessageType.RESERVED_0 or msg_type is MessageType.RESERVED_15:
             raise MQTTHeaderException("Usage of control packet type %s is forbidden" % msg_type)
-        flags = get_flags(b1)
+        flags = decode_flags(b1)
 
         remain_length = yield from decode_remaining_length()
         return MQTTHeader(msg_type, flags, remain_length)
@@ -66,5 +67,28 @@ class MQTTHeaderCodec:
     @staticmethod
     @asyncio.coroutine
     def encode(header: MQTTHeader, writer):
-        # To be done
-        pass
+        def encode_remaining_length(length:int):
+            encoded = b''
+            while True:
+                length_byte = length % 0x80
+                length /= 0x80
+                if length > 0:
+                    length_byte |= 0x80
+                encoded += int_to_bytes(length_byte, 1)
+                if length <= 0:
+                    break
+            return encoded
+
+        packet_type = 0
+        try:
+            packet_type = (header.message_type.value << 4) & header.flags
+            encoded_type = int_to_bytes(packet_type, 1)
+            writer.write(encoded_type)
+        except OverflowError:
+            raise CodecException('packet_size encoding exceed 1 byte length: value=%d', packet_type)
+
+        try:
+            encoded_length = encode_remaining_length(header.remaining_length)
+            writer.write(encoded_length)
+        except OverflowError:
+            raise CodecException('message length encoding exceed 1 byte length: value=%d', header.remaining_length)
