@@ -15,11 +15,21 @@ def bytes_to_hex_str(data):
 
 def bytes_to_int(data):
     """
-    converts a seauence of bytes to an integer using big endian byte ordering
+    convert a sequence of bytes to an integer using big endian byte ordering
     :param data: byte sequence
     :return: integer value
     """
     return int.from_bytes(data, byteorder='big')
+
+def int_to_bytes(int_value:int, length) -> bytes:
+    """
+    convert an integer to a sequence of bytes using big endian byte ordering
+    :param int_value: integer value to convert
+    :param length: byte sequence length
+    :return: byte sequence
+    """
+    int_value.to_bytes(length, byteorder='big')
+
 
 @asyncio.coroutine
 def read_or_raise(reader, n=-1):
