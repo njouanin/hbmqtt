@@ -6,4 +6,6 @@ from hbmqtt.message import MQTTMessage, ConnectMessage
 
 class ConnectHandle:
     @staticmethod
-    def handle(message:ConnectMessage) -> MQTTMessage:
+    def handle(message: ConnectMessage) -> MQTTMessage:
+        # TBD
+        pass
