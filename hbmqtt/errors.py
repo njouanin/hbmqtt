@@ -4,3 +4,9 @@
 
 class BrokerException(BaseException):
     pass
+
+class MQTTException(BaseException):
+    """
+    Base class for all errors refering to MQTT specifications
+    """
+    pass
