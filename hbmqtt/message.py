@@ -41,7 +41,7 @@ class MQTTMessage:
         self.mqtt_header = header
 
 class ConnectMessage(MQTTMessage):
-    def __init__(self, header: MQTTHeader, proto_name, proto_level, flags, keep_alive):
+    def __init__(self, header: MQTTHeader, flags, keep_alive, proto_name='MQTT', proto_level=0x04):
         super().__init__(header)
 
         # Connect header
