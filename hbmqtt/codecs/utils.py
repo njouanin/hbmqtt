@@ -28,7 +28,7 @@ def int_to_bytes(int_value: int) -> bytes:
     :param int_value: integer value to convert
     :return: byte sequence
     """
-    byte_length = ceil(int_value.bit_length()/8)
+    byte_length = ceil(int_value.bit_length()//8)
     if byte_length == 0:
         byte_length = 1
     return int_value.to_bytes(byte_length, byteorder='big')
