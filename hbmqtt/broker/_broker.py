@@ -34,6 +34,7 @@ class Broker:
             self._loop = asyncio.get_event_loop()
         self._server = None
         self._loop_thread = None
+        self._message_handlers = None
 
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
@@ -45,6 +46,10 @@ class Broker:
         self.machine.add_transition(trigger='stopping_failure', source='stopping', dest='not_stopped')
         self.machine.add_transition(trigger='start', source='stopped', dest='starting')
 
+
+    def _init_handlers(self):
+        _message_handlers = dict()
+
     def start(self):
         try:
             self.machine.start()
@@ -54,6 +59,7 @@ class Broker:
             raise BrokerException("Broker instance can't be started: %s" % me)
 
         try:
+            self._init_handlers()
             self._loop_thread = threading.Thread(target=self._run_server_loop, args=(self._loop,))
             self._loop_thread.setDaemon(True)
             self._loop_thread.start()
@@ -74,6 +80,7 @@ class Broker:
         self._loop.run_until_complete(self._server.wait_closed())
         self._loop.close()
         self._server = None
+        self._message_handlers = None
         self.machine.stopping_success()
 
     def _run_server_loop(self, loop):
@@ -95,6 +102,8 @@ def init_message_codecs():
         MessageType.CONNECT, ConnectMessage
     }
     return codecs
+
+
 
 @asyncio.coroutine
 def client_connected(reader, writer):
