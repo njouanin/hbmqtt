@@ -7,7 +7,6 @@ import logging
 from hbmqtt.errors import BrokerException
 from transitions import Machine, MachineError
 from hbmqtt.codecs.header import MQTTHeaderCodec
-from hbmqtt.codecs.errors import CodecException
 from hbmqtt.codecs.connect import ConnectMessage
 from hbmqtt.message import MessageType
 from hbmqtt.errors import MQTTException
