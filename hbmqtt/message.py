@@ -88,7 +88,7 @@ class ConnackMessage(MQTTMessage):
         self.session_parent = session_parent
         self.return_code = return_code
 
-    class ReturnCode(enum):
+    class ReturnCode(Enum):
         CONNECTION_ACCEPTED = 0
         UNACCEPTABLE_PROTOCOL_VERSION = 1
         IDENTIFIER_REJECTED = 2
