@@ -41,7 +41,7 @@ class MQTTMessage:
         self.mqtt_header = header
 
 class ConnectMessage(MQTTMessage):
-    def __init__(self, header: MQTTHeader, flags, keep_alive, proto_name='MQTT', proto_level=0x04):
+    def __init__(self, header: MQTTHeader, flags, keep_alive, remote_address=None, remote_port=None, proto_name='MQTT', proto_level=0x04):
         super().__init__(header)
 
         # Connect header
@@ -54,6 +54,10 @@ class ConnectMessage(MQTTMessage):
         self.will_message = None
         self.user_name = None
         self.password = None
+
+        # HBMQTT info
+        self._remote_address = remote_address
+        self._remote_port = remote_port
 
     def is_user_name_flag(self):
         return True if (self.flags & 0x80) else False
