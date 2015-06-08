@@ -82,7 +82,8 @@ class ConnectCodec:
         return message
 
     @staticmethod
-    def encode(message: ConnectMessage, with_header=True) -> bytes:
+    @asyncio.coroutine
+    def encode(message: ConnectMessage) -> bytes:
         out = b''
 
         # Write CONNECT variable header
@@ -108,8 +109,4 @@ class ConnectCodec:
         # password
         if message.is_password_flag():
             out += encode_string(message.password)
-
-        message.mqtt_header.remaining_length = len(out)
-        if with_header:
-            out = MQTTHeaderCodec.encode(message.mqtt_header) + out
         return out
