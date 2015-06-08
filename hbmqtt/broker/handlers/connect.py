@@ -4,7 +4,7 @@
 
 from hbmqtt.message import MQTTMessage, ConnectMessage
 
-class ConnectHandle:
+class ConnectHandler:
     def __init__(self, broker):
         self._broker = broker
 
