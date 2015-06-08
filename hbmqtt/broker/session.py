@@ -1,9 +1,9 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-import enum
+from enum import Enum
 
-class ClientState(enum):
+class ClientState(Enum):
     CONNECTED = 1
     DISCONNECTED = 2
 
