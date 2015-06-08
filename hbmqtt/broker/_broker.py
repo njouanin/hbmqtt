@@ -30,6 +30,7 @@ class Broker:
         self._loop_thread = None
         self._message_handlers = None
         self._codecs = None
+        self._sessions = dict()
 
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
@@ -100,6 +101,32 @@ class Broker:
         self.logger.debug("Broker started, ready to serve")
         loop.run_forever()
 
+    def discard_session(self, client_id):
+        if client_id in self._sessions:
+            del self._sessions[client_id]
+        else:
+            self.logger.warn("Asked to discard an unknown client ID session")
+
+    def create_session(self, remote_address, remote_port, client_id, clean_session):
+        session = Session(remote_address, remote_port, client_id, clean_session)
+        if client_id in self._sessions:
+            raise BrokerException("Session already exists for client ID: %s", client_id)
+        self.save_session(session)
+        return session
+
+    def get_session(self, client_id):
+        if client_id not in self._sessions:
+            raise BrokerException("Unknown session for client ID: %s", client_id)
+        else:
+            return self._sessions[client_id]
+
+    def resume_session(self, session: Session):
+        # TBD
+        pass
+
+    def save_session(self, session: Session):
+        self._sessions[session.client_id] = session
+
     @asyncio.coroutine
     def _handle_message(self, message: MQTTMessage) -> MQTTMessage:
         handler = self._message_handlers[message.mqtt_header.message_type]
@@ -130,7 +157,8 @@ class Broker:
             request = yield from self._decode_message(header.message_type, reader)
 
             (remote_address, remote_port) = writer.get_extra_info('peername')
-            session = Session(remote_address, remote_port, request.client_id)
+            request.remote_address = remote_address
+            request.remote_address = remote_port
 
             response = self._handle_message(request)
             encoded_response = yield from self._encode_message(response)

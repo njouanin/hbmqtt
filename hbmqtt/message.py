@@ -26,7 +26,7 @@ def get_message_type(byte):
     return MessageType(byte)
 
 class MQTTHeader:
-    def __init__(self, msg_type, flags, length):
+    def __init__(self, msg_type, flags=0, length=0):
         if isinstance(msg_type, int):
             enum_type = msg_type
         else:
@@ -36,7 +36,7 @@ class MQTTHeader:
         self.flags = flags
 
 class MQTTMessage:
-    def __init__(self, header: MQTTHeader):
+    def __init__(self, header):
         # MQTT header
         self.mqtt_header = header
 
@@ -79,3 +79,19 @@ class ConnectMessage(MQTTMessage):
 
     def will_qos(self):
         return (self.flags & 0x18) >> 3
+
+
+class ConnackMessage(MQTTMessage):
+    def __init__(self, session_parent, return_code):
+        header = MQTTHeader(MessageType.CONNACK)
+        super().__init__(header)
+        self.session_parent = session_parent
+        self.return_code = return_code
+
+    class ReturnCode(enum):
+        CONNECTION_ACCEPTED = 0
+        UNACCEPTABLE_PROTOCOL_VERSION = 1
+        IDENTIFIER_REJECTED = 2
+        SERVER_UNAVAILABLE = 3
+        BAD_USERNAME_PASSWORD = 4
+        NOT_AUTHORIZED = 5

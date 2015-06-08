@@ -36,9 +36,6 @@ class ConnectCodec:
         # protocol level (only MQTT 3.1.1 supported)
         protocol_level_byte = yield from read_or_raise(reader, 1)
         protocol_level = bytes_to_int(protocol_level_byte)
-        if protocol_level != 4:
-            raise ConnectException(
-                '[MQTT-3.1.2-2] Unsupported protocol level %s' % bytes_to_hex_str(protocol_level_byte))
 
         # flags
         flags_byte = yield from read_or_raise(reader, 1)
