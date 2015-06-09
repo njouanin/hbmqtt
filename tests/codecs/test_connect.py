@@ -34,14 +34,6 @@ class TestConnectCodec(unittest.TestCase):
         with self.assertRaises(ConnectException):
             self.loop.run_until_complete(ConnectCodec.decode(header, stream))
 
-    def test_decode_fail_protocol_level(self):
-        data = b'\x00\x04MQTT\x05\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream.feed_data(data)
-        with self.assertRaises(ConnectException):
-            self.loop.run_until_complete(ConnectCodec.decode(header, stream))
-
     def test_decode_fail_reserved_flag(self):
         data = b'\x00\x04MQTT\x04\xcf\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
         header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
@@ -94,5 +86,5 @@ class TestConnectCodec(unittest.TestCase):
         message.will_message = 'WillMessage'
         message.user_name = 'user'
         message.password = 'password'
-        encoded = ConnectCodec.encode(message)
+        encoded = yield from ConnectCodec.encode(message)
         self.assertEqual(encoded, b'\x10\x3e\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password')
