@@ -41,22 +41,3 @@ class MQTTPacket:
         self.fixed_header = fixed
         self.variable_header = None
         self.payload = None
-
-
-
-
-
-class ConnackMessage(MQTTMessage):
-    def __init__(self, session_parent, return_code):
-        header = MQTTHeader(PacketType.CONNACK)
-        super().__init__(header)
-        self.session_parent = session_parent
-        self.return_code = return_code
-
-    class ReturnCode(Enum):
-        CONNECTION_ACCEPTED = 0
-        UNACCEPTABLE_PROTOCOL_VERSION = 1
-        IDENTIFIER_REJECTED = 2
-        SERVER_UNAVAILABLE = 3
-        BAD_USERNAME_PASSWORD = 4
-        NOT_AUTHORIZED = 5
