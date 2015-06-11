@@ -18,6 +18,7 @@ from hbmqtt.handlers.utils import (
 class ConnectHandler(PacketHandler):
     def __init__(self):
         super().__init__()
+        self.handled_packet_type = PacketType.CONNECT
 
     @asyncio.coroutine
     def send_request(self, session: Session):
@@ -133,8 +134,6 @@ class ConnectHandler(PacketHandler):
     def _build_packet(self, fixed: MQTTHeader, variable_header, payload):
         if fixed.flags:
             raise MQTTException("[MQTT-2.2.2-1] Header flags reserved for future use")
-        if fixed.packet_type is not PacketType.CONNECT:
-            raise HandlerException("Incompatible packet type '%s'" % fixed.packet_type.value)
         packet = ConnectPacket(variable_header, payload)
         packet.fixed_header.remaining_length = fixed.remaining_length
         return packet

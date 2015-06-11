@@ -8,7 +8,7 @@ import sys
 import logging
 from hbmqtt.messages.packet import MQTTPacket, MQTTHeader, PacketType
 from hbmqtt.handlers.utils import int_to_bytes, bytes_to_int, read_or_raise, bytes_to_hex_str
-from hbmqtt.handlers.errors import CodecException
+from hbmqtt.handlers.errors import CodecException, HandlerException
 from hbmqtt.session import Session
 from hbmqtt.errors import MQTTException
 
@@ -21,6 +21,7 @@ else:
 class PacketHandler(metaclass=abc.ABCMeta):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.handled_packet_type = None
 
     @staticmethod
     @asyncio.coroutine
@@ -30,6 +31,9 @@ class PacketHandler(metaclass=abc.ABCMeta):
 
     @asyncio.coroutine
     def receive_packet(self, fixed: MQTTHeader, session: Session) -> MQTTPacket:
+        if fixed.packet_type is not self.handled_packet_type:
+            raise HandlerException("Incompatible packet type '%s' with this handler" % fixed.packet_type.value)
+
         variable_header = yield from self._decode_variable_header(fixed, session)
         payload = yield from self._decode_payload(fixed, variable_header, session)
         return self._build_packet(fixed, variable_header, payload)
