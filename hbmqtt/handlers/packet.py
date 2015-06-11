@@ -6,16 +6,17 @@ import asyncio
 import abc
 import sys
 import logging
+
 from hbmqtt.messages.packet import MQTTPacket, MQTTHeader, PacketType
-from hbmqtt.handlers.utils import int_to_bytes, bytes_to_int, read_or_raise, bytes_to_hex_str
+from hbmqtt.codecs import int_to_bytes, bytes_to_int, read_or_raise, bytes_to_hex_str
 from hbmqtt.handlers.errors import CodecException, HandlerException
 from hbmqtt.session import Session
 from hbmqtt.errors import MQTTException
 
-if sys.version_info >= (3,4):
-    import asyncio.ensure_future as async
+if sys.version_info >= (3,4,4):
+    from asyncio import ensure_future as async
 else:
-    import asyncio.async as async
+    from asyncio import async
 
 
 class PacketHandler(metaclass=abc.ABCMeta):
@@ -48,9 +49,8 @@ class PacketHandler(metaclass=abc.ABCMeta):
         writer.write(encoded_payload)
         yield from writer.drain()
 
-    @staticmethod
     @asyncio.coroutine
-    def read_packet_header(reader: asyncio.StreamReader) -> MQTTHeader:
+    def read_packet_header(self, reader: asyncio.StreamReader) -> MQTTHeader:
         """
         Read and decode MQTT message fixed header from stream
         :return: FixedHeader instance

@@ -1,20 +1,22 @@
 __author__ = 'nico'
 
-import abc
 import asyncio
+
 from hbmqtt.handlers.packet import RequestPacketHandler
 from hbmqtt.handlers.errors import HandlerException, NoDataException
 from hbmqtt.messages.packet import MQTTHeader, PacketType
 from hbmqtt.messages.connect import ConnectPacket, ConnectVariableHeader, ConnectPayload
 from hbmqtt.errors import MQTTException
 from hbmqtt.session import Session
-from hbmqtt.handlers.utils import (
+from hbmqtt.codecs import (
     read_or_raise,
     bytes_to_int,
     decode_string,
     int_to_bytes,
     encode_string
 )
+
+
 class ConnectHandler(RequestPacketHandler):
     def __init__(self):
         super().__init__()

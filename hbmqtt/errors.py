@@ -10,3 +10,9 @@ class MQTTException(BaseException):
     Base class for all errors refering to MQTT specifications
     """
     pass
+
+class CodecException(HandlerException):
+    """
+    Exceptions thrown by packet encode/decode functions
+    """
+    pass

@@ -5,7 +5,7 @@ import asyncio
 from asyncio import IncompleteReadError
 from math import ceil
 
-from hbmqtt.broker.errors import NoDataException
+from hbmqtt.handlers.errors import NoDataException
 
 
 def bytes_to_hex_str(data):

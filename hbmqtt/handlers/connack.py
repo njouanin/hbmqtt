@@ -4,7 +4,7 @@
 from hbmqtt.handlers.packet import ResponsePacketHandler, MQTTHeader, PacketType
 from hbmqtt.messages.connack import ConnackPacket, ConnackVariableHeader, ReturnCode
 from hbmqtt.session import Session
-from hbmqtt.handlers.utils import *
+from hbmqtt.codecs import *
 from hbmqtt.errors import MQTTException
 
 

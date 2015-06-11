@@ -1,9 +1,12 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from hbmqtt.messages.packet import MQTTPacket, MQTTHeader, PacketType
+import asyncio
+from hbmqtt.messages.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader
+from hbmqtt.codecs import *
+from hbmqtt.errors import MQTTException
 
-class ConnectVariableHeader:
+class ConnectVariableHeader(MQTTVariableHeader):
     USERNAME_FLAG = 0x80
     PASSWORD_FLAG = 0x40
     WILL_RETAIN_FLAG = 0x20
@@ -86,6 +89,44 @@ class ConnectVariableHeader:
         self.flags &= (0x00 << 3)
         self.flags |= (val << 3)
 
+    @classmethod
+    def from_stream(cls, reader: asyncio.StreamReader):
+        #  protocol name
+        protocol_name = yield from decode_string(reader)
+        if protocol_name != "MQTT":
+            raise MQTTException('[MQTT-3.1.2-1] Incorrect protocol name: "%s"' % protocol_name)
+
+        # protocol level (only MQTT 3.1.1 supported)
+        protocol_level_byte = yield from read_or_raise(reader, 1)
+        protocol_level = bytes_to_int(protocol_level_byte)
+
+        # flags
+        flags_byte = yield from read_or_raise(reader, 1)
+        flags = bytes_to_int(flags_byte)
+        if flags & 0x01:
+            raise MQTTException('[MQTT-3.1.2-3] CONNECT reserved flag must be set to 0')
+
+        # keep-alive
+        keep_alive_byte = yield from read_or_raise(reader, 2)
+        keep_alive = bytes_to_int(keep_alive_byte)
+
+        return cls(flags, keep_alive, protocol_name, protocol_level)
+
+    def to_bytes(self):
+        out = b''
+
+        # Protocol name
+        out += encode_string(self.proto_name)
+        # Protocol level
+        out += int_to_bytes(self.proto_level)
+        # flags
+        out += int_to_bytes(self.flags)
+        # keep alive
+        out += int_to_bytes(self.keep_alive, 2)
+
+        return out
+
+
 
 class ConnectPayload:
     def __init__(self, client_id=None, will_topic=None, will_message=None, username=None, password=None):
@@ -98,7 +139,7 @@ class ConnectPayload:
 
 class ConnectPacket(MQTTPacket):
     def __init__(self, vh: ConnectVariableHeader, payload: ConnectPayload):
-        header = MQTTHeader(PacketType.CONNECT, 0x00)
+        header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
         super().__init__(header)
         self.variable_header = vh
         self.payload = payload
