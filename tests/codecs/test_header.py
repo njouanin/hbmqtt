@@ -3,9 +3,9 @@
 # See the file license.txt for copying permission.
 import unittest
 import asyncio
+
 from hbmqtt.codecs.header import MQTTHeaderCodec, MQTTHeaderException
-from hbmqtt.message import MessageType, MQTTHeader
-from hbmqtt.codecs.utils import bytes_to_hex_str
+from hbmqtt.messages.packet import PacketType, MQTTHeader
 
 
 class TestMQTTHeaderCodec(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestMQTTHeaderCodec(unittest.TestCase):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x10\x7f')
         header = self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))
-        self.assertEqual(header.message_type, MessageType.CONNECT)
+        self.assertEqual(header.message_type, PacketType.CONNECT)
         self.assertFalse(header.flags & 0x08)
         self.assertEqual((header.flags & 0x06) >> 1, 0)
         self.assertFalse(header.flags & 0x01)
@@ -26,7 +26,7 @@ class TestMQTTHeaderCodec(unittest.TestCase):
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(b'\x10\xff\xff\xff\x7f')
         header = self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))
-        self.assertEqual(header.message_type, MessageType.CONNECT)
+        self.assertEqual(header.message_type, PacketType.CONNECT)
         self.assertFalse(header.flags & 0x08)
         self.assertEqual((header.flags & 0x06) >> 1, 0)
         self.assertFalse(header.flags & 0x01)
@@ -45,11 +45,11 @@ class TestMQTTHeaderCodec(unittest.TestCase):
             self.loop.run_until_complete(MQTTHeaderCodec.decode(stream))
 
     def test_encode(self):
-        header = MQTTHeader(MessageType.CONNECT, 0x00, 0)
+        header = MQTTHeader(PacketType.CONNECT, 0x00, 0)
         data = MQTTHeaderCodec.encode(header)
         self.assertEqual(data, b'\x10\x00')
 
     def test_encode_2(self):
-        header = MQTTHeader(MessageType.CONNECT, 0x00, 268435455)
+        header = MQTTHeader(PacketType.CONNECT, 0x00, 268435455)
         data = MQTTHeaderCodec.encode(header)
         self.assertEqual(data, b'\x10\xff\xff\xff\x7f')

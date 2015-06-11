@@ -3,8 +3,10 @@
 # See the file license.txt for copying permission.
 import asyncio
 from asyncio import IncompleteReadError
-from hbmqtt.codecs.errors import NoDataException
 from math import ceil
+
+from hbmqtt.broker.errors import NoDataException
+
 
 def bytes_to_hex_str(data):
     """

@@ -4,13 +4,15 @@
 import asyncio
 import threading
 import logging
-from hbmqtt.errors import BrokerException
+
 from transitions import Machine, MachineError
+
+from hbmqtt.errors import BrokerException
 from hbmqtt.codecs.header import MQTTHeaderCodec
 from hbmqtt.codecs.connect import ConnectMessage
-from hbmqtt.message import MessageType, MQTTMessage, MQTTHeader
+from hbmqtt.messages.packet import PacketType, MQTTMessage, MQTTHeader
 from hbmqtt.errors import MQTTException
-from hbmqtt.broker.session import Session
+from hbmqtt.session import Session
 from hbmqtt.broker.handlers import ConnectHandler
 
 
@@ -45,7 +47,7 @@ class Broker:
 
     def _init_handlers(self):
         self._message_handlers = {
-            MessageType.CONNECT, ConnectHandler(self),
+            PacketType.CONNECT, ConnectHandler(self),
         }
 
     def _init_codecs(self):
@@ -54,7 +56,7 @@ class Broker:
         :return:
         """
         self._codecs = {
-            MessageType.CONNECT, ConnectMessage
+            PacketType.CONNECT, ConnectMessage
         }
 
     def start(self):
@@ -128,13 +130,13 @@ class Broker:
         self._sessions[session.client_id] = session
 
     @asyncio.coroutine
-    def _handle_message(self, message: MQTTMessage) -> MQTTMessage:
+    def _handle_message(self, session: Session, message: MQTTMessage) -> MQTTMessage:
         handler = self._message_handlers[message.mqtt_header.message_type]
-        response = yield from handler.handle(message)
+        response = yield from handler.handle(session, message)
         return response
 
     @asyncio.coroutine
-    def _decode_message(self, header: MQTTHeader, reader):
+    def decode_message(self, header: MQTTHeader, reader):
         decoder = self._codecs[header.message_type]
         message = yield from decoder.decode(header, reader)
         return message
@@ -148,19 +150,35 @@ class Broker:
         return encoded
 
     @asyncio.coroutine
+    def run_for_messages(self, session):
+        header = yield from MQTTHeaderCodec.decode(session.reader)
+        handler = self._message_handlers[header.message_type]
+        message = yield from handler.
+
+    @asyncio.coroutine
     def client_connected(self, reader, writer):
+        # Init new session
+        (remote_address, remote_port) = writer.get_extra_info('peername')
+        session = Session(reader, writer, remote_address, remote_port)
+
+        while True:
+            yield from self.run_for_messages(session)
+            except MQTTException:
+                # End connection
+                break
+
+
         # Handle connection
         try:
             header = yield from MQTTHeaderCodec.decode(reader)
-            if header.message_type != MessageType.CONNECT:
+            if header.message_type != PacketType.CONNECT:
                 raise MQTTException("[MQTT-3.1.0-1] First Packet sent from the Client MUST be a CONNECT Packet")
             request = yield from self._decode_message(header.message_type, reader)
 
             (remote_address, remote_port) = writer.get_extra_info('peername')
-            request.remote_address = remote_address
-            request.remote_address = remote_port
+            session = Session(reader, writer, remote_address, remote_port)
 
-            response = self._handle_message(request)
+            response = self._handle_message(session, request)
             encoded_response = yield from self._encode_message(response)
             writer.write(encoded_response)
             yield from writer.drain()

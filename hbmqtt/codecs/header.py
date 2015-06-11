@@ -3,14 +3,14 @@
 # See the file license.txt for copying permission.
 import asyncio
 
-from hbmqtt.codecs.utils import (
+from hbmqtt.handlers.utils import (
     bytes_to_hex_str,
     bytes_to_int,
     int_to_bytes,
     read_or_raise,
 )
-from hbmqtt.message import MQTTHeader, MessageType
-from hbmqtt.codecs.errors import CodecException
+from hbmqtt.messages.packet import MQTTHeader, PacketType
+from hbmqtt.broker.errors import CodecException
 
 
 class MQTTHeaderException(CodecException):
@@ -27,7 +27,7 @@ class MQTTHeaderCodec:
         """
         def decode_message_type(byte):
             byte_type = (bytes_to_int(byte) & 0xf0) >> 4
-            return MessageType(byte_type)
+            return PacketType(byte_type)
 
         def decode_flags(data):
             byte = bytes_to_int(data)
@@ -57,7 +57,7 @@ class MQTTHeaderCodec:
 
         b1 = yield from read_or_raise(reader, 1)
         msg_type = decode_message_type(b1)
-        if msg_type is MessageType.RESERVED_0 or msg_type is MessageType.RESERVED_15:
+        if msg_type is PacketType.RESERVED_0 or msg_type is PacketType.RESERVED_15:
             raise MQTTHeaderException("Usage of control packet type %s is forbidden" % msg_type)
         flags = decode_flags(b1)
 

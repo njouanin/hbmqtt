@@ -3,17 +3,28 @@
 # See the file license.txt for copying permission.
 
 import asyncio
-from hbmqtt.message import MQTTMessage, ConnectMessage, ConnackMessage
-from hbmqtt.broker.session import Session, ClientState
-from hbmqtt.errors import BrokerException
 
-class ConnectHandler:
+from hbmqtt.messages.packet import MQTTMessage, ConnectMessage, ConnackMessage
+from hbmqtt.session import Session, ClientState
+from hbmqtt.errors import BrokerException,MQTTException
+from hbmqtt.broker.handlers.abstract import AbstractHandler
+
+
+class ConnectException(CodecException):
+    pass
+
+class ConnectHandler(AbstractHandler):
     def __init__(self, broker):
-        self.broker = broker
+        super().__init__(broker)
+
+    def _check_header(self, header):
+        if header.flags:
+            raise MQTTException("[MQTT-2.2.2-1] Header flags reserved for future use")
+
+    def _decode_payload(self, session: Session, header: MQTTHeader):
 
     @asyncio.coroutine
-    def handle(self, message: ConnectMessage) -> MQTTMessage:
-        session = None
+    def handle(self, session: Session, message: ConnectMessage) -> MQTTMessage:
         response = None
 
         # Check Protocol

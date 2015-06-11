@@ -3,8 +3,10 @@
 # See the file license.txt for copying permission.
 import unittest
 import asyncio
+
 from hbmqtt.codecs.connect import ConnectCodec, ConnectException
-from hbmqtt.message import MessageType, MQTTHeader, ConnectMessage
+from hbmqtt.messages.packet import PacketType, MQTTHeader, ConnectMessage
+
 
 class TestConnectCodec(unittest.TestCase):
     def setUp(self):
@@ -12,7 +14,7 @@ class TestConnectCodec(unittest.TestCase):
 
     def test_decode_ok(self):
         data = b'\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
+        header = MQTTHeader(PacketType.CONNECT, 0x00, len(data))
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         message = self.loop.run_until_complete(ConnectCodec.decode(header, stream))
@@ -28,7 +30,7 @@ class TestConnectCodec(unittest.TestCase):
 
     def test_decode_fail_protocol_name(self):
         data = b'\x00\x04TTQM\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
+        header = MQTTHeader(PacketType.CONNECT, 0x00, len(data))
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         with self.assertRaises(ConnectException):
@@ -36,7 +38,7 @@ class TestConnectCodec(unittest.TestCase):
 
     def test_decode_fail_reserved_flag(self):
         data = b'\x00\x04MQTT\x04\xcf\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
+        header = MQTTHeader(PacketType.CONNECT, 0x00, len(data))
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         with self.assertRaises(ConnectException):
@@ -44,7 +46,7 @@ class TestConnectCodec(unittest.TestCase):
 
     def test_decode_fail_miss_clientId(self):
         data = b'\x00\x04MQTT\x04\xce\x00\x00'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
+        header = MQTTHeader(PacketType.CONNECT, 0x00, len(data))
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
@@ -53,7 +55,7 @@ class TestConnectCodec(unittest.TestCase):
 
     def test_decode_fail_miss_willtopic(self):
         data = b'\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
+        header = MQTTHeader(PacketType.CONNECT, 0x00, len(data))
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
@@ -62,7 +64,7 @@ class TestConnectCodec(unittest.TestCase):
 
     def test_decode_fail_miss_username(self):
         data = b'\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
+        header = MQTTHeader(PacketType.CONNECT, 0x00, len(data))
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
@@ -71,7 +73,7 @@ class TestConnectCodec(unittest.TestCase):
 
     def test_decode_fail_miss_password(self):
         data = b'\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user'
-        header = MQTTHeader(MessageType.CONNECT, 0x00, len(data))
+        header = MQTTHeader(PacketType.CONNECT, 0x00, len(data))
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
@@ -79,7 +81,7 @@ class TestConnectCodec(unittest.TestCase):
             self.loop.run_until_complete(ConnectCodec.decode(header, stream))
 
     def test_encode(self):
-        header = MQTTHeader(MessageType.CONNECT, 0x00, 0)
+        header = MQTTHeader(PacketType.CONNECT, 0x00, 0)
         message = ConnectMessage(header, 0xce, 0, 'MQTT', 4)
         message.client_id = '0123456789'
         message.will_topic = 'WillTopic'

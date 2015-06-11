@@ -3,17 +3,15 @@
 # See the file license.txt for copying permission.
 import asyncio
 
-from hbmqtt.codecs.utils import (
-    bytes_to_hex_str,
+from hbmqtt.handlers.utils import (
     bytes_to_int,
     decode_string,
     read_or_raise,
     encode_string,
     int_to_bytes,
 )
-from hbmqtt.message import MQTTHeader, ConnectMessage
-from hbmqtt.codecs.errors import CodecException, NoDataException
-from hbmqtt.codecs.header import MQTTHeaderCodec
+from hbmqtt.messages.packet import MQTTHeader, ConnectMessage
+from hbmqtt.broker.errors import CodecException, NoDataException
 
 
 class ConnectException(CodecException):
