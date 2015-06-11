@@ -23,23 +23,17 @@ class PacketHandler(metaclass=abc.ABCMeta):
         self.logger = logging.getLogger(__name__)
         self.handled_packet_type = None
 
-    @staticmethod
     @asyncio.coroutine
-    def receive_next_packet_header(session: Session) -> MQTTHeader:
-        next_packet_header = yield from PacketHandler._read_packet_header(session)
-        return next_packet_header
-
-    @asyncio.coroutine
-    def receive_packet(self, fixed: MQTTHeader, session: Session) -> MQTTPacket:
+    def _read_packet(self, fixed: MQTTHeader, reader: asyncio.StreamReader) -> MQTTPacket:
         if fixed.packet_type is not self.handled_packet_type:
             raise HandlerException("Incompatible packet type '%s' with this handler" % fixed.packet_type.value)
 
-        variable_header = yield from self._decode_variable_header(fixed, session)
-        payload = yield from self._decode_payload(fixed, variable_header, session)
+        variable_header = yield from self._decode_variable_header(fixed, reader)
+        payload = yield from self._decode_payload(fixed, variable_header, reader)
         return self._build_packet(fixed, variable_header, payload)
 
     @asyncio.coroutine
-    def send_packet(self, packet: MQTTPacket, session: Session):
+    def _write_packet(self, packet: MQTTPacket, writer: asyncio.StreamWriter) -> MQTTPacket:
         encoders = [
             async(self._encode_variable_header(packet.variable_header)),
             async(self._encode_payload(packet.payload)),
@@ -49,14 +43,14 @@ class PacketHandler(metaclass=abc.ABCMeta):
         packet.fixed_header.remaining_length = len(encoded_variable_header) + len(encoded_payload)
         encoded_fixed_header = yield from self._encode_fixed_header(packet.fixed_header)
 
-        session.writer.write(encoded_fixed_header)
-        session.writer.write(encoded_variable_header)
-        session.writer.write(encoded_payload)
-        yield from session.writer.drain()
+        writer.write(encoded_fixed_header)
+        writer.write(encoded_variable_header)
+        writer.write(encoded_payload)
+        yield from writer.drain()
 
     @staticmethod
     @asyncio.coroutine
-    def _read_packet_header(session: Session) -> MQTTHeader:
+    def read_packet_header(reader: asyncio.StreamReader) -> MQTTHeader:
         """
         Read and decode MQTT message fixed header from stream
         :return: FixedHeader instance
@@ -79,7 +73,7 @@ class PacketHandler(metaclass=abc.ABCMeta):
             value = 0
             length_bytes = b''
             while True:
-                encoded_byte = yield from read_or_raise(session.reader, 1)
+                encoded_byte = yield from read_or_raise(reader, 1)
                 length_bytes += encoded_byte
                 int_byte = bytes_to_int(encoded_byte)
                 value += (int_byte & 0x7f) * multiplier
@@ -91,7 +85,7 @@ class PacketHandler(metaclass=abc.ABCMeta):
                         raise MQTTException("Invalid remaining length bytes:%s" % bytes_to_hex_str(length_bytes))
             return value
 
-        b1 = yield from read_or_raise(session.reader, 1)
+        b1 = yield from read_or_raise(reader, 1)
         msg_type = decode_message_type(b1)
         if msg_type is PacketType.RESERVED_0 or msg_type is PacketType.RESERVED_15:
             raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
@@ -142,12 +136,94 @@ class PacketHandler(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     @asyncio.coroutine
-    def _decode_variable_header(self, fixed: MQTTHeader, session: Session):
+    def _decode_variable_header(self, fixed: MQTTHeader, reader: asyncio.StreamReader):
         pass
 
     @abc.abstractmethod
     @asyncio.coroutine
-    def _decode_payload(self, fixed: MQTTHeader, variable_header, session: Session):
+    def _decode_payload(self, fixed: MQTTHeader, variable_header, reader: asyncio.StreamReader):
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _build_packet(self, fixed: MQTTHeader, variable_header, payload):
+        pass
+
+
+class RequestPacketHandler(PacketHandler, metaclass=abc.ABCMeta):
+    def __init__(self):
+        super().__init__()
+        self.handled_packet_type = PacketType.CONNECT
+
+    @asyncio.coroutine
+    def send_request(self, request: MQTTPacket, session: Session):
+        sent = yield from self._write_packet(request, session.writer)
+        return sent
+
+    @asyncio.coroutine
+    def receive_request(self, fixed: MQTTHeader, session: Session) -> MQTTPacket:
+        received = yield from self._read_packet(fixed, session.reader)
+        return received
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _encode_variable_header(self, variable) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _encode_payload(self, payload) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _decode_variable_header(self, fixed: MQTTHeader, reader: asyncio.StreamReader):
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _decode_payload(self, fixed: MQTTHeader, variable_header, reader: asyncio.StreamReader):
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _build_packet(self, fixed: MQTTHeader, variable_header, payload):
+        pass
+
+
+class ResponsePacketHandler(PacketHandler, metaclass=abc.ABCMeta):
+    def __init__(self):
+        super().__init__()
+        self.handled_packet_type = PacketType.CONNECT
+
+    @asyncio.coroutine
+    def send_response(self, request: MQTTPacket, session: Session):
+        sent = yield from self._write_packet(request, session.writer)
+        return sent
+
+    @asyncio.coroutine
+    def receive_response(self, fixed: MQTTHeader, session: Session) -> MQTTPacket:
+        received = yield from self._read_packet(fixed, session.reader)
+        return received
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _encode_variable_header(self, variable) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _encode_payload(self, payload) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _decode_variable_header(self, fixed: MQTTHeader, reader: asyncio.StreamReader):
+        pass
+
+    @abc.abstractmethod
+    @asyncio.coroutine
+    def _decode_payload(self, fixed: MQTTHeader, variable_header, reader: asyncio.StreamReader):
         pass
 
     @abc.abstractmethod

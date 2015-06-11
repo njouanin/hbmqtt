@@ -1,14 +1,14 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from hbmqtt.handlers.packet import PacketHandler, MQTTHeader, PacketType
+from hbmqtt.handlers.packet import ResponsePacketHandler, MQTTHeader, PacketType
 from hbmqtt.messages.connack import ConnackPacket, ConnackVariableHeader, ReturnCode
 from hbmqtt.session import Session
 from hbmqtt.handlers.utils import *
 from hbmqtt.errors import MQTTException
 
 
-class ConnackHandler(PacketHandler):
+class ConnackHandler(ResponsePacketHandler):
     def __init__(self):
         super().__init__()
         self.handled_packet_type = PacketType.CONNACK
