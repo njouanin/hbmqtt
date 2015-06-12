@@ -22,7 +22,10 @@ def bytes_to_int(data):
     :param data: byte sequence
     :return: integer value
     """
-    return int.from_bytes(data, byteorder='big')
+    if isinstance(data, int):
+        return data
+    else:
+        return int.from_bytes(data, byteorder='big')
 
 def int_to_bytes(int_value: int, length=-1) -> bytes:
     """
