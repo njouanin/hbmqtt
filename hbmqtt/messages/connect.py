@@ -2,9 +2,11 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from hbmqtt.messages.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader
+from hbmqtt.messages.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
-from hbmqtt.errors import MQTTException
+from hbmqtt.errors import MQTTException, CodecException
+from hbmqtt.session import Session
+
 
 class ConnectVariableHeader(MQTTVariableHeader):
     USERNAME_FLAG = 0x80
@@ -16,6 +18,7 @@ class ConnectVariableHeader(MQTTVariableHeader):
     RESERVED_FLAG = 0x01
 
     def __init__(self, connect_flags=0x00, keep_alive=0, proto_name='MQTT', proto_level=0x04):
+        super().__init__()
         self.proto_name = proto_name
         self.proto_level = proto_level
         self.flags = connect_flags
@@ -90,7 +93,8 @@ class ConnectVariableHeader(MQTTVariableHeader):
         self.flags |= (val << 3)
 
     @classmethod
-    def from_stream(cls, reader: asyncio.StreamReader):
+    @asyncio.coroutine
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         #  protocol name
         protocol_name = yield from decode_string(reader)
         if protocol_name != "MQTT":
@@ -127,14 +131,63 @@ class ConnectVariableHeader(MQTTVariableHeader):
         return out
 
 
-
-class ConnectPayload:
+class ConnectPayload(MQTTPayload):
     def __init__(self, client_id=None, will_topic=None, will_message=None, username=None, password=None):
+        super().__init__()
         self.client_id = client_id
         self.will_topic = will_topic
         self.will_message = will_message
         self.username = username
         self.password = password
+
+    @classmethod
+    @asyncio.coroutine
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header : MQTTFixedHeader, variable_header: ConnectVariableHeader):
+        payload = cls()
+        #  Client identifier
+        try:
+            payload.client_id = yield from decode_string(reader)
+        except NoDataException:
+            raise MQTTException('[[MQTT-3.1.3-3]] Client identifier must be present')
+
+        # Read will topic, username and password
+        if variable_header.will_flag:
+            try:
+                payload.will_topic = yield from decode_string(reader)
+                payload.will_message = yield from decode_string(reader)
+            except NoDataException:
+                raise MQTTException('will flag set, but will topic/message not present in payload')
+
+        if variable_header.username_flag:
+            try:
+                payload.username = yield from decode_string(reader)
+            except NoDataException:
+                raise CodecException('username flag set, but username not present in payload')
+
+        if variable_header.password_flag:
+            try:
+                payload.password = yield from decode_string(reader)
+            except NoDataException:
+                raise CodecException('password flag set, but password not present in payload')
+
+        return payload
+
+    def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: ConnectVariableHeader):
+        out = b''
+        # Client identifier
+        out += encode_string(self.client_id)
+        # Will topic / message
+        if variable_header.will_flag:
+            out += encode_string(self.will_topic)
+            out += encode_string(self.will_message)
+        # username
+        if variable_header.username_flag:
+            out += encode_string(self.username)
+        # password
+        if variable_header.password_flag:
+            out += encode_string(self.password)
+
+        return out
 
 
 class ConnectPacket(MQTTPacket):
@@ -143,3 +196,35 @@ class ConnectPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = vh
         self.payload = payload
+
+    @classmethod
+    def build_request_from_session(cls, session: Session):
+        vh = ConnectVariableHeader()
+        payload = ConnectPayload()
+
+        vh.keep_alive = session.keep_alive
+        vh.clean_session_flag = session.clean_session
+        vh.will_retain_flag = session.will_retain
+        payload.client_id = session.client_id
+
+        if session.username:
+            vh.username_flag = True
+            payload.username = session.username
+        else:
+            vh.username_flag = False
+
+        if session.password:
+            vh.password_flag = True
+            payload.password = session.password
+        else:
+            vh.password_flag = False
+        if session.will_flag:
+            vh.will_flag = True
+            vh.will_qos = session.will_qos
+            payload.will_message = session.will_message
+            payload.will_topic = session.will_topic
+        else:
+            vh.will_flag = False
+
+        packet = cls(vh, payload)
+        return packet
