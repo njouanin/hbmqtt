@@ -4,7 +4,7 @@
 import asyncio
 from hbmqtt.messages.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
-from hbmqtt.errors import MQTTException, CodecException
+from hbmqtt.errors import MQTTException, CodecException, HBMQTTException
 from hbmqtt.session import Session
 
 
@@ -191,8 +191,16 @@ class ConnectPayload(MQTTPayload):
 
 
 class ConnectPacket(MQTTPacket):
-    def __init__(self, vh: ConnectVariableHeader, payload: ConnectPayload):
-        header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
+    VARIABLE_HEADER = ConnectVariableHeader
+    PAYLOAD = ConnectPayload
+
+    def __init__(self, fixed: MQTTFixedHeader, vh: ConnectVariableHeader, payload: ConnectPayload):
+        if fixed is None:
+            header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
+        else:
+            if fixed.packet_type is not PacketType.CONNECT:
+                raise HBMQTTException("Invalid fixed packet type %s for ConnectPacket init" % fixed.packet_type)
+            header = fixed
         super().__init__(header)
         self.variable_header = vh
         self.payload = payload
@@ -226,5 +234,6 @@ class ConnectPacket(MQTTPacket):
         else:
             vh.will_flag = False
 
-        packet = cls(vh, payload)
+        header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
+        packet = cls(header, vh, payload)
         return packet

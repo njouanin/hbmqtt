@@ -2,8 +2,9 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from hbmqtt.messages.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader
+from hbmqtt.messages.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import int_to_bytes, read_or_raise
+from hbmqtt.errors import HBMQTTException
 from enum import Enum
 
 
@@ -41,10 +42,21 @@ class ConnackVariableHeader(MQTTVariableHeader):
 
         return out
 
+    def __repr__(self):
+        return 'ConnackVariableHeader(session_parent={0}, return_code={1})'.format(hex(self.session_parent), hex(self.return_code))
+
 
 class ConnackPacket(MQTTPacket):
-    def __init__(self, vh: ConnackVariableHeader):
-        header = MQTTFixedHeader(PacketType.CONNACK, 0x00)
+    VARIABLE_HEADER = ConnackVariableHeader
+    PAYLOAD = None
+
+    def __init__(self, fixed: MQTTFixedHeader, variable_header: ConnackVariableHeader=None, payload: MQTTPayload=None):
+        if fixed is None:
+            header = MQTTFixedHeader(PacketType.CONNACK, 0x00)
+        else:
+            if fixed.packet_type is not PacketType.CONNACK:
+                raise HBMQTTException("Invalid fixed packet type %s for ConnackPacket init" % fixed.packet_type)
+            header = fixed
         super().__init__(header)
-        self.variable_header = vh
+        self.variable_header = variable_header
         self.payload = None
