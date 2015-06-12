@@ -11,7 +11,7 @@ class MQTTException(BaseException):
     """
     pass
 
-class CodecException(HandlerException):
+class CodecException(BaseException):
     """
     Exceptions thrown by packet encode/decode functions
     """
