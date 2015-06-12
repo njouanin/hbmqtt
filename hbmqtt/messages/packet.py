@@ -7,6 +7,7 @@ from hbmqtt.errors import CodecException, MQTTException
 from hbmqtt.codecs import *
 import abc
 
+
 class PacketType(Enum):
     RESERVED_0 = 0
     CONNECT = 1
@@ -28,6 +29,7 @@ class PacketType(Enum):
 
 def get_packet_type(byte):
     return PacketType(byte)
+
 
 class MQTTFixedHeader:
     def __init__(self, packet_type, flags=0, length=0):
@@ -77,6 +79,7 @@ class MQTTFixedHeader:
         Read and decode MQTT message fixed header from stream
         :return: FixedHeader instance
         """
+
         def decode_message_type(byte):
             byte_type = (bytes_to_int(byte) & 0xf0) >> 4
             return PacketType(byte_type)
@@ -103,7 +106,7 @@ class MQTTFixedHeader:
                     break
                 else:
                     multiplier *= 128
-                    if multiplier > 128*128*128:
+                    if multiplier > 128 * 128 * 128:
                         raise MQTTException("Invalid remaining length bytes:%s" % bytes_to_hex_str(length_bytes))
             return value
 
@@ -153,7 +156,8 @@ class MQTTPayload:
     @classmethod
     @asyncio.coroutine
     @abc.abstractclassmethod
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
+                    variable_header: MQTTVariableHeader):
         return
 
 
