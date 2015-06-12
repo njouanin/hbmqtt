@@ -193,5 +193,8 @@ class MQTTClient:
             s.will_message = self.config['will']['message']
         else:
             s.will_flag = False
+            s.will_retain = False
+            s.will_topic = None
+            s.will_message = None
         return s
 
