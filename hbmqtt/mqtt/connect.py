@@ -2,7 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from hbmqtt.messages.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
+from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
 from hbmqtt.errors import MQTTException, CodecException, HBMQTTException
 from hbmqtt.session import Session

@@ -4,7 +4,7 @@
 import unittest
 import asyncio
 
-from hbmqtt.messages.packet import PacketType, MQTTPacket, MQTTFixedHeader
+from hbmqtt.mqtt.packet import PacketType, MQTTPacket, MQTTFixedHeader
 from hbmqtt.errors import MQTTException
 
 
