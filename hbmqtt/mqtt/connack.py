@@ -3,7 +3,7 @@
 # See the file license.txt for copying permission.
 import asyncio
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
-from hbmqtt.codecs import int_to_bytes, read_or_raise
+from hbmqtt.codecs import int_to_bytes, read_or_raise, bytes_to_int
 from hbmqtt.errors import HBMQTTException
 from enum import Enum
 
@@ -27,7 +27,7 @@ class ConnackVariableHeader(MQTTVariableHeader):
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         data = yield from read_or_raise(reader, 2)
         session_parent = data[0] & 0x01
-        return_code = data[1]
+        return_code = ReturnCode(bytes_to_int(data[1]))
         return cls(session_parent, return_code)
 
     def to_bytes(self):
@@ -43,7 +43,7 @@ class ConnackVariableHeader(MQTTVariableHeader):
         return out
 
     def __repr__(self):
-        return 'ConnackVariableHeader(session_parent={0}, return_code={1})'.format(hex(self.session_parent), hex(self.return_code))
+        return 'ConnackVariableHeader(session_parent={0}, return_code={1})'.format(hex(self.session_parent), hex(self.return_code.value))
 
 
 class ConnackPacket(MQTTPacket):
