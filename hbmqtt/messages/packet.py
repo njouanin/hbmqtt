@@ -52,7 +52,7 @@ class MQTTFixedHeader:
                     break
             return encoded
 
-        out = bytes(3)  # MQTTHeader are at least 3 bytes long
+        out = b''
         packet_type = 0
         try:
             packet_type = (self.packet_type.value << 4) | self.flags
@@ -133,7 +133,7 @@ class MQTTVariableHeader:
     @classmethod
     @asyncio.coroutine
     @abc.abstractclassmethod
-    def from_stream(cls, reader: asyncio.StreamReader):
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         return
 
 
@@ -147,13 +147,13 @@ class MQTTPayload:
         yield from writer.drain()
 
     @abc.abstractmethod
-    def to_bytes(self):
+    def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
         return
 
     @classmethod
     @asyncio.coroutine
     @abc.abstractclassmethod
-    def from_stream(cls, reader: asyncio.StreamReader):
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
         return
 
 
@@ -187,7 +187,7 @@ class MQTTPacket:
     @asyncio.coroutine
     def from_stream(cls, reader: asyncio.StreamReader):
         fixed_header = yield from MQTTFixedHeader.from_stream(reader)
-        variable_header = yield from MQTTVariableHeader.from_stream(reader)
-        payload = yield from MQTTPayload.from_stream(reader)
+        variable_header = yield from MQTTVariableHeader.from_stream(reader, fixed_header)
+        payload = yield from MQTTPayload.from_stream(reader, fixed_header, variable_header)
 
         return cls(fixed_header, variable_header, payload)
