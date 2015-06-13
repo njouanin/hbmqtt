@@ -12,7 +12,7 @@ from hbmqtt.codecs import (
 )
 
 
-class TestUtils(unittest.TestCase):
+class TestCodecs(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
 
