@@ -2,4 +2,4 @@
 #
 # See the file license.txt for copying permission.
 
-from .connect import ConnectHandler
+#from .connect import ConnectHandler
