@@ -9,10 +9,12 @@ from transitions import Machine, MachineError
 
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session, SessionState
-from hbmqtt.messages.packet import ConnectMessage
+from hbmqtt.mqtt.connect import ConnectPacket
+from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
+from hbmqtt.mqtt.packet import MQTTFixedHeader
 
 _defaults = {
-    'keep_alive': 60,
+    'keep_alive': 5,
 }
 
 
@@ -21,7 +23,7 @@ class ClientException(BaseException):
 
 def gen_client_id():
     import uuid
-    return uuid.uuid4()
+    return str(uuid.uuid4())
 
 class MQTTClient:
     states = ['new', 'connecting', 'connected', 'idle', 'disconnected']
@@ -113,13 +115,20 @@ class MQTTClient:
         self.machine.stopping_success()
 
     @asyncio.coroutine
-    def _client_coro(self):
+    def _connect_coro(self):
         try:
             self._session.reader, self._session.writer = \
                 yield from asyncio.open_connection(self._session.remote_address, self._session.remote_port)
             self._session.local_address, self._session.local_port = self._session.writer.get_extra_info('sockname')
 
-            message = ConnectMessage()
+            # Send CONNECT packet and wait for CONNACK
+            packet = ConnectPacket.build_request_from_session(self._session)
+            yield from packet.to_stream(self._session.writer)
+            print(packet)
+            connack = yield from ConnackPacket.from_stream(self._session.reader)
+            if connack.variable_header.return_code is not ReturnCode.CONNECTION_ACCEPTED:
+                raise ClientException("Connection rejected with code '%s'" % hex(connack.variable_header.return_code))
+            print(connack)
             self._session.state = SessionState.CONNECTED
             self.logger.debug("connected to %s:%s" % (self._session.remote_address, self._session.remote_port))
         except Exception as e:
@@ -127,14 +136,21 @@ class MQTTClient:
             self._session.state = SessionState.DISCONNECTED
             raise ClientException("Connection failed: %s" % e)
 
-    def _start_client_loop(self, connect_event:threading.Event, loop):
+    @asyncio.coroutine
+    def _message_loop(self):
+        while True:
+            header = yield from MQTTFixedHeader.from_stream(self._session.reader)
+            print(header)
+
+    def _start_client_loop(self, connect_event:threading.Event, loop: asyncio.BaseEventLoop):
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(self._client_coro())
+            loop.run_until_complete(self._connect_coro())
+            connect_event.set()
+            loop.run_until_complete(self._message_loop)
         except Exception as e:
             # absorb exception
             self._session._last_exception = e
-        finally:
             connect_event.set()
 
     def init_session(self, host=None, port=None, username=None, password=None, uri=None, clean_session=None) -> dict:
