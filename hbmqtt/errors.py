@@ -19,3 +19,9 @@ class CodecException(HBMQTTException):
     Exceptions thrown by packet encode/decode functions
     """
     pass
+
+class NoDataException(HBMQTTException):
+    """
+    Exceptions thrown by packet encode/decode functions
+    """
+    pass

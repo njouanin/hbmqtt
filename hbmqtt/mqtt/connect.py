@@ -4,7 +4,7 @@
 import asyncio
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
-from hbmqtt.errors import MQTTException, CodecException, HBMQTTException
+from hbmqtt.errors import MQTTException, CodecException, HBMQTTException, NoDataException
 from hbmqtt.session import Session
 
 
