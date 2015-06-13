@@ -122,7 +122,7 @@ class MQTTFixedHeader:
     def __repr__(self):
         return 'MQTTFixedHeader(type={0}, length={1}, flags={2})'.format(self.packet_type, self.remaining_length, hex(self.flags))
 
-class MQTTVariableHeader:
+class MQTTVariableHeader(metaclass=abc.ABCMeta):
     def __init__(self):
         pass
 
@@ -142,7 +142,7 @@ class MQTTVariableHeader:
         return
 
 
-class MQTTPayload:
+class MQTTPayload(metaclass=abc.ABCMeta):
     def __init__(self):
         pass
 
