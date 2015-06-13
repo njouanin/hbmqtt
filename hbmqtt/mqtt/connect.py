@@ -162,13 +162,13 @@ class ConnectPayload(MQTTPayload):
             try:
                 payload.username = yield from decode_string(reader)
             except NoDataException:
-                raise CodecException('username flag set, but username not present in payload')
+                raise MQTTException('username flag set, but username not present in payload')
 
         if variable_header.password_flag:
             try:
                 payload.password = yield from decode_string(reader)
             except NoDataException:
-                raise CodecException('password flag set, but password not present in payload')
+                raise MQTTException('password flag set, but password not present in payload')
 
         return payload
 
