@@ -12,9 +12,11 @@ from hbmqtt.session import Session, SessionState
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.mqtt.packet import MQTTFixedHeader
+from hbmqtt.mqtt.disconnect import DisconnectPacket
+from hbmqtt.errors import NoDataException, HBMQTTException
 
 _defaults = {
-    'keep_alive': 5,
+    'keep_alive': 60,
 }
 
 
@@ -78,6 +80,7 @@ class MQTTClient:
         self.machine.add_transition(trigger='connect_success', source='connecting', dest='connected')
         self.machine.add_transition(trigger='idle', source='connected', dest='idle')
         self.machine.add_transition(trigger='disconnect', source='idle', dest='disconnected')
+        self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
 
 
     def connect(self, host=None, port=None, username=None, password=None, uri=None, clean_session=None):
@@ -106,13 +109,23 @@ class MQTTClient:
     def disconnect(self):
         try:
             self.machine.disconnect()
+            if self._loop.is_running():
+                self._loop.call_soon_threadsafe(asyncio.async, self._disconnect_coro())
+            else:
+                self._loop.run_until_complete(self._disconnect_coro())
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise ClientException("Client instance can't be disconnected: %s" % me)
-        self._loop.call_soon_threadsafe(self._loop.stop)
         self._loop_thread.join()
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self.logger.warn(self._session._last_exception)
         self._session = None
-        self.machine.stopping_success()
+
+    @asyncio.coroutine
+    def _disconnect_coro(self):
+        disconnect_packet = DisconnectPacket()
+        yield from disconnect_packet.to_stream(self._session.writer)
+        self._session.writer.close()
 
     @asyncio.coroutine
     def _connect_coro(self):
@@ -139,16 +152,28 @@ class MQTTClient:
     @asyncio.coroutine
     def _message_loop(self):
         while True:
-            header = yield from MQTTFixedHeader.from_stream(self._session.reader)
-            print(header)
+            try:
+                header = yield from MQTTFixedHeader.from_stream(self._session.reader)
+                print(header)
+            except NoDataException as e:
+                self.logger.info("Message loop ending")
+                # absorb exception
+                self._session._last_exception = HBMQTTException("Message loop ending due to disconnection")
+                break
+            except BaseException as e:
+                # absorb exception
+                self._session._last_exception = e
+                break
 
     def _start_client_loop(self, connect_event:threading.Event, loop: asyncio.BaseEventLoop):
         asyncio.set_event_loop(loop)
         try:
+            self.logger.debug("Connecting to broker")
             loop.run_until_complete(self._connect_coro())
             connect_event.set()
-            loop.run_until_complete(self._message_loop)
-        except Exception as e:
+            self.logger.debug("Starting message loop")
+            loop.run_until_complete(self._message_loop())
+        except BaseException as e:
             # absorb exception
             self._session._last_exception = e
             connect_event.set()
