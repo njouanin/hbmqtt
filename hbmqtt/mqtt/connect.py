@@ -25,7 +25,8 @@ class ConnectVariableHeader(MQTTVariableHeader):
         self.keep_alive = keep_alive
 
     def __repr__(self):
-        return "ConnectVariableHeader(proto_name={0}, proto_level={1}, flags={2}, keepalive={3})".format(self.proto_name, self.proto_level, hex(self.flags), self.keep_alive)
+        return "ConnectVariableHeader(proto_name={0}, proto_level={1}, flags={2}, keepalive={3})".format(
+            self.proto_name, self.proto_level, hex(self.flags), self.keep_alive)
 
     def _set_flag(self, val, mask):
         if val:
@@ -143,9 +144,14 @@ class ConnectPayload(MQTTPayload):
         self.username = username
         self.password = password
 
+    def __repr__(self):
+        return "ConnectVariableHeader(client_id={0}, will_topic={1}, will_message={2}, username={3}, password={4})".format(
+            self.client_id, self.will_topic, self.will_message, self.username, self.password)
+
     @classmethod
     @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header : MQTTFixedHeader, variable_header: ConnectVariableHeader):
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
+                    variable_header: ConnectVariableHeader):
         payload = cls()
         #  Client identifier
         try:
