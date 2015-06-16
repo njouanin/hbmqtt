@@ -24,7 +24,10 @@ class ConnectVariableHeader(MQTTVariableHeader):
         self.flags = connect_flags
         self.keep_alive = keep_alive
 
-    def _set_flag(self, mask, val):
+    def __repr__(self):
+        return "ConnectVariableHeader(proto_name={0}, proto_level={1}, flags={2}, keepalive={3})".format(self.proto_name, self.proto_level, hex(self.flags), self.keep_alive)
+
+    def _set_flag(self, val, mask):
         if val:
             self.flags |= mask
         else:
