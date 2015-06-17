@@ -85,10 +85,7 @@ class ConnectVariableHeader(MQTTVariableHeader):
 
     @property
     def will_qos(self):
-        if (self.flags & 0x18) >> 3:
-            return True
-        else:
-            return False
+        return (self.flags & 0x18) >> 3
 
     @will_qos.setter
     def will_qos(self, val: int):
