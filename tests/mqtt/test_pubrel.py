@@ -3,7 +3,7 @@
 # See the file license.txt for copying permission.
 import unittest
 
-from hbmqtt.mqtt.pubrel import PubrelPacket, PubrelVariableHeader
+from hbmqtt.mqtt.pubrel import PubrelPacket, PacketIdVariableHeader
 from hbmqtt.codecs import *
 
 class PubrelPacketTest(unittest.TestCase):
@@ -18,7 +18,7 @@ class PubrelPacketTest(unittest.TestCase):
         self.assertEqual(message.variable_header.packet_id, 10)
 
     def test_to_bytes(self):
-        variable_header = PubrelVariableHeader(10)
+        variable_header = PacketIdVariableHeader(10)
         publish = PubrelPacket(variable_header=variable_header)
         out = publish.to_bytes()
         self.assertEqual(out, b'\x60\x02\x00\x0a')

@@ -3,7 +3,7 @@
 # See the file license.txt for copying permission.
 import unittest
 
-from hbmqtt.mqtt.puback import PubackPacket, PubackVariableHeader
+from hbmqtt.mqtt.puback import PubackPacket, PacketIdVariableHeader
 from hbmqtt.codecs import *
 
 class PubackPacketTest(unittest.TestCase):
@@ -18,7 +18,7 @@ class PubackPacketTest(unittest.TestCase):
         self.assertEqual(message.variable_header.packet_id, 10)
 
     def test_to_bytes(self):
-        variable_header = PubackVariableHeader(10)
+        variable_header = PacketIdVariableHeader(10)
         publish = PubackPacket(variable_header=variable_header)
         out = publish.to_bytes()
         self.assertEqual(out, b'\x40\x02\x00\x0a')

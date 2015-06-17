@@ -210,3 +210,19 @@ class MQTTPacket:
 
     def __repr__(self):
         return 'MQPacket(fixed={0!r}, variable={1!r}, payload={2!r})'.format(self.fixed_header, self.variable_header, self.payload)
+
+
+class PacketIdVariableHeader(MQTTVariableHeader):
+    def __init__(self, packet_id):
+        super().__init__()
+        self.packet_id = packet_id
+
+    def to_bytes(self):
+        out = b''
+        out += int_to_bytes(self.packet_id, 2)
+        return out
+
+    @classmethod
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
+        packet_id = yield from decode_packet_id(reader)
+        return cls(packet_id)
