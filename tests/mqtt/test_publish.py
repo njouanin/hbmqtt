@@ -13,7 +13,7 @@ class PublishPacketTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
 
-    def test_decode_ok(self):
+    def test_from_stream(self):
         data = b'\x3f\x09\x00\x05topic\x00\x0a'
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
@@ -23,3 +23,9 @@ class PublishPacketTest(unittest.TestCase):
         self.assertEqual(message.fixed_header.qos, 0x03)
         self.assertTrue(message.fixed_header.dup_flag)
         self.assertTrue(message.fixed_header.retain_flag)
+
+    def test_to_stream(self):
+        variable_header = PublishVariableHeader('topic', 10)
+        publish = PublishPacket(variable_header=variable_header)
+        out = publish.to_bytes()
+        self.assertEqual(out, b'\x30\x09\x00\x05topic\x00\x0a')
