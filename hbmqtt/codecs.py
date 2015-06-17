@@ -73,3 +73,13 @@ def encode_string(string: str) -> bytes:
     data = string.encode(encoding='utf-8')
     data_length = len(data)
     return int_to_bytes(data_length, 2) + data
+
+@asyncio.coroutine
+def decode_packet_id(reader) -> int:
+    """
+    Read a packet ID as 2-bytes int from stream according to MQTT specification (2.3.1)
+    :param reader: Stream reader
+    :return: Packet ID
+    """
+    packet_id_bytes = yield from read_or_raise(stream, 2)
+    return bytes_to_int(packet_id_bytes)
