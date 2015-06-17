@@ -29,7 +29,6 @@ class SubscribePayload(MQTTPayload):
                 qos_byte = yield from read_or_raise(reader, 1)
                 qos = bytes_to_int(qos_byte)
                 topics.append({'filter': topic, 'qos': qos})
-                print(topic)
             except NoDataException:
                 break
         return cls(topics)
