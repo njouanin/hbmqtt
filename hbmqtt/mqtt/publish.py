@@ -1,7 +1,7 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
+from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader
 from hbmqtt.errors import HBMQTTException, MQTTException
 from hbmqtt.codecs import *
 
@@ -11,7 +11,7 @@ class PublishFixedHeader(MQTTFixedHeader):
     RETAIN_FLAG = 0x01
     QOS_FLAG = 0x06
 
-    def set_flags(self, dup_flag=False, qos=0, retain_flag=False, length=0):
+    def set_flags(self, dup_flag=False, qos=0, retain_flag=False):
         self.dup_flag = dup_flag
         self.retain_flag = retain_flag
         self.qos = qos
@@ -55,7 +55,7 @@ class PublishFixedHeader(MQTTFixedHeader):
 
 
 class PublishVariableHeader(MQTTVariableHeader):
-    def __init__(self, topic_name:str, packet_id:int = None):
+    def __init__(self, topic_name: str, packet_id: int=None):
         super().__init__()
         if '*' in topic_name:
             raise MQTTException("[MQTT-3.3.2-2] Topic name in the PUBLISH Packet MUST NOT contain wildcard characters.")
