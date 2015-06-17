@@ -13,6 +13,8 @@ from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.mqtt.packet import MQTTFixedHeader
 from hbmqtt.mqtt.disconnect import DisconnectPacket
+from hbmqtt.mqtt.pingreq import PingReqPacket
+from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.errors import NoDataException, HBMQTTException
 
 _defaults = {
@@ -126,6 +128,17 @@ class MQTTClient:
         disconnect_packet = DisconnectPacket()
         yield from disconnect_packet.to_stream(self._session.writer)
         self._session.writer.close()
+
+    def ping(self):
+        self._loop.call_soon_threadsafe(asyncio.async, self._ping_coro())
+
+    @asyncio.coroutine
+    def _ping_coro(self):
+        ping_packet = PingReqPacket()
+        print(ping_packet)
+        yield from ping_packet.to_stream(self._session.writer)
+        response = yield from PingRespPacket.from_stream(self._session.reader)
+        print(response)
 
     @asyncio.coroutine
     def _connect_coro(self):
