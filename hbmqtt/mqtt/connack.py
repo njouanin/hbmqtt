@@ -50,7 +50,7 @@ class ConnackPacket(MQTTPacket):
     VARIABLE_HEADER = ConnackVariableHeader
     PAYLOAD = None
 
-    def __init__(self, fixed: MQTTFixedHeader, variable_header: ConnackVariableHeader=None, payload: MQTTPayload=None):
+    def __init__(self, fixed: MQTTFixedHeader, variable_header: ConnackVariableHeader=None):
         if fixed is None:
             header = MQTTFixedHeader(PacketType.CONNACK, 0x00)
         else:
