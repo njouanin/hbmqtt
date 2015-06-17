@@ -164,6 +164,7 @@ class MQTTPayload(metaclass=abc.ABCMeta):
 
 
 class MQTTPacket:
+    FIXED_HEADER = MQTTFixedHeader
     VARIABLE_HEADER = None
     PAYLOAD = None
 
@@ -195,7 +196,7 @@ class MQTTPacket:
     @classmethod
     @asyncio.coroutine
     def from_stream(cls, reader: asyncio.StreamReader):
-        fixed_header = yield from MQTTFixedHeader.from_stream(reader)
+        fixed_header = yield from cls.FIXED_HEADER.from_stream(reader)
         if cls.VARIABLE_HEADER:
             variable_header = yield from cls.VARIABLE_HEADER.from_stream(reader, fixed_header)
         else:
@@ -203,7 +204,7 @@ class MQTTPacket:
         if cls.PAYLOAD:
             payload = yield from cls.PAYLOAD.from_stream(reader, fixed_header, variable_header)
         else:
-            payload= None
+            payload = None
 
         return cls(fixed_header, variable_header, payload)
 
