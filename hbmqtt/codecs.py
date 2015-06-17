@@ -81,5 +81,5 @@ def decode_packet_id(reader) -> int:
     :param reader: Stream reader
     :return: Packet ID
     """
-    packet_id_bytes = yield from read_or_raise(stream, 2)
+    packet_id_bytes = yield from read_or_raise(reader, 2)
     return bytes_to_int(packet_id_bytes)
