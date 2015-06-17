@@ -2,11 +2,8 @@
 #
 # See the file license.txt for copying permission.
 import unittest
-import asyncio
 
 from hbmqtt.mqtt.publish import PublishPacket, PublishVariableHeader
-from hbmqtt.mqtt.packet import MQTTFixedHeader, PacketType
-from hbmqtt.errors import MQTTException
 from hbmqtt.codecs import *
 
 class PublishPacketTest(unittest.TestCase):
