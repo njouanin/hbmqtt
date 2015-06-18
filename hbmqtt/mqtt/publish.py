@@ -1,7 +1,7 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader
+from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
 from hbmqtt.errors import HBMQTTException, MQTTException
 from hbmqtt.codecs import *
 
@@ -79,10 +79,25 @@ class PublishVariableHeader(MQTTVariableHeader):
         return cls(topic_name, packet_id)
 
 
+class PublishPayload(MQTTPayload):
+    def __init__(self, data: bytes=None):
+        super().__init__()
+        self.data = data
+
+    def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
+        return self.data
+
+    @classmethod
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
+                    variable_header: MQTTVariableHeader):
+        data = yield from reader.read()
+        return cls(data)
+
+
 class PublishPacket(MQTTPacket):
     FIXED_HEADER = PublishFixedHeader
     VARIABLE_HEADER = PublishVariableHeader
-    PAYLOAD = None
+    PAYLOAD = PublishPayload
 
     def __init__(self, fixed: PublishFixedHeader=None, variable_header: PublishVariableHeader=None, payload=None):
         if fixed is None:
@@ -94,4 +109,9 @@ class PublishPacket(MQTTPacket):
 
         super().__init__(header)
         self.variable_header = variable_header
-        self.payload = None
+        self.payload = payload
+
+    @classmethod
+    def build(cls, topic_name: str, packet_id: int=None):
+        v_header = PublishVariableHeader(topic_name, packet_id)
+        return PublishPacket(variable_header=v_header)
