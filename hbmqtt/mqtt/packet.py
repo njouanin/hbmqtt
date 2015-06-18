@@ -226,3 +226,6 @@ class PacketIdVariableHeader(MQTTVariableHeader):
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         packet_id = yield from decode_packet_id(reader)
         return cls(packet_id)
+
+    def __repr__(self):
+        return type(self).__name__ + '(packet_id={0})'.format(self.packet_id)
