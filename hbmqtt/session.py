@@ -28,3 +28,9 @@ class Session:
         self.username = None
         self.password = None
         self.scheme = None
+        self._packet_id = 0
+
+    @property
+    def next_packet_id(self):
+        self._packet_id += 1
+        return self._packet_id
