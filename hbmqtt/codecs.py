@@ -54,7 +54,7 @@ def read_or_raise(reader, n=-1):
     except IncompleteReadError:
         raise NoDataException("Incomplete read")
     if not data:
-        raise NoDataException
+        raise NoDataException("No more data")
     return data
 
 @asyncio.coroutine
