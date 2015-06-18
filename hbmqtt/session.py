@@ -28,4 +28,3 @@ class Session:
         self.username = None
         self.password = None
         self.scheme = None
-        self._last_exception = None
