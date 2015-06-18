@@ -11,7 +11,7 @@ class PubrelPacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PacketIdVariableHeader=None, payload=None):
         if fixed is None:
-            header = MQTTFixedHeader(PacketType.PUBREL, 0x00)
+            header = MQTTFixedHeader(PacketType.PUBREL, 0x02) # [MQTT-3.6.1-1]
         else:
             if fixed.packet_type is not PacketType.PUBREL:
                 raise HBMQTTException("Invalid fixed packet type %s for PubrelPacket init" % fixed.packet_type)
@@ -19,3 +19,8 @@ class PubrelPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = variable_header
         self.payload = None
+
+    @classmethod
+    def build(cls, packet_id):
+        variable_header = PacketIdVariableHeader(packet_id)
+        return PubrelPacket(variable_header=variable_header)
