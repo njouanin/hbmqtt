@@ -8,7 +8,7 @@ class PingReqPacket(MQTTPacket):
     VARIABLE_HEADER = None
     PAYLOAD = None
 
-    def __init__(self, fixed: MQTTFixedHeader=None):
+    def __init__(self, fixed: MQTTFixedHeader=None, variable_header=None, payload=None):
         if fixed is None:
             header = MQTTFixedHeader(PacketType.PINGREQ, 0x00)
         else:

@@ -120,7 +120,7 @@ class MQTTFixedHeader:
         return cls(msg_type, flags, remain_length)
 
     def __repr__(self):
-        return 'MQTTFixedHeader(type={0}, length={1}, flags={2})'.format(self.packet_type, self.remaining_length, hex(self.flags))
+        return type(self).__name__ + '(type={0}, length={1}, flags={2})'.format(self.packet_type, self.remaining_length, hex(self.flags))
 
 class MQTTVariableHeader(metaclass=abc.ABCMeta):
     def __init__(self):
@@ -209,7 +209,7 @@ class MQTTPacket:
         return cls(fixed_header, variable_header, payload)
 
     def __repr__(self):
-        return 'MQPacket(fixed={0!r}, variable={1!r}, payload={2!r})'.format(self.fixed_header, self.variable_header, self.payload)
+        return type(self).__name__ + '(fixed={0!r}, variable={1!r}, payload={2!r})'.format(self.fixed_header, self.variable_header, self.payload)
 
 
 class PacketIdVariableHeader(MQTTVariableHeader):
