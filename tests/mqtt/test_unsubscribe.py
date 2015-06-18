@@ -25,5 +25,4 @@ class SubscribePacketTest(unittest.TestCase):
         payload = UnubscribePayload(['a/b', 'c/d'])
         publish = UnsubscribePacket(variable_header=variable_header, payload=payload)
         out = publish.to_bytes()
-        print(out)
         self.assertEqual(out, b'\xa0\x0c\x00\n\x00\x03a/b\x00\x03c/d')
