@@ -22,4 +22,5 @@ class SubscribePacketTest(unittest.TestCase):
     def test_to_stream(self):
         variable_header = PacketIdVariableHeader(10)
         publish = UnsubackPacket(variable_header=variable_header)
+        out = publish.to_bytes()
         self.assertEqual(out, b'\xb0\x02\x00\x0a')
