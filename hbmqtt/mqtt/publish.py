@@ -62,6 +62,9 @@ class PublishVariableHeader(MQTTVariableHeader):
         self.topic_name = topic_name
         self.packet_id = packet_id
 
+    def __repr__(self):
+        return type(self).__name__ + '(topic={0}, packet_id={1})'.format(self.topic_name, self.packet_id)
+
     def to_bytes(self):
         out = b''
         out += encode_string(self.topic_name)

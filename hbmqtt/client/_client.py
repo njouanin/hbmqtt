@@ -11,8 +11,14 @@ from hbmqtt.session import Session, SessionState
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.mqtt.disconnect import DisconnectPacket
+from hbmqtt.mqtt.publish import PublishPacket
+from hbmqtt.mqtt.puback import PubackPacket
+from hbmqtt.mqtt.pubrec import PubrecPacket
+from hbmqtt.mqtt.pubrel import PubrelPacket
+from hbmqtt.mqtt.pubcomp import PubcompPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
+from hbmqtt.errors import MQTTException
 
 _defaults = {
     'keep_alive': 60,
@@ -168,13 +174,50 @@ class MQTTClient:
         (app_qos, app_retain) = get_retain_and_qos()
         if app_qos == 0:
             yield from self._publish_qos_0(topic, message, dup, app_retain)
+        if app_qos == 1:
+            yield from self._publish_qos_1(topic, message, dup, app_retain)
+        if app_qos == 2:
+            yield from self._publish_qos_2(topic, message, dup, app_retain)
 
     @asyncio.coroutine
     def _publish_qos_0(self, topic, message, dup, retain):
-        from hbmqtt.mqtt.publish import PublishPacket
         packet = PublishPacket.build(topic, message, self._session.next_packet_id, dup, 0x00, retain)
         self.logger.debug(" -out-> " + repr(packet))
         yield from packet.to_stream(self._session.writer)
+        self._keep_alive()
+
+    @asyncio.coroutine
+    def _publish_qos_1(self, topic, message, dup, retain):
+        packet = PublishPacket.build(topic, message, self._session.next_packet_id, dup, 0x01, retain)
+        self.logger.debug(" -out-> " + repr(packet))
+        yield from packet.to_stream(self._session.writer)
+
+        puback = yield from PubackPacket.from_stream(self._session.reader)
+        self.logger.debug(" <-in-- " + repr(puback))
+        self._keep_alive()
+
+        if packet.variable_header.packet_id != puback.variable_header.packet_id:
+            raise MQTTException("[MQTT-4.3.2-2] Puback packet packet_id doesn't match publish packet")
+
+    @asyncio.coroutine
+    def _publish_qos_2(self, topic, message, dup, retain):
+        publish = PublishPacket.build(topic, message, self._session.next_packet_id, dup, 0x02, retain)
+        self.logger.debug(" -out-> " + repr(publish))
+        yield from publish.to_stream(self._session.writer)
+
+        pubrec = yield from PubrecPacket.from_stream(self._session.reader)
+        if publish.variable_header.packet_id != pubrec.variable_header.packet_id:
+            raise MQTTException("[MQTT-4.3.2-2] Puback packet packet_id doesn't match publish packet")
+        self.logger.debug(" <-in-- " + repr(pubrec))
+
+        pubrel = PubrelPacket.build(pubrec.variable_header.packet_id)
+        yield from pubrel.to_stream(self._session.writer)
+        self.logger.debug(" -out-> " + repr(pubrel))
+
+        pubcomp = yield from PubcompPacket.from_stream(self._session.reader)
+        self.logger.debug(" <-in-- " + repr(pubcomp))
+        if pubrel.variable_header.packet_id != pubcomp.variable_header.packet_id:
+            raise MQTTException("[MQTT-4.3.2-2] Pubcomp packet packet_id doesn't match pubrel packet")
         self._keep_alive()
 
     @asyncio.coroutine
