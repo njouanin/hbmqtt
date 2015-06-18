@@ -112,6 +112,11 @@ class PublishPacket(MQTTPacket):
         self.payload = payload
 
     @classmethod
-    def build(cls, topic_name: str, packet_id: int=None):
+    def build(cls, topic_name: str, message:bytes, packet_id: int, dup_flag, qos, retain):
         v_header = PublishVariableHeader(topic_name, packet_id)
-        return PublishPacket(variable_header=v_header)
+        payload = PublishPayload(message)
+        packet = PublishPacket(variable_header=v_header, payload=payload)
+        packet.fixed_header.dup_flag = dup_flag
+        packet.fixed_header.retain_flag = retain
+        packet.fixed_header.qos = qos
+        return packet

@@ -2,7 +2,6 @@ __author__ = 'nico'
 
 import logging
 import asyncio
-import threading
 from urllib.parse import urlparse
 
 from transitions import Machine, MachineError
@@ -11,23 +10,26 @@ from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session, SessionState
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
-from hbmqtt.mqtt.packet import MQTTFixedHeader
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
-from hbmqtt.errors import NoDataException, HBMQTTException
 
 _defaults = {
     'keep_alive': 60,
+    'ping_delay': 1,
+    'default_qos': 0,
+    'default_retain': False
 }
 
 
 class ClientException(BaseException):
     pass
 
+
 def gen_client_id():
     import uuid
     return str(uuid.uuid4())
+
 
 class MQTTClient:
     states = ['new', 'connecting', 'connected', 'idle', 'disconnected']
@@ -52,13 +54,18 @@ class MQTTClient:
                 topic: some/topic
                 message: Will message
                 qos: 0
+            default_qos: 0
+            default_retain: false
+            topics:
+                a/b:
+                    qos: 2
+                    retain: true
         :param loop:
         :return:
         """
         self.logger = logging.getLogger(__name__)
         self.config = config.copy()
         self.config.update(_defaults)
-        self._keep_alive = int(config.get('keep_alive', 60))
         if client_id is not None:
             self.client_id = client_id
         else:
@@ -70,8 +77,7 @@ class MQTTClient:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
-
-        self._loop_thread = None
+        self._ping_handle = None
         self._session = None
 
     def _init_states(self):
@@ -84,14 +90,8 @@ class MQTTClient:
         self.machine.add_transition(trigger='disconnect', source='idle', dest='disconnected')
         self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
 
-    def connect(self, **kwargs):
-        try:
-            self._loop.run_until_complete(self.connect_async(**kwargs))
-        except Exception as e:
-            self.logger.warn(e)
-
     @asyncio.coroutine
-    def connect_async(self, host=None, port=None, username=None, password=None, uri=None, clean_session=None):
+    def connect(self, host=None, port=None, username=None, password=None, uri=None, clean_session=None):
         try:
             self.machine.connect()
             self._session = self._init_session(host, port, username, password, uri, clean_session)
@@ -99,6 +99,7 @@ class MQTTClient:
 
             yield from self._connect_coro()
             self.machine.connect_success()
+            self._keep_alive()
         except MachineError:
             msg = "Connect call incompatible with client current state '%s'" % self.machine.current_state
             self.logger.warn(msg)
@@ -109,13 +110,14 @@ class MQTTClient:
             self.logger.warn("Connection failed: %s " % e)
             raise ClientException("Connection failed: %s " % e)
 
+    @asyncio.coroutine
     def disconnect(self):
         try:
             self.machine.disconnect()
-            if self._loop.is_running():
-                self._loop.call_soon(asyncio.async, self._disconnect_coro())
-            else:
-                self._loop.run_until_complete(self._disconnect_coro())
+            disconnect_packet = DisconnectPacket()
+            self.logger.debug(" -out-> " + repr(disconnect_packet))
+            yield from disconnect_packet.to_stream(self._session.writer)
+            self._session.writer.close()
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise ClientException("Client instance can't be disconnected: %s" % me)
@@ -123,21 +125,57 @@ class MQTTClient:
         self._session = None
 
     @asyncio.coroutine
-    def _disconnect_coro(self):
-        disconnect_packet = DisconnectPacket()
-        yield from disconnect_packet.to_stream(self._session.writer)
-        self._session.writer.close()
-
     def ping(self):
-        self._loop.call_soon_threadsafe(asyncio.async, self._ping_coro())
-
-    @asyncio.coroutine
-    def _ping_coro(self):
         ping_packet = PingReqPacket()
-        print(ping_packet)
+        self.logger.debug(" -out-> " + repr(ping_packet))
         yield from ping_packet.to_stream(self._session.writer)
         response = yield from PingRespPacket.from_stream(self._session.reader)
-        print(response)
+        self.logger.debug(" <-in-- " + repr(response))
+        self._keep_alive()
+
+    def _keep_alive(self):
+        if self._ping_handle:
+            try:
+                self._ping_handle.cancel()
+                self.logger.debug('Cancel pending ping')
+            except Exception:
+                pass
+        next_ping = self._session.keep_alive-self.config['ping_delay']
+        if next_ping > 0:
+            self.logger.debug('Next ping in %d seconds' % next_ping)
+            self._ping_handle = self._loop.call_later(next_ping, asyncio.async, self.ping())
+
+    @asyncio.coroutine
+    def publish(self, topic, message, dup=False, qos=None, retain=None):
+        def get_retain_and_qos():
+            if qos:
+                _qos = qos
+            else:
+                _qos = self.config['default_qos']
+                try:
+                    _qos = self.config['topics'][topic]['qos']
+                except KeyError:
+                    pass
+            if retain:
+                _retain = retain
+            else:
+                _retain = self.config['default_retain']
+                try:
+                    _retain = self.config['topics'][topic]['retain']
+                except KeyError:
+                    pass
+            return _qos, _retain
+        (app_qos, app_retain) = get_retain_and_qos()
+        if app_qos == 0:
+            yield from self._publish_qos_0(topic, message, dup, app_retain)
+
+    @asyncio.coroutine
+    def _publish_qos_0(self, topic, message, dup, retain):
+        from hbmqtt.mqtt.publish import PublishPacket
+        packet = PublishPacket.build(topic, message, self._session.next_packet_id, dup, 0x00, retain)
+        self.logger.debug(" -out-> " + repr(packet))
+        yield from packet.to_stream(self._session.writer)
+        self._keep_alive()
 
     @asyncio.coroutine
     def _connect_coro(self):
@@ -149,17 +187,18 @@ class MQTTClient:
             # Send CONNECT packet and wait for CONNACK
             packet = ConnectPacket.build_request_from_session(self._session)
             yield from packet.to_stream(self._session.writer)
-            self.logger.debug(packet)
+            self.logger.debug(" -out-> " + repr(packet))
+
             connack = yield from ConnackPacket.from_stream(self._session.reader)
-            self.logger.debug(connack)
+            self.logger.debug(" <-in-- " + repr(connack))
             if connack.variable_header.return_code is not ReturnCode.CONNECTION_ACCEPTED:
                 raise ClientException("Connection rejected with code '%s'" % hex(connack.variable_header.return_code))
+
             self._session.state = SessionState.CONNECTED
             self.logger.debug("connected to %s:%s" % (self._session.remote_address, self._session.remote_port))
         except Exception as e:
-            self.logger.error("Connection failed: %s" % e)
             self._session.state = SessionState.DISCONNECTED
-            raise
+            raise e
 
     def _init_session(self, host=None, port=None, username=None, password=None, uri=None, clean_session=None) -> dict:
         # Load config
