@@ -15,6 +15,9 @@ class SubackPayload(MQTTPayload):
         super().__init__()
         self.return_codes = return_codes
 
+    def __repr__(self):
+        return type(self).__name__ + '(return_codes={0})'.format(repr(self.return_codes))
+
     def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
         out = b''
         for return_code in self.return_codes:
@@ -26,12 +29,13 @@ class SubackPayload(MQTTPayload):
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
         return_codes = []
-        while True:
+        bytes_to_read = fixed_header.remaining_length - variable_header.bytes_length
+        for i in range(0, bytes_to_read):
             try:
                 return_code_byte = yield from read_or_raise(reader, 1)
                 return_code = bytes_to_int(return_code_byte)
                 return_codes.append(return_code)
-            except NoDataException:
+            except NoDataException as e:
                 break
         return cls(return_codes)
 

@@ -18,6 +18,8 @@ from hbmqtt.mqtt.pubrel import PubrelPacket
 from hbmqtt.mqtt.pubcomp import PubcompPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
+from hbmqtt.mqtt.subscribe import SubscribePacket
+from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.errors import MQTTException
 
 _defaults = {
@@ -218,6 +220,18 @@ class MQTTClient:
         self.logger.debug(" <-in-- " + repr(pubcomp))
         if pubrel.variable_header.packet_id != pubcomp.variable_header.packet_id:
             raise MQTTException("[MQTT-4.3.2-2] Pubcomp packet packet_id doesn't match pubrel packet")
+        self._keep_alive()
+
+    @asyncio.coroutine
+    def subscribe(self, topics):
+        subscribe = SubscribePacket.build(topics, self._session.next_packet_id)
+        yield from subscribe.to_stream(self._session.writer)
+        self.logger.debug(" -out-> " + repr(subscribe))
+
+        suback = yield from SubackPacket.from_stream(self._session.reader)
+        self.logger.debug(" <-in-- " + repr(suback))
+        if suback.variable_header.packet_id != subscribe.variable_header.packet_id:
+            raise MQTTException("[MQTT-4.3.2-2] Suback packet packet_id doesn't match subscribe packet")
         self._keep_alive()
 
     @asyncio.coroutine

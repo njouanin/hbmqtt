@@ -40,7 +40,7 @@ class SubscribePacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PacketIdVariableHeader=None, payload=None):
         if fixed is None:
-            header = MQTTFixedHeader(PacketType.SUBSCRIBE, 0x00)
+            header = MQTTFixedHeader(PacketType.SUBSCRIBE, 0x02) # [MQTT-3.8.1-1]
         else:
             if fixed.packet_type is not PacketType.SUBSCRIBE:
                 raise HBMQTTException("Invalid fixed packet type %s for SubscribePacket init" % fixed.packet_type)
@@ -49,3 +49,9 @@ class SubscribePacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = variable_header
         self.payload = payload
+
+    @classmethod
+    def build(cls, topics, packet_id):
+        v_header = PacketIdVariableHeader(packet_id)
+        payload = SubscribePayload(topics)
+        return SubscribePacket(variable_header=v_header, payload=payload)

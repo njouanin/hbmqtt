@@ -132,8 +132,12 @@ class MQTTVariableHeader(metaclass=abc.ABCMeta):
         yield from writer.drain()
 
     @abc.abstractmethod
-    def to_bytes(self):
-        return
+    def to_bytes(self) -> bytes:
+        pass
+
+    @property
+    def bytes_length(self):
+        return len(self.to_bytes())
 
     @classmethod
     @asyncio.coroutine
