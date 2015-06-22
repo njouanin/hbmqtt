@@ -199,10 +199,12 @@ class MQTTPacket:
 
     @classmethod
     @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader):
-        fixed_header = yield from cls.FIXED_HEADER.from_stream(reader)
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header=None, variable_header=None):
+        if fixed_header is None:
+            fixed_header = yield from cls.FIXED_HEADER.from_stream(reader)
         if cls.VARIABLE_HEADER:
-            variable_header = yield from cls.VARIABLE_HEADER.from_stream(reader, fixed_header)
+            if variable_header is None:
+                variable_header = yield from cls.VARIABLE_HEADER.from_stream(reader, fixed_header)
         else:
             variable_header = None
         if cls.PAYLOAD:
