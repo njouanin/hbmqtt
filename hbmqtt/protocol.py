@@ -8,22 +8,22 @@ from hbmqtt.session import Session
 from hbmqtt.mqtt.packet import MQTTFixedHeader
 from hbmqtt.mqtt import packet_class
 
-class ProtoThread(threading.Thread):
-    def __init__(self, session: Session, loop: asyncio.BaseEventLoop):
-        super().__init__(name="MQTT Protocol communication thread")
-        self.logger = logging.getLogger(__name__)
-        self._loop = loop
-        self._session = session
-
-    def run(self):
-        asyncio.set_event_loop(self._loop)
-        self._loop.call_soon(asyncio.async, self._read_protocol())
-        if not self._loop.is_running():
-            self._loop.run_forever()
-
-    @asyncio.coroutine
-    def _read_protocol(self):
-        while true:
+# class ProtoThread(threading.Thread):
+#     def __init__(self, session: Session, loop: asyncio.BaseEventLoop):
+#         super().__init__(name="MQTT Protocol communication thread")
+#         self.logger = logging.getLogger(__name__)
+#         self._loop = loop
+#         self._session = session
+#
+#     def run(self):
+#         asyncio.set_event_loop(self._loop)
+#         self._loop.call_soon(asyncio.async, self._read_protocol())
+#         if not self._loop.is_running():
+#             self._loop.run_forever()
+#
+#     @asyncio.coroutine
+#     def _read_protocol(self):
+#         while true:
 
 class ProtocolHandler:
     """
@@ -37,8 +37,8 @@ class ProtocolHandler:
         self._writer_task = None
 
     def start(self):
-        self._reader_task = asyncio.async(self._writer_coro, loop=self._loop)
-        self._writer_task = asyncio.async(self._reader_coro, loop=self._loop)
+        self._reader_task = asyncio.async(self._writer_coro(), loop=self._loop)
+        self._writer_task = asyncio.async(self._reader_coro(), loop=self._loop)
 
     def stop(self):
         self._reader_task.cancel()
@@ -50,7 +50,9 @@ class ProtocolHandler:
         while True:
             try:
                 fixed_header = yield from MQTTFixedHeader.from_stream(self.session.reader)
-                packet = packet_class(fixed_header).from_stream(self.session.reader, fixed_header=fixed_header)
+                cls = packet_class(fixed_header)
+                packet = yield from cls.from_stream(self.session.reader, fixed_header=fixed_header)
+                self.logger.debug(packet)
             except asyncio.CancelledError:
                 self.logger.warn("Reader coro stopping")
                 break
