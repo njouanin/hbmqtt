@@ -199,7 +199,7 @@ class ConnectPacket(MQTTPacket):
     VARIABLE_HEADER = ConnectVariableHeader
     PAYLOAD = ConnectPayload
 
-    def __init__(self, fixed: MQTTFixedHeader, vh: ConnectVariableHeader, payload: ConnectPayload):
+    def __init__(self, fixed: MQTTFixedHeader=None, vh: ConnectVariableHeader=None, payload: ConnectPayload=None):
         if fixed is None:
             header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
         else:
