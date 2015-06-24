@@ -14,7 +14,7 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-packet = "str"
+ret_packet = None
 
 class ConnectPacketTest(unittest.TestCase):
     def setUp(self):
@@ -49,36 +49,37 @@ class ConnectPacketTest(unittest.TestCase):
         self.assertEquals(packet.fixed_header.packet_type, PacketType.CONNECT)
 
     def test_write_loop(self):
-        data_ref = b'\x10\x3e\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
+        test_packet = ConnectPacket(vh=ConnectVariableHeader(), payload=ConnectPayload('Id', 'WillTopic', 'WillMessage', 'user', 'password'))
         event=asyncio.Event()
+
         @asyncio.coroutine
         def serve_test(reader, writer):
-            global packet
+            global ret_packet
             packet = yield from ConnectPacket.from_stream(reader)
-            self.logger.info("data=" + repr(packet))
+            ret_packet = packet
             writer.close()
             event.set()
-            return packet
 
+        @asyncio.coroutine
+        def client():
+            S = Session()
+            S.reader, S.writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=loop)
+            handler = ProtocolHandler(S, loop)
+            yield from handler.start()
+            yield from S.outgoing_queue.put(test_packet)
+            yield from handler.stop()
+            S.writer.close()
+
+        # Start server
         loop = asyncio.get_event_loop()
         coro = asyncio.start_server(serve_test, '127.0.0.1', 8888, loop=loop)
         server = loop.run_until_complete(coro)
 
-        S = Session()
-        @asyncio.coroutine
-        def client():
-            S.reader, S.writer = yield from asyncio.open_connection('127.0.0.1', 8888,
-                                                        loop=loop)
-            handler = ProtocolHandler(S, loop)
-            yield from handler.start()
-            conn = ConnectPacket(vh=ConnectVariableHeader(), payload=ConnectPayload('Id', 'WillTopic', 'WillMessage', 'user', 'password'))
-            yield from S.outgoing_queue.put(conn)
-            self.logger.debug("Messages in queue: %d" % S.outgoing_queue.qsize())
-            yield from handler.stop()
-            S.writer.close()
+        # Schedule client
+        loop.call_soon(asyncio.async, client())
 
-        loop.run_until_complete(client())
+        # Wait for server to complete client request
         loop.run_until_complete(asyncio.wait([event.wait()]))
-        ret = server.close()
-        self.logger.info(packet)
+        server.close()
+        self.logger.info(ret_packet)
         #self.assertEquals(packet.fixed_header.packet_type, PacketType.CONNECT)
