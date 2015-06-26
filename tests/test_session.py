@@ -79,4 +79,4 @@ class ConnectPacketTest(unittest.TestCase):
         loop.run_until_complete(asyncio.wait([event.wait()]))
         server.close()
         self.logger.info(ret_packet)
-        #self.assertEquals(packet.fixed_header.packet_type, PacketType.CONNECT)
+        self.assertEquals(ret_packet.fixed_header.packet_type, PacketType.CONNECT)
