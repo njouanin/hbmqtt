@@ -6,6 +6,7 @@ import logging
 from enum import Enum
 from hbmqtt.mqtt.packet import PacketType
 from hbmqtt.mqtt.packet import MQTTFixedHeader
+from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
 from hbmqtt.mqtt import packet_class
 from hbmqtt.errors import NoDataException
 
@@ -47,6 +48,39 @@ class Session:
         for p in PacketType:
             self.incoming_queues[p] = asyncio.Queue()
         self.outgoing_queue = asyncio.Queue()
+
+    def build_connect_packet(self):
+        vh = ConnectVariableHeader()
+        payload = ConnectPayload()
+
+        vh.keep_alive = self.keep_alive
+        vh.clean_session_flag = self.clean_session
+        vh.will_retain_flag = self.will_retain
+        payload.client_id = self.client_id
+
+        if self.username:
+            vh.username_flag = True
+            payload.username = self.username
+        else:
+            vh.username_flag = False
+
+        if self.password:
+            vh.password_flag = True
+            payload.password = self.password
+        else:
+            vh.password_flag = False
+        if self.will_flag:
+            vh.will_flag = True
+            vh.will_qos = self.will_qos
+            payload.will_message = self.will_message
+            payload.will_topic = self.will_topic
+        else:
+            vh.will_flag = False
+
+        header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
+        packet = ConnectPacket(header, vh, payload)
+        return packet
+
 
     @property
     def next_packet_id(self):

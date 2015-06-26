@@ -242,7 +242,7 @@ class MQTTClient:
             self._session.local_address, self._session.local_port = self._session.writer.get_extra_info('sockname')
 
             # Send CONNECT packet and wait for CONNACK
-            packet = ConnectPacket.build_request_from_session(self._session)
+            packet = self._session.build_connect_packet()
             yield from packet.to_stream(self._session.writer)
             self.logger.debug(" -out-> " + repr(packet))
 

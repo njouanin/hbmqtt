@@ -4,7 +4,6 @@
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
 from hbmqtt.errors import MQTTException, CodecException, HBMQTTException, NoDataException
-from hbmqtt.session import Session
 
 
 class ConnectVariableHeader(MQTTVariableHeader):
@@ -209,36 +208,3 @@ class ConnectPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = vh
         self.payload = payload
-
-    @classmethod
-    def build_request_from_session(cls, session: Session):
-        vh = ConnectVariableHeader()
-        payload = ConnectPayload()
-
-        vh.keep_alive = session.keep_alive
-        vh.clean_session_flag = session.clean_session
-        vh.will_retain_flag = session.will_retain
-        payload.client_id = session.client_id
-
-        if session.username:
-            vh.username_flag = True
-            payload.username = session.username
-        else:
-            vh.username_flag = False
-
-        if session.password:
-            vh.password_flag = True
-            payload.password = session.password
-        else:
-            vh.password_flag = False
-        if session.will_flag:
-            vh.will_flag = True
-            vh.will_qos = session.will_qos
-            payload.will_message = session.will_message
-            payload.will_topic = session.will_topic
-        else:
-            vh.will_flag = False
-
-        header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
-        packet = cls(header, vh, payload)
-        return packet
