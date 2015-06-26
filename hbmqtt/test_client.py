@@ -20,4 +20,4 @@ def test_coro():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    asyncio.get_event_loop().run_until_complete(test_coro())
+#    asyncio.get_event_loop().run_until_complete(test_coro())
