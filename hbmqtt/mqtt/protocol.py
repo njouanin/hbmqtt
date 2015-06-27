@@ -9,12 +9,18 @@ from hbmqtt.errors import NoDataException
 from hbmqtt.mqtt.packet import PacketType
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
 from hbmqtt.mqtt.disconnect import DisconnectPacket
+from hbmqtt.mqtt.pingreq import PingReqPacket
+from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.session import Session
+from blinker import Signal
 
 class ProtocolHandler:
     """
     Class implementing the MQTT communication protocol using asyncio features
     """
+    packet_sent = Signal()
+    packet_received = Signal()
+
     def __init__(self, session: Session, loop=None):
         self.logger = logging.getLogger(__name__)
         self.session = session
@@ -61,10 +67,11 @@ class ProtocolHandler:
                     packet = yield from cls.from_stream(self.session.reader, fixed_header=fixed_header)
                     self.logger.debug(" <-in-- " + repr(packet))
                     yield from self.incoming_queues[packet.fixed_header.packet_type].put(packet)
+                    self.packet_received.send(packet)
                 else:
                     self.logger.debug("No data")
             except asyncio.TimeoutError:
-                self.logger.warn("Input stream read timeout")
+                self.logger.debug("Input stream read timeout")
             except NoDataException as nde:
                 self.logger.debug("No data available")
                 #break
@@ -77,7 +84,6 @@ class ProtocolHandler:
     @asyncio.coroutine
     def _writer_coro(self):
         self.logger.debug("Starting writer coro")
-        packet = None
         while self._running:
             try:
                 self._writer_ready.set()
@@ -85,8 +91,9 @@ class ProtocolHandler:
                 self.logger.debug(" -out-> " + repr(packet))
                 yield from packet.to_stream(self.session.writer)
                 yield from self.session.writer.drain()
+                self.packet_sent.send(packet)
             except asyncio.TimeoutError as ce:
-                self.logger.warn("Output queue get timeout")
+                self.logger.debug("Output queue get timeout")
             except Exception as e:
                 self.logger.warn("Unhandled exception in writer coro: %s" % e)
                 break
@@ -108,6 +115,33 @@ class ProtocolHandler:
 class ClientProtocolHandler(ProtocolHandler):
     def __init__(self, session: Session, loop=None):
         super().__init__(session, loop)
+        self._ping_task = None
+
+    @asyncio.coroutine
+    def start(self):
+        yield from super().start()
+        self.packet_sent.connect(self._do_keepalive)
+
+    @asyncio.coroutine
+    def stop(self):
+        if self._ping_task:
+            try:
+                self._ping_task.cancel()
+            except Exception:
+                pass
+        yield from super().stop()
+
+    def _do_keepalive(self, message):
+        if self._ping_task:
+            try:
+                self._ping_task.cancel()
+                self.logger.debug('Cancel pending ping')
+            except Exception:
+                pass
+        next_ping = self.session.keep_alive #-self.config['ping_delay']
+        if next_ping > 0:
+            self.logger.debug('Next ping in %d seconds' % next_ping)
+            self._ping_task = self._loop.call_later(next_ping, asyncio.async, self.mqtt_ping())
 
     @asyncio.coroutine
     def mqtt_connect(self):
@@ -146,12 +180,20 @@ class ClientProtocolHandler(ProtocolHandler):
         packet = build_connect_packet(self.session)
         yield from self.outgoing_queue.put(packet)
         connack = yield from self.incoming_queues[PacketType.CONNACK].get()
+
         return connack.variable_header.return_code
 
     @asyncio.coroutine
     def mqtt_disconnect(self):
         disconnect_packet = DisconnectPacket()
         yield from self.outgoing_queue.put(disconnect_packet)
+        self._ping_task.cancel()
 
+    @asyncio.coroutine
+    def mqtt_ping(self):
+        self.logger.debug("Pinging ...")
+        ping_packet = PingReqPacket()
+        yield from self.outgoing_queue.put(ping_packet)
+        yield from self.incoming_queues[PacketType.PINGRESP].get()
 
 
