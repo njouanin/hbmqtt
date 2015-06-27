@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from transitions import Machine, MachineError
 
 from hbmqtt.utils import not_in_dict_or_none
-from hbmqtt.mqtt.protocol import Session, SessionState
+from hbmqtt.session import Session, SessionState
 from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.publish import PublishPacket
@@ -20,6 +20,7 @@ from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.errors import MQTTException
+from hbmqtt.mqtt.protocol import ClientProtocolHandler
 
 _defaults = {
     'keep_alive': 60,
@@ -55,7 +56,7 @@ class MQTTClient:
                 uri: mqtt:xxx@yyy//localhost:1883/
                 # OR a mix ot both
             keep_alive: 60
-            clean_session: true
+            cleansession: true
             will:
                 retain: false
                 topic: some/topic
@@ -85,7 +86,8 @@ class MQTTClient:
         else:
             self._loop = asyncio.get_event_loop()
         self._ping_handle = None
-        self._session = None
+        self.session = None
+        self._handler = None
 
     def _init_states(self):
         self.machine = Machine(states=MQTTClient.states, initial='new')
@@ -97,11 +99,11 @@ class MQTTClient:
         self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
 
     @asyncio.coroutine
-    def connect(self, host=None, port=None, username=None, password=None, uri=None, clean_session=None):
+    def connect(self, host=None, port=None, username=None, password=None, uri=None, cleansession=None):
         try:
             self.machine.connect()
-            self._session = self._init_session(host, port, username, password, uri, clean_session)
-            self.logger.debug("Connect with session parameters: %s" % self._session)
+            self.session = self._initsession(host, port, username, password, uri, cleansession)
+            self.logger.debug("Connect with session parameters: %s" % self.session)
 
             yield from self._connect_coro()
             self.machine.connect_success()
@@ -119,23 +121,22 @@ class MQTTClient:
     @asyncio.coroutine
     def disconnect(self):
         try:
-            self.machine.disconnect()
-            disconnect_packet = DisconnectPacket()
-            self.logger.debug(" -out-> " + repr(disconnect_packet))
-            yield from disconnect_packet.to_stream(self._session.writer)
-            self._session.writer.close()
+            yield from self._handler.mqtt_disconnect()
+            yield from self._handler.stop()
+        except Exception as e:
+            self.logger.warn("Unhandled exception: %s" % e)
+            raise ClientException("Unhandled exception: %s" % e)
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise ClientException("Client instance can't be disconnected: %s" % me)
-        self._loop.stop()
-        self._session = None
+        self.session = None
 
     @asyncio.coroutine
     def ping(self):
         ping_packet = PingReqPacket()
         self.logger.debug(" -out-> " + repr(ping_packet))
-        yield from ping_packet.to_stream(self._session.writer)
-        response = yield from PingRespPacket.from_stream(self._session.reader)
+        yield from ping_packet.to_stream(self.session.writer)
+        response = yield from PingRespPacket.from_stream(self.session.reader)
         self.logger.debug(" <-in-- " + repr(response))
         self._keep_alive()
 
@@ -146,7 +147,7 @@ class MQTTClient:
                 self.logger.debug('Cancel pending ping')
             except Exception:
                 pass
-        next_ping = self._session.keep_alive-self.config['ping_delay']
+        next_ping = self.session.keep_alive-self.config['ping_delay']
         if next_ping > 0:
             self.logger.debug('Next ping in %d seconds' % next_ping)
             self._ping_handle = self._loop.call_later(next_ping, asyncio.async, self.ping())
@@ -181,18 +182,18 @@ class MQTTClient:
 
     @asyncio.coroutine
     def _publish_qos_0(self, topic, message, dup, retain):
-        packet = PublishPacket.build(topic, message, self._session.next_packet_id, dup, 0x00, retain)
+        packet = PublishPacket.build(topic, message, self.session.next_packet_id, dup, 0x00, retain)
         self.logger.debug(" -out-> " + repr(packet))
-        yield from packet.to_stream(self._session.writer)
+        yield from packet.to_stream(self.session.writer)
         self._keep_alive()
 
     @asyncio.coroutine
     def _publish_qos_1(self, topic, message, dup, retain):
-        packet = PublishPacket.build(topic, message, self._session.next_packet_id, dup, 0x01, retain)
+        packet = PublishPacket.build(topic, message, self.session.next_packet_id, dup, 0x01, retain)
         self.logger.debug(" -out-> " + repr(packet))
-        yield from packet.to_stream(self._session.writer)
+        yield from packet.to_stream(self.session.writer)
 
-        puback = yield from PubackPacket.from_stream(self._session.reader)
+        puback = yield from PubackPacket.from_stream(self.session.reader)
         self.logger.debug(" <-in-- " + repr(puback))
         self._keep_alive()
 
@@ -201,20 +202,20 @@ class MQTTClient:
 
     @asyncio.coroutine
     def _publish_qos_2(self, topic, message, dup, retain):
-        publish = PublishPacket.build(topic, message, self._session.next_packet_id, dup, 0x02, retain)
+        publish = PublishPacket.build(topic, message, self.session.next_packet_id, dup, 0x02, retain)
         self.logger.debug(" -out-> " + repr(publish))
-        yield from publish.to_stream(self._session.writer)
+        yield from publish.to_stream(self.session.writer)
 
-        pubrec = yield from PubrecPacket.from_stream(self._session.reader)
+        pubrec = yield from PubrecPacket.from_stream(self.session.reader)
         if publish.variable_header.packet_id != pubrec.variable_header.packet_id:
             raise MQTTException("[MQTT-4.3.2-2] Puback packet packet_id doesn't match publish packet")
         self.logger.debug(" <-in-- " + repr(pubrec))
 
         pubrel = PubrelPacket.build(pubrec.variable_header.packet_id)
-        yield from pubrel.to_stream(self._session.writer)
+        yield from pubrel.to_stream(self.session.writer)
         self.logger.debug(" -out-> " + repr(pubrel))
 
-        pubcomp = yield from PubcompPacket.from_stream(self._session.reader)
+        pubcomp = yield from PubcompPacket.from_stream(self.session.reader)
         self.logger.debug(" <-in-- " + repr(pubcomp))
         if pubrel.variable_header.packet_id != pubcomp.variable_header.packet_id:
             raise MQTTException("[MQTT-4.3.2-2] Pubcomp packet packet_id doesn't match pubrel packet")
@@ -222,11 +223,11 @@ class MQTTClient:
 
     @asyncio.coroutine
     def subscribe(self, topics):
-        subscribe = SubscribePacket.build(topics, self._session.next_packet_id)
-        yield from subscribe.to_stream(self._session.writer)
+        subscribe = SubscribePacket.build(topics, self.session.next_packet_id)
+        yield from subscribe.to_stream(self.session.writer)
         self.logger.debug(" -out-> " + repr(subscribe))
 
-        suback = yield from SubackPacket.from_stream(self._session.reader)
+        suback = yield from SubackPacket.from_stream(self.session.reader)
         self.logger.debug(" <-in-- " + repr(suback))
         if suback.variable_header.packet_id != subscribe.variable_header.packet_id:
             raise MQTTException("[MQTT-4.3.2-2] Suback packet packet_id doesn't match subscribe packet")
@@ -235,26 +236,23 @@ class MQTTClient:
     @asyncio.coroutine
     def _connect_coro(self):
         try:
-            reader, writer = yield from asyncio.open_connection(self._session.remote_address, self._session.remote_port)
-            self._session.open(reader, writer)
+            self.session.reader, self.session.writer = \
+                yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port)
+            self._handler = ClientProtocolHandler(self.session)
+            yield from self._handler.start()
 
-            # Send CONNECT packet and wait for CONNACK
-            packet = self._session.build_connect_packet()
-            yield from packet.to_stream(self._session.writer)
-            self.logger.debug(" -out-> " + repr(packet))
+            return_code = yield from self._handler.mqtt_connect()
 
-            connack = yield from ConnackPacket.from_stream(self._session.reader)
-            self.logger.debug(" <-in-- " + repr(connack))
-            if connack.variable_header.return_code is not ReturnCode.CONNECTION_ACCEPTED:
-                raise ClientException("Connection rejected with code '%s'" % hex(connack.variable_header.return_code))
+            if return_code is not ReturnCode.CONNECTION_ACCEPTED:
+                raise ClientException("Connection rejected with code '%s'" % hex(return_code))
 
-            self._session.state = SessionState.CONNECTED
-            self.logger.debug("connected to %s:%s" % (self._session.remote_address, self._session.remote_port))
+            self.session.state = SessionState.CONNECTED
+            self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
         except Exception as e:
-            self._session.state = SessionState.DISCONNECTED
+            self.session.state = SessionState.DISCONNECTED
             raise e
 
-    def _init_session(self, host=None, port=None, username=None, password=None, uri=None, clean_session=None) -> dict:
+    def _initsession(self, host=None, port=None, username=None, password=None, uri=None, cleansession=None) -> dict:
         # Load config
         broker_conf = self.config.get('broker', dict()).copy()
         if 'mqtt' not in broker_conf:
@@ -284,8 +282,8 @@ class MQTTClient:
             broker_conf['username'] = username
         if password:
             broker_conf['password'] = password
-        if clean_session is not None:
-            broker_conf['clean_session'] = clean_session
+        if cleansession is not None:
+            broker_conf['cleansession'] = cleansession
 
         for key in ['scheme', 'host', 'port']:
             if not_in_dict_or_none(broker_conf, key):
@@ -298,10 +296,10 @@ class MQTTClient:
         s.username = broker_conf['username']
         s.password = broker_conf['password']
         s.scheme = broker_conf['scheme']
-        if clean_session is not None:
-            s.clean_session = clean_session
+        if cleansession is not None:
+            s.cleansession = cleansession
         else:
-            s.clean_session = self.config.get('clean_session', True)
+            s.cleansession = self.config.get('cleansession', True)
         s.keep_alive = self.config['keep_alive']
         if 'will' in self.config:
             s.will_flag = True
