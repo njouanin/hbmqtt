@@ -5,7 +5,7 @@ import unittest
 import asyncio
 
 from hbmqtt.mqtt.connect import ConnectPacket, ConnectVariableHeader, ConnectPayload
-from hbmqtt.session import Session
+from hbmqtt.mqtt.protocol import Session
 from hbmqtt.mqtt.packet import PacketType
 import logging
 
@@ -60,12 +60,11 @@ class ConnectPacketTest(unittest.TestCase):
 
         @asyncio.coroutine
         def client():
-            S = Session(loop)
-            S.reader, S.writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=loop)
-            yield from S.start()
+            S = Session()
+            reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=loop)
+            yield from S.open(reader, writer)
             yield from S.outgoing_queue.put(test_packet)
-            yield from S.stop()
-            S.writer.close()
+            yield from S.close()
 
         # Start server
         loop = asyncio.get_event_loop()
