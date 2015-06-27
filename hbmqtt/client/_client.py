@@ -7,8 +7,7 @@ from urllib.parse import urlparse
 from transitions import Machine, MachineError
 
 from hbmqtt.utils import not_in_dict_or_none
-from hbmqtt.session import Session, SessionState
-from hbmqtt.mqtt.connect import ConnectPacket
+from hbmqtt.mqtt.protocol import Session, SessionState
 from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.publish import PublishPacket
@@ -40,7 +39,7 @@ def gen_client_id():
 
 
 class MQTTClient:
-    states = ['new', 'connecting', 'connected', 'idle', 'disconnected']
+    states = ['new', 'connecting', 'connected', 'disconnected']
 
     def __init__(self, client_id=None, config={}, loop=None):
         """
@@ -94,7 +93,6 @@ class MQTTClient:
         self.machine.add_transition(trigger='connect', source='disconnected', dest='connecting')
         self.machine.add_transition(trigger='connect_fail', source='connecting', dest='disconnected')
         self.machine.add_transition(trigger='connect_success', source='connecting', dest='connected')
-        self.machine.add_transition(trigger='idle', source='connected', dest='idle')
         self.machine.add_transition(trigger='disconnect', source='idle', dest='disconnected')
         self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
 
@@ -237,9 +235,8 @@ class MQTTClient:
     @asyncio.coroutine
     def _connect_coro(self):
         try:
-            self._session.reader, self._session.writer = \
-                yield from asyncio.open_connection(self._session.remote_address, self._session.remote_port)
-            self._session.local_address, self._session.local_port = self._session.writer.get_extra_info('sockname')
+            reader, writer = yield from asyncio.open_connection(self._session.remote_address, self._session.remote_port)
+            self._session.open(reader, writer)
 
             # Send CONNECT packet and wait for CONNACK
             packet = self._session.build_connect_packet()
