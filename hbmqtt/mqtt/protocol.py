@@ -50,6 +50,8 @@ class Session:
     def open(self, reader: asyncio.StreamReader, writer:asyncio.StreamWriter):
         self.reader = reader
         self.writer = writer
+        self.local_address, self.local_port = self.writer.get_extra_info('sockname')
+
         yield from self.handler.start()
 
     @asyncio.coroutine
@@ -132,7 +134,7 @@ class ProtocolHandler:
         while self._running:
             try:
                 self._reader_ready.set()
-                fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.session.reader), 60)
+                fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.session.reader), 5)
                 if fixed_header:
                     cls = packet_class(fixed_header)
                     packet = yield from cls.from_stream(self.session.reader, fixed_header=fixed_header)
@@ -158,7 +160,7 @@ class ProtocolHandler:
         while self._running:
             try:
                 self._writer_ready.set()
-                packet = yield from asyncio.wait_for(out_queue.get(), 60)
+                packet = yield from asyncio.wait_for(out_queue.get(), 5)
                 self.logger.debug(packet)
                 yield from packet.to_stream(self.session.writer)
                 yield from self.session.writer.drain()

@@ -32,18 +32,16 @@ class ConnectPacketTest(unittest.TestCase):
 
         @asyncio.coroutine
         def client():
-            S = Session(loop)
-            S.reader, S.writer = yield from asyncio.open_connection('127.0.0.1', 8888,
+            S = Session()
+            reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888,
                                                         loop=loop)
-            yield from S.start()
+            yield from S.open(reader, writer)
             incoming_packet = yield from S.incoming_queues[PacketType.CONNECT].get()
-            S.writer.close()
-            yield from S.stop()
+            yield from S.close()
             return incoming_packet
 
         packet = loop.run_until_complete(client())
         server.close()
-        loop.stop()
         self.assertEquals(packet.fixed_header.packet_type, PacketType.CONNECT)
 
     def test_write_loop(self):
