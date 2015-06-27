@@ -8,8 +8,7 @@ from transitions import Machine, MachineError
 
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session, SessionState
-from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
-from hbmqtt.mqtt.disconnect import DisconnectPacket
+from hbmqtt.mqtt.connack import ReturnCode
 from hbmqtt.mqtt.publish import PublishPacket
 from hbmqtt.mqtt.puback import PubackPacket
 from hbmqtt.mqtt.pubrec import PubrecPacket
@@ -23,7 +22,7 @@ from hbmqtt.errors import MQTTException
 from hbmqtt.mqtt.protocol import ClientProtocolHandler
 
 _defaults = {
-    'keep_alive': 60,
+    'keep_alive': 10,
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False
@@ -85,7 +84,6 @@ class MQTTClient:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
-        self._ping_handle = None
         self.session = None
         self._handler = None
 
@@ -107,7 +105,6 @@ class MQTTClient:
 
             yield from self._connect_coro()
             self.machine.connect_success()
-            self._keep_alive()
         except MachineError:
             msg = "Connect call incompatible with client current state '%s'" % self.machine.current_state
             self.logger.warn(msg)
@@ -133,24 +130,7 @@ class MQTTClient:
 
     @asyncio.coroutine
     def ping(self):
-        ping_packet = PingReqPacket()
-        self.logger.debug(" -out-> " + repr(ping_packet))
-        yield from ping_packet.to_stream(self.session.writer)
-        response = yield from PingRespPacket.from_stream(self.session.reader)
-        self.logger.debug(" <-in-- " + repr(response))
-        self._keep_alive()
-
-    def _keep_alive(self):
-        if self._ping_handle:
-            try:
-                self._ping_handle.cancel()
-                self.logger.debug('Cancel pending ping')
-            except Exception:
-                pass
-        next_ping = self.session.keep_alive-self.config['ping_delay']
-        if next_ping > 0:
-            self.logger.debug('Next ping in %d seconds' % next_ping)
-            self._ping_handle = self._loop.call_later(next_ping, asyncio.async, self.ping())
+        self._handler.mqtt_ping()
 
     @asyncio.coroutine
     def publish(self, topic, message, dup=False, qos=None, retain=None):
@@ -185,7 +165,6 @@ class MQTTClient:
         packet = PublishPacket.build(topic, message, self.session.next_packet_id, dup, 0x00, retain)
         self.logger.debug(" -out-> " + repr(packet))
         yield from packet.to_stream(self.session.writer)
-        self._keep_alive()
 
     @asyncio.coroutine
     def _publish_qos_1(self, topic, message, dup, retain):
@@ -195,7 +174,6 @@ class MQTTClient:
 
         puback = yield from PubackPacket.from_stream(self.session.reader)
         self.logger.debug(" <-in-- " + repr(puback))
-        self._keep_alive()
 
         if packet.variable_header.packet_id != puback.variable_header.packet_id:
             raise MQTTException("[MQTT-4.3.2-2] Puback packet packet_id doesn't match publish packet")
@@ -219,7 +197,6 @@ class MQTTClient:
         self.logger.debug(" <-in-- " + repr(pubcomp))
         if pubrel.variable_header.packet_id != pubcomp.variable_header.packet_id:
             raise MQTTException("[MQTT-4.3.2-2] Pubcomp packet packet_id doesn't match pubrel packet")
-        self._keep_alive()
 
     @asyncio.coroutine
     def subscribe(self, topics):
@@ -231,7 +208,6 @@ class MQTTClient:
         self.logger.debug(" <-in-- " + repr(suback))
         if suback.variable_header.packet_id != subscribe.variable_header.packet_id:
             raise MQTTException("[MQTT-4.3.2-2] Suback packet packet_id doesn't match subscribe packet")
-        self._keep_alive()
 
     @asyncio.coroutine
     def _connect_coro(self):
