@@ -46,3 +46,9 @@ class UnsubscribePacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = variable_header
         self.payload = payload
+
+    @classmethod
+    def build(cls, topics, packet_id):
+        v_header = PacketIdVariableHeader(packet_id)
+        payload = UnubscribePayload(topics)
+        return UnsubscribePacket(variable_header=v_header, payload=payload)
