@@ -19,7 +19,8 @@ _defaults = {
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False,
-    'inflight-polling-interval': 1
+    'inflight-polling-interval': 2,
+    'subscriptions-polling-interval': 2,
 }
 
 
@@ -172,14 +173,11 @@ class MQTTClient:
 
     @asyncio.coroutine
     def subscribe(self, topics):
-        subscribe = SubscribePacket.build(topics, self.session.next_packet_id)
-        yield from subscribe.to_stream(self.session.writer)
-        self.logger.debug(" -out-> " + repr(subscribe))
+        yield from self._handler.mqtt_subscribe(topics, self.session.next_packet_id)
 
-        suback = yield from SubackPacket.from_stream(self.session.reader)
-        self.logger.debug(" <-in-- " + repr(suback))
-        if suback.variable_header.packet_id != subscribe.variable_header.packet_id:
-            raise MQTTException("[MQTT-4.3.2-2] Suback packet packet_id doesn't match subscribe packet")
+    @asyncio.coroutine
+    def unsubscribe(self, topics):
+        yield from self._handler.mqtt_unsubscribe(topics, self.session.next_packet_id)
 
     @asyncio.coroutine
     def _connect_coro(self):

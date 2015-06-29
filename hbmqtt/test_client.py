@@ -35,14 +35,18 @@ def test_coro():
     ]
     yield from asyncio.wait(tasks)
     logger.info("messages published")
-#     yield from C.subscribe([
-#                 {'filter': 'a/b', 'qos': 0x01},
-#                 {'filter': 'c/d', 'qos': 0x02}
-#             ])
+    yield from C.subscribe([
+                 {'filter': 'a/b', 'qos': 0x01},
+                 {'filter': 'c/d', 'qos': 0x02}
+             ])
+    logger.info("Subscribed")
+    yield from C.unsubscribe(['a/b', 'c/d'])
+    logger.info("Unsubscribed")
 
     yield from C.disconnect()
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    formatter = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+    logging.basicConfig(level=logging.DEBUG, format=formatter)
     asyncio.get_event_loop().run_until_complete(test_coro())

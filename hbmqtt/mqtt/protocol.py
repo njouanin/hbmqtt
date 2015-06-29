@@ -12,6 +12,8 @@ from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.publish import PublishPacket
 from hbmqtt.mqtt.pubrel import PubrelPacket
+from hbmqtt.mqtt.subscribe import SubscribePacket
+from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.session import Session
 from blinker import Signal
 from transitions import Machine, MachineError
@@ -148,7 +150,8 @@ class ProtocolHandler:
                     yield from self.incoming_queues[packet.fixed_header.packet_type].put(packet)
                     self.packet_received.send(packet)
                 else:
-                    self.logger.debug("No data")
+                    self.logger.debug("No more data, stopping reader coro")
+                    break
             except asyncio.TimeoutError:
                 self.logger.debug("Input stream read timeout")
             except NoDataException as nde:
@@ -189,6 +192,7 @@ class ProtocolHandler:
                     self.logger.warn("Unhandled exception in writer coro: %s" % e)
         self.logger.debug("Writer coro stopped")
 
+    @asyncio.coroutine
     def _inflight_coro(self):
         self.logger.debug("Starting in-flight messages polling coro")
         while self._running:
@@ -232,25 +236,57 @@ class ProtocolHandler:
         self.logger.debug("In-flight messages polling coro stopped")
 
 
+class Subscription:
+    states = ['new', 'subscribed', 'acknowledged']
+    def __init__(self, packet_id, topics):
+        self.topics = topics
+        self.packet_id = packet_id
+        self._init_states()
+
+    def _init_states(self):
+        self.machine = Machine(model=self, states=Subscription.states, initial='new')
+        self.machine.add_transition(trigger='subscribe', source='new', dest='subscribed')
+        self.machine.add_transition(trigger='acknowledge', source='subscribed', dest='acknowledged')
+
+class UnSubscription:
+    states = ['new', 'unsubscribed', 'acknowledged']
+    def __init__(self, packet_id, topics):
+        self.topics = topics
+        self.packet_id = packet_id
+        self._init_states()
+
+    def _init_states(self):
+        self.machine = Machine(model=self, states=UnSubscription.states, initial='new')
+        self.machine.add_transition(trigger='unsubscribe', source='new', dest='unsubscribed')
+        self.machine.add_transition(trigger='acknowledge', source='unsubscribed', dest='acknowledged')
+
 
 class ClientProtocolHandler(ProtocolHandler):
     def __init__(self, session: Session, config, loop=None):
         super().__init__(session, config, loop)
         self._ping_task = None
+        self.subscriptions = dict()
+        self._subscription_task = None
+        self._subscriptions_changed = asyncio.Condition(loop=self._loop)
+        self._subscriptions_ready = asyncio.Event(loop=self._loop)
 
     @asyncio.coroutine
     def start(self):
         yield from super().start()
         self.packet_sent.connect(self._do_keepalive)
+        self._subscription_task = asyncio.async(self._subscriptions_coro(), loop=self._loop)
+        yield from asyncio.wait([self._subscriptions_ready.wait()], loop=self._loop)
+
 
     @asyncio.coroutine
     def stop(self):
+        yield from super().stop()
+        yield from asyncio.wait([self._subscription_task], loop=self._loop)
         if self._ping_task:
             try:
                 self._ping_task.cancel()
             except Exception:
                 pass
-        yield from super().stop()
 
     def _do_keepalive(self, message):
         if self._ping_task:
@@ -263,6 +299,85 @@ class ClientProtocolHandler(ProtocolHandler):
         if next_ping > 0:
             self.logger.debug('Next ping in %d seconds' % next_ping)
             self._ping_task = self._loop.call_later(next_ping, asyncio.async, self.mqtt_ping())
+
+    def _subscriptions_coro(self):
+        self.logger.debug("Starting subscriptions polling coro")
+        while self._running:
+            self._subscriptions_ready.set()
+            yield from asyncio.sleep(self.config['subscriptions-polling-interval'])
+            self.logger.debug("Subscriptions polling coro wake-up")
+            try:
+                while not self.incoming_queues[PacketType.SUBACK].empty():
+                    packet = self.incoming_queues[PacketType.SUBACK].get_nowait()
+                    packet_id = packet.variable_header.packet_id
+                    subscription = self.subscriptions.get(packet_id)
+                    for i in range(len(subscription.topics)):
+                        subscription.topics[i]['return_code'] = packet.payload.return_codes[i]
+                    subscription.acknowledge()
+                    self.logger.debug("Subscription with packet Id=%s acknowledged" % packet_id)
+
+                while not self.incoming_queues[PacketType.UNSUBACK].empty():
+                    packet = self.incoming_queues[PacketType.UNSUBACK].get_nowait()
+                    packet_id = packet.variable_header.packet_id
+                    subscription = self.subscriptions.get(packet_id)
+                    subscription.acknowledge()
+                    self.logger.debug("Unsubscription with packet Id=%s acknowledged" % packet_id)
+
+                yield from self._subscriptions_changed.acquire()
+                self._subscriptions_changed.notify_all()
+                self._subscriptions_changed.release()
+            except KeyError:
+                self.logger.warn("Received %s for unknown subscription message Id %d" % (packet.fixed_header.packet_type, packet_id))
+            except MachineError as me:
+                self.logger.warn("Packet type incompatible with message QOS: %s" % me)
+        self.logger.debug("Subscriptions polling coro stopped")
+
+    @asyncio.coroutine
+    def mqtt_subscribe(self, topics, packet_id):
+        """
+
+        :param topics: array of topics [{'filter':'/a/b', 'qos': 0x00}, ...]
+        :return:
+        """
+        def acknowledged_predicate():
+            if self.subscriptions[subscribe.variable_header.packet_id].state == 'acknowledged':
+                return True
+            else:
+                return False
+
+        subscribe = SubscribePacket.build(topics, packet_id)
+        yield from self.outgoing_queue.put(subscribe)
+        subscription = Subscription(subscribe.variable_header.packet_id, topics)
+        subscription.subscribe()
+        self.subscriptions[subscribe.variable_header.packet_id] = subscription
+        yield from self._subscriptions_changed.acquire()
+        yield from self._subscriptions_changed.wait_for(acknowledged_predicate)
+        self.subscriptions.pop(subscribe.variable_header.packet_id)
+        self._subscriptions_changed.release()
+
+    @asyncio.coroutine
+    def mqtt_unsubscribe(self, topics, packet_id):
+        """
+
+        :param topics: array of topics ['/a/b', ...]
+        :return:
+        """
+        def acknowledged_predicate():
+            if self.subscriptions[unsubscribe.variable_header.packet_id].state == 'acknowledged':
+                return True
+            else:
+                return False
+
+        unsubscribe = UnsubscribePacket.build(topics, packet_id)
+        yield from self.outgoing_queue.put(unsubscribe)
+        subscription = UnSubscription(unsubscribe.variable_header.packet_id, topics)
+        subscription.unsubscribe()
+        self.subscriptions[unsubscribe.variable_header.packet_id] = subscription
+        self.subscriptions[unsubscribe.variable_header.packet_id] = subscription
+        yield from self._subscriptions_changed.acquire()
+        yield from self._subscriptions_changed.wait_for(acknowledged_predicate)
+        self.subscriptions.pop(unsubscribe.variable_header.packet_id)
+        self._subscriptions_changed.release()
 
     @asyncio.coroutine
     def mqtt_connect(self):
