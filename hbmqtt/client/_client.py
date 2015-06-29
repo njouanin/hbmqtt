@@ -19,8 +19,8 @@ _defaults = {
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False,
-    'inflight-polling-interval': 2,
-    'subscriptions-polling-interval': 2,
+    'inflight-polling-interval': 1,
+    'subscriptions-polling-interval': 1,
 }
 
 

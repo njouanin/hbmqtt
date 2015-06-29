@@ -292,12 +292,11 @@ class ClientProtocolHandler(ProtocolHandler):
         if self._ping_task:
             try:
                 self._ping_task.cancel()
-                self.logger.debug('Cancel pending ping')
             except Exception:
                 pass
         next_ping = self.session.keep_alive - self.config['ping_delay']
         if next_ping > 0:
-            self.logger.debug('Next ping in %d seconds' % next_ping)
+            self.logger.debug('Next ping in %d seconds if no new messages between' % next_ping)
             self._ping_task = self._loop.call_later(next_ping, asyncio.async, self.mqtt_ping())
 
     def _subscriptions_coro(self):

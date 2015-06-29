@@ -9,7 +9,6 @@ C = MQTTClient()
 @asyncio.coroutine
 def test_coro():
     yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username='testuser', password="passwd")
-    yield from asyncio.sleep(1)
     tasks = [
         asyncio.async(C.publish('a/b', b'0123456789')),
         asyncio.async(C.publish('a/b', b'0', qos=0x01)),
