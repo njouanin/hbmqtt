@@ -20,6 +20,7 @@ from transitions import Machine, MachineError
 
 class InFlightMessage:
     states = ['new', 'published', 'acknowledged', 'received', 'released', 'completed']
+
     def __init__(self, packet_id, qos):
         self.packet_id = packet_id
         self.qos = qos
@@ -34,6 +35,7 @@ class InFlightMessage:
             self.machine.add_transition(trigger='receive', source='published', dest='received')
             self.machine.add_transition(trigger='release', source='received', dest='released')
             self.machine.add_transition(trigger='complete', source='released', dest='completed')
+
 
 class ProtocolHandler:
     """
@@ -74,13 +76,13 @@ class ProtocolHandler:
         self._reader_task = asyncio.async(self._reader_coro(), loop=self._loop)
         self._writer_task = asyncio.async(self._writer_coro(), loop=self._loop)
         self._inflight_task = asyncio.async(self._inflight_coro(), loop=self._loop)
-        yield from asyncio.wait([self._reader_ready.wait(), self._writer_ready.wait(), self._inflight_ready.wait()], loop=self._loop)
+        yield from asyncio.wait(
+            [self._reader_ready.wait(), self._writer_ready.wait(), self._inflight_ready.wait()], loop=self._loop)
         self.logger.debug("Handler tasks started")
 
     @asyncio.coroutine
     def mqtt_publish(self, topic, message, packet_id, dup, qos, retain):
         def qos_0_predicate():
-            #self.logger.debug("qos_0 predicate call")
             ret = False
             try:
                 if self.inflight_messages.get(packet_id).state == 'published':
@@ -91,7 +93,6 @@ class ProtocolHandler:
                 return False
 
         def qos_1_predicate():
-            #self.logger.debug("qos_1 predicate call")
             ret = False
             try:
                 if self.inflight_messages.get(packet_id).state == 'acknowledged':
@@ -102,7 +103,6 @@ class ProtocolHandler:
                 return False
 
         def qos_2_predicate():
-            #self.logger.debug("qos_2 predicate call")
             ret = False
             try:
                 if self.inflight_messages.get(packet_id).state == 'completed':
@@ -160,7 +160,6 @@ class ProtocolHandler:
                 self.logger.warn("Unhandled exception in reader coro: %s" % e)
                 break
         self.logger.debug("Reader coro stopped")
-
 
     @asyncio.coroutine
     def _writer_coro(self):
@@ -238,6 +237,7 @@ class ProtocolHandler:
 
 class Subscription:
     states = ['new', 'subscribed', 'acknowledged']
+
     def __init__(self, packet_id, topics):
         self.topics = topics
         self.packet_id = packet_id
@@ -250,6 +250,7 @@ class Subscription:
 
 class UnSubscription:
     states = ['new', 'unsubscribed', 'acknowledged']
+
     def __init__(self, packet_id, topics):
         self.topics = topics
         self.packet_id = packet_id
@@ -276,7 +277,6 @@ class ClientProtocolHandler(ProtocolHandler):
         self.packet_sent.connect(self._do_keepalive)
         self._subscription_task = asyncio.async(self._subscriptions_coro(), loop=self._loop)
         yield from asyncio.wait([self._subscriptions_ready.wait()], loop=self._loop)
-
 
     @asyncio.coroutine
     def stop(self):
@@ -352,8 +352,9 @@ class ClientProtocolHandler(ProtocolHandler):
         self.subscriptions[subscribe.variable_header.packet_id] = subscription
         yield from self._subscriptions_changed.acquire()
         yield from self._subscriptions_changed.wait_for(acknowledged_predicate)
-        self.subscriptions.pop(subscribe.variable_header.packet_id)
+        subscription = self.subscriptions.pop(subscribe.variable_header.packet_id)
         self._subscriptions_changed.release()
+        return subscription
 
     @asyncio.coroutine
     def mqtt_unsubscribe(self, topics, packet_id):
@@ -376,8 +377,9 @@ class ClientProtocolHandler(ProtocolHandler):
         self.subscriptions[unsubscribe.variable_header.packet_id] = subscription
         yield from self._subscriptions_changed.acquire()
         yield from self._subscriptions_changed.wait_for(acknowledged_predicate)
-        self.subscriptions.pop(unsubscribe.variable_header.packet_id)
+        subscription = self.subscriptions.pop(unsubscribe.variable_header.packet_id)
         self._subscriptions_changed.release()
+        return subscription
 
     @asyncio.coroutine
     def mqtt_connect(self):
@@ -431,5 +433,3 @@ class ClientProtocolHandler(ProtocolHandler):
         ping_packet = PingReqPacket()
         yield from self.outgoing_queue.put(ping_packet)
         yield from self.incoming_queues[PacketType.PINGRESP].get()
-
-
