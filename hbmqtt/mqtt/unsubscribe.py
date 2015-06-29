@@ -37,7 +37,7 @@ class UnsubscribePacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PacketIdVariableHeader=None, payload=None):
         if fixed is None:
-            header = MQTTFixedHeader(PacketType.UNSUBSCRIBE, 0x00)
+            header = MQTTFixedHeader(PacketType.UNSUBSCRIBE, 0x02) # [MQTT-3.10.1-1]
         else:
             if fixed.packet_type is not PacketType.UNSUBSCRIBE:
                 raise HBMQTTException("Invalid fixed packet type %s for UnsubscribePacket init" % fixed.packet_type)

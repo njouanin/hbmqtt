@@ -7,12 +7,12 @@ from hbmqtt.mqtt.unsubscribe import UnsubscribePacket, UnubscribePayload
 from hbmqtt.mqtt.packet import PacketIdVariableHeader
 from hbmqtt.codecs import *
 
-class SubscribePacketTest(unittest.TestCase):
+class UnsubscribePacketTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
 
     def test_from_stream(self):
-        data = b'\xa0\x0c\x00\n\x00\x03a/b\x00\x03c/d'
+        data = b'\xa2\x0c\x00\n\x00\x03a/b\x00\x03c/d'
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
@@ -25,4 +25,4 @@ class SubscribePacketTest(unittest.TestCase):
         payload = UnubscribePayload(['a/b', 'c/d'])
         publish = UnsubscribePacket(variable_header=variable_header, payload=payload)
         out = publish.to_bytes()
-        self.assertEqual(out, b'\xa0\x0c\x00\n\x00\x03a/b\x00\x03c/d')
+        self.assertEqual(out, b'\xa2\x0c\x00\n\x00\x03a/b\x00\x03c/d')
