@@ -7,7 +7,7 @@ from hbmqtt.mqtt.suback import SubackPacket, SubackPayload
 from hbmqtt.mqtt.packet import PacketIdVariableHeader
 from hbmqtt.codecs import *
 
-class SubscribePacketTest(unittest.TestCase):
+class SubackPacketTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
 
