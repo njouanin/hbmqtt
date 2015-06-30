@@ -6,54 +6,6 @@ from hbmqtt.errors import HBMQTTException, MQTTException
 from hbmqtt.codecs import *
 
 
-class PublishFixedHeader(MQTTFixedHeader):
-    DUP_FLAG = 0x08
-    RETAIN_FLAG = 0x01
-    QOS_FLAG = 0x06
-
-    def set_flags(self, dup_flag=False, qos=0, retain_flag=False):
-        self.dup_flag = dup_flag
-        self.retain_flag = retain_flag
-        self.qos = qos
-
-    def _set_flag(self, val, mask):
-        if val:
-            self.flags |= mask
-        else:
-            self.flags &= ~mask
-
-    def _get_flag(self, mask):
-        if self.flags & mask:
-            return True
-        else:
-            return False
-
-    @property
-    def dup_flag(self) -> bool:
-        return self._get_flag(self.DUP_FLAG)
-
-    @dup_flag.setter
-    def dup_flag(self, val: bool):
-        self._set_flag(val, self.DUP_FLAG)
-
-    @property
-    def retain_flag(self) -> bool:
-        return self._get_flag(self.RETAIN_FLAG)
-
-    @retain_flag.setter
-    def retain_flag(self, val: bool):
-        self._set_flag(val, self.RETAIN_FLAG)
-
-    @property
-    def qos(self):
-        return (self.flags & self.QOS_FLAG) >> 1
-
-    @qos.setter
-    def qos(self, val: int):
-        self.flags &= (0x00 << 1)
-        self.flags |= (val << 1)
-
-
 class PublishVariableHeader(MQTTVariableHeader):
     def __init__(self, topic_name: str, packet_id: int=None):
         super().__init__()
@@ -73,12 +25,9 @@ class PublishVariableHeader(MQTTVariableHeader):
         return out
 
     @classmethod
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: PublishFixedHeader):
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         topic_name = yield from decode_string(reader)
-        if fixed_header.qos:
-            packet_id = yield from decode_packet_id(reader)
-        else:
-            packet_id = None
+        packet_id = yield from decode_packet_id(reader)
         return cls(topic_name, packet_id)
 
 
@@ -93,18 +42,25 @@ class PublishPayload(MQTTPayload):
     @classmethod
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
-        data = yield from reader.read()
+        data = yield from reader.read(fixed_header.remaining_length-variable_header.bytes_length)
         return cls(data)
+
+    def __repr__(self):
+        return type(self).__name__ + '(data={0!r})'.format(repr(self.data))
 
 
 class PublishPacket(MQTTPacket):
-    FIXED_HEADER = PublishFixedHeader
     VARIABLE_HEADER = PublishVariableHeader
     PAYLOAD = PublishPayload
 
-    def __init__(self, fixed: PublishFixedHeader=None, variable_header: PublishVariableHeader=None, payload=None):
+    DUP_FLAG = 0x08
+    RETAIN_FLAG = 0x01
+    QOS_FLAG = 0x06
+
+
+    def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PublishVariableHeader=None, payload=None):
         if fixed is None:
-            header = PublishFixedHeader(PacketType.PUBLISH, 0x00)
+            header = MQTTFixedHeader(PacketType.PUBLISH, 0x00)
         else:
             if fixed.packet_type is not PacketType.PUBLISH:
                 raise HBMQTTException("Invalid fixed packet type %s for PublishPacket init" % fixed.packet_type)
@@ -114,12 +70,55 @@ class PublishPacket(MQTTPacket):
         self.variable_header = variable_header
         self.payload = payload
 
+    def set_flags(self, dup_flag=False, qos=0, retain_flag=False):
+        self.dup_flag = dup_flag
+        self.retain_flag = retain_flag
+        self.qos = qos
+
+    def _set_header_flag(self, val, mask):
+        if val:
+            self.fixed_header.flags |= mask
+        else:
+            self.fixed_header.flags &= ~mask
+
+    def _get_header_flag(self, mask):
+        if self.fixed_header.flags & mask:
+            return True
+        else:
+            return False
+
+    @property
+    def dup_flag(self) -> bool:
+        return self._get_header_flag(self.DUP_FLAG)
+
+    @dup_flag.setter
+    def dup_flag(self, val: bool):
+        self._set_header_flag(val, self.DUP_FLAG)
+
+    @property
+    def retain_flag(self) -> bool:
+        return self._get_header_flag(self.RETAIN_FLAG)
+
+    @retain_flag.setter
+    def retain_flag(self, val: bool):
+        self._set_header_flag(val, self.RETAIN_FLAG)
+
+    @property
+    def qos(self):
+        return (self.fixed_header.flags & self.QOS_FLAG) >> 1
+
+    @qos.setter
+    def qos(self, val: int):
+        self.fixed_header.flags &= (0x00 << 1)
+        self.fixed_header.flags |= (val << 1)
+
+
     @classmethod
     def build(cls, topic_name: str, message:bytes, packet_id: int, dup_flag, qos, retain):
         v_header = PublishVariableHeader(topic_name, packet_id)
         payload = PublishPayload(message)
         packet = PublishPacket(variable_header=v_header, payload=payload)
-        packet.fixed_header.dup_flag = dup_flag
-        packet.fixed_header.retain_flag = retain
-        packet.fixed_header.qos = qos
+        packet.dup_flag = dup_flag
+        packet.retain_flag = retain
+        packet.qos = qos
         return packet
