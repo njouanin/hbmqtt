@@ -14,6 +14,15 @@ logging.basicConfig(level=logging.DEBUG)
 
 ret_packet = None
 
+config = {
+    'keep_alive': 10,
+    'ping_delay': 1,
+    'default_qos': 0,
+    'default_retain': False,
+    'inflight-polling-interval': 1,
+    'subscriptions-polling-interval': 1,
+}
+
 class ConnectPacketTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
@@ -36,7 +45,7 @@ class ConnectPacketTest(unittest.TestCase):
             S = Session()
             S.reader, S.writer = yield from asyncio.open_connection('127.0.0.1', 8888,
                                                         loop=loop)
-            h = ProtocolHandler(S)
+            h = ProtocolHandler(S, config)
             yield from h.start()
             incoming_packet = yield from h.incoming_queues[PacketType.CONNECT].get()
             yield from h.stop()
@@ -62,7 +71,7 @@ class ConnectPacketTest(unittest.TestCase):
         def client():
             S = Session()
             S.reader, S.writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=loop)
-            h = ProtocolHandler(S)
+            h = ProtocolHandler(S, config)
             yield from h.start()
             yield from h.outgoing_queue.put(test_packet)
             yield from h.stop()
