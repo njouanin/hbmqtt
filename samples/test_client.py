@@ -8,7 +8,7 @@ C = MQTTClient()
 
 @asyncio.coroutine
 def test_coro():
-    yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username='testuser', password="passwd")
+    yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username=None, password=None)
     tasks = [
         asyncio.async(C.publish('a/b', b'0123456789')),
         asyncio.async(C.publish('a/b', b'0', qos=0x01)),
@@ -35,12 +35,11 @@ def test_coro():
     yield from asyncio.wait(tasks)
     logger.info("messages published")
     yield from C.subscribe([
-                 {'filter': 'a/b', 'qos': 0x01},
-                 {'filter': 'c/d', 'qos': 0x02}
+                 {'filter': '$SYS/broker/connections/*', 'qos': 0x01},
              ])
     logger.info("Subscribed")
-    yield from C.unsubscribe(['a/b', 'c/d'])
-    logger.info("Unsubscribed")
+    #yield from C.unsubscribe(['a/b', 'c/d'])
+    #logger.info("Unsubscribed")
 
     yield from C.disconnect()
 
