@@ -1,7 +1,3 @@
-# Copyright (c) 2015 Nicolas JOUANIN
-#
-# See the file license.txt for copying permission.
-import asyncio
 from enum import Enum
 
 class SessionState(Enum):
@@ -30,8 +26,6 @@ class Session:
         self.password = None
         self.scheme = None
         self._packet_id = 0
-
-        self._out_queue = asyncio.Queue()
 
     @property
     def next_packet_id(self):

@@ -31,4 +31,4 @@ class SubscribePacketTest(unittest.TestCase):
             ])
         publish = SubscribePacket(variable_header=variable_header, payload=payload)
         out = publish.to_bytes()
-        self.assertEqual(out, b'\x80\x0e\x00\x0a\x00\x03a/b\x01\x00\x03c/d\x02')
+        self.assertEqual(out, b'\x82\x0e\x00\x0a\x00\x03a/b\x01\x00\x03c/d\x02')

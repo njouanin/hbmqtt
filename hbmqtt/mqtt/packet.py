@@ -110,14 +110,17 @@ class MQTTFixedHeader:
                         raise MQTTException("Invalid remaining length bytes:%s" % bytes_to_hex_str(length_bytes))
             return value
 
-        b1 = yield from read_or_raise(reader, 1)
-        msg_type = decode_message_type(b1)
-        if msg_type is PacketType.RESERVED_0 or msg_type is PacketType.RESERVED_15:
-            raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
-        flags = decode_flags(b1)
+        try:
+            b1 = yield from read_or_raise(reader, 1)
+            msg_type = decode_message_type(b1)
+            if msg_type is PacketType.RESERVED_0 or msg_type is PacketType.RESERVED_15:
+                raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
+            flags = decode_flags(b1)
 
-        remain_length = yield from decode_remaining_length()
-        return cls(msg_type, flags, remain_length)
+            remain_length = yield from decode_remaining_length()
+            return cls(msg_type, flags, remain_length)
+        except NoDataException:
+            return None
 
     def __repr__(self):
         return type(self).__name__ + '(type={0}, length={1}, flags={2})'.format(self.packet_type, self.remaining_length, hex(self.flags))

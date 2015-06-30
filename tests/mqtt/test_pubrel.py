@@ -21,4 +21,4 @@ class PubrelPacketTest(unittest.TestCase):
         variable_header = PacketIdVariableHeader(10)
         publish = PubrelPacket(variable_header=variable_header)
         out = publish.to_bytes()
-        self.assertEqual(out, b'\x60\x02\x00\x0a')
+        self.assertEqual(out, b'\x62\x02\x00\x0a')
