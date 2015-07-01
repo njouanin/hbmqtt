@@ -27,7 +27,11 @@ class PublishVariableHeader(MQTTVariableHeader):
     @classmethod
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         topic_name = yield from decode_string(reader)
-        packet_id = yield from decode_packet_id(reader)
+        has_qos = (fixed_header.flags >> 1) & 0x03
+        if has_qos:
+            packet_id = yield from decode_packet_id(reader)
+        else:
+            packet_id = None
         return cls(topic_name, packet_id)
 
 
