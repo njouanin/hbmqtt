@@ -118,8 +118,10 @@ class ProtocolHandler:
             self._pubcomp_waiters[packet_id] = waiter
             yield from waiter
             del self._pubcomp_waiters[packet_id]
+            inflight_message.complete()
 
         del self.inflight_messages[packet_id]
+        return inflight_message
 
     @asyncio.coroutine
     def stop(self):
