@@ -174,7 +174,7 @@ class MQTTClient:
 
     @asyncio.coroutine
     def subscribe(self, topics):
-        yield from self._handler.mqtt_subscribe(topics, self.session.next_packet_id)
+        return (yield from self._handler.mqtt_subscribe(topics, self.session.next_packet_id))
 
     @asyncio.coroutine
     def unsubscribe(self, topics):
