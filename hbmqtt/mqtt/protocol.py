@@ -8,6 +8,7 @@ from hbmqtt.mqtt import packet_class
 from hbmqtt.errors import NoDataException
 from hbmqtt.mqtt.packet import PacketType
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
+from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.publish import PublishPacket
@@ -148,7 +149,11 @@ class ProtocolHandler:
                     cls = packet_class(fixed_header)
                     packet = yield from cls.from_stream(self.session.reader, fixed_header=fixed_header)
                     self.logger.debug(" <-in-- " + repr(packet))
-                    yield from self.incoming_queues[packet.fixed_header.packet_type].put(packet)
+
+                    if packet.fixed_header.packet_type == PacketType.CONNACK:
+                        yield from self.handle_connack(packet)
+                    else:
+                        yield from self.incoming_queues[packet.fixed_header.packet_type].put(packet)
                 else:
                     self.logger.debug("No more data, stopping reader coro")
                     break
@@ -263,6 +268,9 @@ class ProtocolHandler:
     def handle_keepalive(self):
         pass
 
+    @asyncio.coroutine
+    def handle_connack(self, connack: ConnackPacket):
+        pass
 
 class Subscription:
     states = ['new', 'subscribed', 'acknowledged']
@@ -299,6 +307,7 @@ class ClientProtocolHandler(ProtocolHandler):
         self._subscription_task = None
         self._subscriptions_changed = asyncio.Condition(loop=self._loop)
         self._subscriptions_ready = asyncio.Event(loop=self._loop)
+        self._connack_queue = asyncio.Queue(maxsize=1)
 
     @asyncio.coroutine
     def start(self):
@@ -436,9 +445,13 @@ class ClientProtocolHandler(ProtocolHandler):
 
         packet = build_connect_packet(self.session)
         yield from self.outgoing_queue.put(packet)
-        connack = yield from self.incoming_queues[PacketType.CONNACK].get()
+        connack = yield from self._connack_queue.get()
 
         return connack.variable_header.return_code
+
+    @asyncio.coroutine
+    def handle_connack(self, connack: ConnackPacket):
+        yield from self._connack_queue.put(connack)
 
     @asyncio.coroutine
     def mqtt_disconnect(self):
