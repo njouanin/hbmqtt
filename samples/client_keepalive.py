@@ -4,18 +4,17 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
-C = MQTTClient()
+config = {
+    'keep_alive': 5,
+    'ping_delay': 1,
+}
+C = MQTTClient(config=config)
 
 @asyncio.coroutine
 def test_coro():
     yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username=None, password=None)
-    tasks = [
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
-    ]
-    yield from asyncio.wait(tasks)
-    logger.info("messages published")
+    yield from asyncio.sleep(18)
+
     yield from C.disconnect()
 
 

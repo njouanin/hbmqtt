@@ -9,12 +9,14 @@ C = MQTTClient()
 @asyncio.coroutine
 def test_coro():
     yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username=None, password=None)
-    yield from C.subscribe([
-                 {'filter': '$SYS/broker/uptime', 'qos': 0x00},
+    ret = yield from C.subscribe([
+                 {'filter': '$SYS/broker/uptime', 'qos': 0x01},
              ])
     logger.info("Subscribed")
-
-    yield from asyncio.sleep(60)
+    logger.info(repr(ret))
+    yield from asyncio.sleep(10)
+    yield from C.unsubscribe(['$SYS/broker/uptime'])
+    logger.info("UnSubscribed")
     yield from C.disconnect()
 
 

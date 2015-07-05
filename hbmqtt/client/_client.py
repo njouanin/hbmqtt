@@ -19,7 +19,6 @@ _defaults = {
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False,
-    'inflight-polling-interval': 1,
     'subscriptions-polling-interval': 1,
 }
 
@@ -66,8 +65,8 @@ class MQTTClient:
         :return:
         """
         self.logger = logging.getLogger(__name__)
-        self.config = config.copy()
-        self.config.update(_defaults)
+        self.config = _defaults
+        self.config.update(config)
         if client_id is not None:
             self.client_id = client_id
         else:
@@ -98,8 +97,9 @@ class MQTTClient:
             self.session = self._initsession(host, port, username, password, uri, cleansession)
             self.logger.debug("Connect with session parameters: %s" % self.session)
 
-            yield from self._connect_coro()
+            return_code = yield from self._connect_coro()
             self.machine.connect_success()
+            return return_code
         except MachineError:
             msg = "Connect call incompatible with client current state '%s'" % self.machine.current_state
             self.logger.warn(msg)
@@ -173,7 +173,7 @@ class MQTTClient:
 
     @asyncio.coroutine
     def subscribe(self, topics):
-        yield from self._handler.mqtt_subscribe(topics, self.session.next_packet_id)
+        return (yield from self._handler.mqtt_subscribe(topics, self.session.next_packet_id))
 
     @asyncio.coroutine
     def unsubscribe(self, topics):
@@ -194,6 +194,7 @@ class MQTTClient:
 
             self.session.state = SessionState.CONNECTED
             self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
+            return return_code
         except Exception as e:
             self.session.state = SessionState.DISCONNECTED
             raise e
