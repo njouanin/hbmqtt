@@ -10,37 +10,12 @@ C = MQTTClient()
 def test_coro():
     yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username=None, password=None)
     tasks = [
-        asyncio.async(C.publish('a/b', b'0123456789')),
-        asyncio.async(C.publish('a/b', b'0', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'1', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'2', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'3', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'4', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'5', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'6', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'7', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'8', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'9', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'0', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'1', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'2', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'3', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'4', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'5', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'6', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'7', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'8', qos=0x02)),
-        asyncio.async(C.publish('a/b', b'9', qos=0x02)),
+        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
+        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
+        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
     ]
     yield from asyncio.wait(tasks)
     logger.info("messages published")
-    yield from C.subscribe([
-                 {'filter': '$SYS/broker/connections/*', 'qos': 0x01},
-             ])
-    logger.info("Subscribed")
-    #yield from C.unsubscribe(['a/b', 'c/d'])
-    #logger.info("Unsubscribed")
-
     yield from C.disconnect()
 
 

@@ -10,7 +10,7 @@ C = MQTTClient()
 def test_coro():
     yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username=None, password=None)
     ret = yield from C.subscribe([
-                 {'filter': '$SYS/broker/uptime', 'qos': 0x00},
+                 {'filter': '$SYS/broker/uptime', 'qos': 0x01},
              ])
     logger.info("Subscribed")
     logger.info(repr(ret))
