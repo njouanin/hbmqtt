@@ -3,6 +3,7 @@
 # See the file license.txt for copying permission.
 import logging
 import asyncio
+from asyncio import futures
 from hbmqtt.mqtt.packet import MQTTFixedHeader
 from hbmqtt.mqtt import packet_class
 from hbmqtt.errors import NoDataException
@@ -307,7 +308,7 @@ class ClientProtocolHandler(ProtocolHandler):
         self._subscription_task = None
         self._subscriptions_changed = asyncio.Condition(loop=self._loop)
         self._subscriptions_ready = asyncio.Event(loop=self._loop)
-        self._connack_queue = asyncio.Queue(maxsize=1)
+        self._connack_waiter = None
 
     @asyncio.coroutine
     def start(self):
@@ -445,19 +446,19 @@ class ClientProtocolHandler(ProtocolHandler):
 
         packet = build_connect_packet(self.session)
         yield from self.outgoing_queue.put(packet)
-        connack = yield from self._connack_queue.get()
-
-        return connack.variable_header.return_code
+        self._connack_waiter = futures.Future(loop=self._loop)
+        return (yield from self._connack_waiter)
 
     @asyncio.coroutine
     def handle_connack(self, connack: ConnackPacket):
-        yield from self._connack_queue.put(connack)
+        self._connack_waiter.set_result(connack.variable_header.return_code)
 
     @asyncio.coroutine
     def mqtt_disconnect(self):
         # yield from self.outgoing_queue.join() To be used in Python 3.5
         disconnect_packet = DisconnectPacket()
         yield from self.outgoing_queue.put(disconnect_packet)
+        self._connack_waiter = None
 
     @asyncio.coroutine
     def mqtt_ping(self):
