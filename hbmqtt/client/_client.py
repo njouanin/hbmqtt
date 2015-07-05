@@ -98,8 +98,9 @@ class MQTTClient:
             self.session = self._initsession(host, port, username, password, uri, cleansession)
             self.logger.debug("Connect with session parameters: %s" % self.session)
 
-            yield from self._connect_coro()
+            return_code = yield from self._connect_coro()
             self.machine.connect_success()
+            return return_code
         except MachineError:
             msg = "Connect call incompatible with client current state '%s'" % self.machine.current_state
             self.logger.warn(msg)
@@ -194,6 +195,7 @@ class MQTTClient:
 
             self.session.state = SessionState.CONNECTED
             self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
+            return return_code
         except Exception as e:
             self.session.state = SessionState.DISCONNECTED
             raise e
