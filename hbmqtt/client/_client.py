@@ -66,8 +66,8 @@ class MQTTClient:
         :return:
         """
         self.logger = logging.getLogger(__name__)
-        self.config = config.copy()
-        self.config.update(_defaults)
+        self.config = _defaults
+        self.config.update(config)
         if client_id is not None:
             self.client_id = client_id
         else:
