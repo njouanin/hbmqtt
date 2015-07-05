@@ -18,7 +18,6 @@ from hbmqtt.mqtt.pubcomp import PubcompPacket
 from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.session import Session
-from blinker import Signal
 from transitions import Machine, MachineError
 
 class InFlightMessage:
@@ -44,8 +43,6 @@ class ProtocolHandler:
     """
     Class implementing the MQTT communication protocol using asyncio features
     """
-    packet_sent = Signal()
-    packet_received = Signal()
 
     def __init__(self, session: Session, config, loop=None):
         self.logger = logging.getLogger(__name__)
@@ -152,7 +149,6 @@ class ProtocolHandler:
                     packet = yield from cls.from_stream(self.session.reader, fixed_header=fixed_header)
                     self.logger.debug(" <-in-- " + repr(packet))
                     yield from self.incoming_queues[packet.fixed_header.packet_type].put(packet)
-                    self.packet_received.send(packet)
                 else:
                     self.logger.debug("No more data, stopping reader coro")
                     break
@@ -168,16 +164,20 @@ class ProtocolHandler:
     @asyncio.coroutine
     def _writer_coro(self):
         self.logger.debug("Starting writer coro")
+        keepalive_timeout = self.session.keep_alive - self.config['ping_delay']
         while self._running:
             try:
                 self._writer_ready.set()
-                packet = yield from asyncio.wait_for(self.outgoing_queue.get(), 5)
+                packet = yield from asyncio.wait_for(self.outgoing_queue.get(), keepalive_timeout)
                 yield from packet.to_stream(self.session.writer)
                 self.logger.debug(" -out-> " + repr(packet))
                 yield from self.session.writer.drain()
-                self.packet_sent.send(packet)
+                #self.outgoing_queue.task_done() # to be used with Python 3.5
             except asyncio.TimeoutError as ce:
                 self.logger.debug("Output queue get timeout")
+                if self._running:
+                    self.logger.debug("PING for keepalive")
+                    self.handle_keepalive()
             except Exception as e:
                 self.logger.warn("Unhandled exception in writer coro: %s" % e)
                 break
@@ -260,6 +260,10 @@ class ProtocolHandler:
             yield from self.outgoing_queue.put(PubrecPacket.build(message_id))
         return message
 
+    def handle_keepalive(self):
+        pass
+
+
 class Subscription:
     states = ['new', 'subscribed', 'acknowledged']
 
@@ -299,7 +303,6 @@ class ClientProtocolHandler(ProtocolHandler):
     @asyncio.coroutine
     def start(self):
         yield from super().start()
-        self.packet_sent.connect(self._do_keepalive)
         self._subscription_task = asyncio.async(self._subscriptions_coro(), loop=self._loop)
         yield from asyncio.wait([self._subscriptions_ready.wait()], loop=self._loop)
 
@@ -313,16 +316,8 @@ class ClientProtocolHandler(ProtocolHandler):
             except Exception:
                 pass
 
-    def _do_keepalive(self, message):
-        if self._ping_task:
-            try:
-                self._ping_task.cancel()
-            except Exception:
-                pass
-        next_ping = self.session.keep_alive - self.config['ping_delay']
-        if next_ping > 0:
-            self.logger.debug('Next ping in %d seconds if no new messages between' % next_ping)
-            self._ping_task = self._loop.call_later(next_ping, asyncio.async, self.mqtt_ping())
+    def handle_keepalive(self):
+        self._ping_task = self._loop.call_soon(asyncio.async, self.mqtt_ping())
 
     def _subscriptions_coro(self):
         self.logger.debug("Starting subscriptions polling coro")
@@ -447,13 +442,12 @@ class ClientProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def mqtt_disconnect(self):
+        # yield from self.outgoing_queue.join() To be used in Python 3.5
         disconnect_packet = DisconnectPacket()
         yield from self.outgoing_queue.put(disconnect_packet)
-        self._ping_task.cancel()
 
     @asyncio.coroutine
     def mqtt_ping(self):
-        self.logger.debug("Pinging ...")
         ping_packet = PingReqPacket()
         yield from self.outgoing_queue.put(ping_packet)
         yield from self.incoming_queues[PacketType.PINGRESP].get()
