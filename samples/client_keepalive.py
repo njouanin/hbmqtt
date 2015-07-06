@@ -2,6 +2,12 @@ import logging
 from hbmqtt.client._client import MQTTClient
 import asyncio
 
+#
+# This sample shows a client running idle.
+# Meanwhile, keepalive is managed through PING messages sent every 5 seconds
+#
+
+
 logger = logging.getLogger(__name__)
 
 config = {
