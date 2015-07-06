@@ -149,17 +149,17 @@ class ProtocolHandler:
                     self.logger.debug(" <-in-- " + repr(packet))
 
                     if packet.fixed_header.packet_type == PacketType.CONNACK:
-                        yield from self.handle_connack(packet)
+                        asyncio.Task(self.handle_connack(packet))
                     if packet.fixed_header.packet_type == PacketType.SUBACK:
-                        yield from self.handle_suback(packet)
+                        asyncio.Task(self.handle_suback(packet))
                     if packet.fixed_header.packet_type == PacketType.UNSUBACK:
-                        yield from self.handle_unsuback(packet)
+                        asyncio.Task(self.handle_unsuback(packet))
                     if packet.fixed_header.packet_type == PacketType.PUBACK:
-                        yield from self.handle_puback(packet)
+                        asyncio.Task(self.handle_puback(packet))
                     if packet.fixed_header.packet_type == PacketType.PUBREC:
-                        yield from self.handle_pubrec(packet)
+                        asyncio.Task(self.handle_pubrec(packet))
                     if packet.fixed_header.packet_type == PacketType.PUBCOMP:
-                        yield from self.handle_pubcomp(packet)
+                        asyncio.Task(self.handle_pubcomp(packet))
                     if packet.fixed_header.packet_type == PacketType.PINGRESP:
                         asyncio.Task(self.handle_pingresp(packet))
                     else:
