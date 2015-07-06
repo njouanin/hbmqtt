@@ -180,6 +180,10 @@ class MQTTClient:
         yield from self._handler.mqtt_unsubscribe(topics, self.session.next_packet_id)
 
     @asyncio.coroutine
+    def deliver_message(self):
+        return (yield from self._handler.mqtt_deliver_next_message())
+
+    @asyncio.coroutine
     def _connect_coro(self):
         try:
             self.session.reader, self.session.writer = \
