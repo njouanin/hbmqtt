@@ -34,6 +34,7 @@ class InFlightMessage:
         self.puback = None
         self.pubrec = None
         self.pubcomp = None
+        self.pubrel = None
         self._init_states()
 
     def _init_states(self):
@@ -76,9 +77,9 @@ class ProtocolHandler:
         self.outgoing_queue = asyncio.Queue()
         self._puback_waiters = dict()
         self._pubrec_waiters = dict()
-        self._pubrec_waiters = dict()
+        self._pubrel_waiters = dict()
         self._pubcomp_waiters = dict()
-        self.inflight_messages = dict()
+        self.delivered_message = asyncio.Queue()
 
     @asyncio.coroutine
     def start(self):
@@ -91,12 +92,13 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def mqtt_publish(self, topic, message, packet_id, dup, qos, retain):
-        if packet_id in self.inflight_messages:
+        if packet_id in self.session.inflight_out:
             self.logger.warn("A message with the same packet ID is already in flight")
         packet = PublishPacket.build(topic, message, packet_id, dup, qos, retain)
         yield from self.outgoing_queue.put(packet)
         inflight_message = InFlightMessage(packet, qos)
-        self.inflight_messages[packet.variable_header.packet_id] = inflight_message
+        self.session.inflight_out[packet.variable_header.packet_id] = inflight_message
+
         inflight_message.publish()
         if qos == 0x01:
             waiter = futures.Future(loop=self._loop)
@@ -117,6 +119,7 @@ class ProtocolHandler:
             # Send pubrel
             pubrel = PubrelPacket.build(packet_id)
             yield from self.outgoing_queue.put(pubrel)
+            inflight_message.pubrel = pubrel
             inflight_message.release()
 
             # Wait for pubcomp
@@ -127,7 +130,7 @@ class ProtocolHandler:
             del self._pubcomp_waiters[packet_id]
             inflight_message.complete()
 
-        del self.inflight_messages[packet_id]
+        del self.session.inflight_out[packet_id]
         return inflight_message
 
     @asyncio.coroutine
@@ -150,20 +153,24 @@ class ProtocolHandler:
 
                     if packet.fixed_header.packet_type == PacketType.CONNACK:
                         asyncio.Task(self.handle_connack(packet))
-                    if packet.fixed_header.packet_type == PacketType.SUBACK:
+                    elif packet.fixed_header.packet_type == PacketType.SUBACK:
                         asyncio.Task(self.handle_suback(packet))
-                    if packet.fixed_header.packet_type == PacketType.UNSUBACK:
+                    elif packet.fixed_header.packet_type == PacketType.UNSUBACK:
                         asyncio.Task(self.handle_unsuback(packet))
-                    if packet.fixed_header.packet_type == PacketType.PUBACK:
+                    elif packet.fixed_header.packet_type == PacketType.PUBACK:
                         asyncio.Task(self.handle_puback(packet))
-                    if packet.fixed_header.packet_type == PacketType.PUBREC:
+                    elif packet.fixed_header.packet_type == PacketType.PUBREC:
                         asyncio.Task(self.handle_pubrec(packet))
-                    if packet.fixed_header.packet_type == PacketType.PUBCOMP:
+                    elif packet.fixed_header.packet_type == PacketType.PUBREL:
+                        asyncio.Task(self.handle_pubrel(packet))
+                    elif packet.fixed_header.packet_type == PacketType.PUBCOMP:
                         asyncio.Task(self.handle_pubcomp(packet))
-                    if packet.fixed_header.packet_type == PacketType.PINGRESP:
+                    elif packet.fixed_header.packet_type == PacketType.PINGRESP:
                         asyncio.Task(self.handle_pingresp(packet))
+                    elif packet.fixed_header.packet_type == PacketType.PUBLISH:
+                        asyncio.Task(self.handle_publish(packet))
                     else:
-                        yield from self.incoming_queues[packet.fixed_header.packet_type].put(packet)
+                        self.logger.warn("Unhandled packet type: %s" % packet.fixed_header.packet_type)
                 else:
                     self.logger.debug("No more data, stopping reader coro")
                     break
@@ -211,26 +218,9 @@ class ProtocolHandler:
         self.logger.debug("Writer coro stopped")
 
     @asyncio.coroutine
-    def _receive_publish_coro(self):
-        while self._running:
-            message = yield from self.incoming_queues[PacketType.PUBLISH].get()
-            yield self.application_messages.put(message)
-            message_id = message.fixed_header.packet_id
-            if (message.fixed_header.flags >> 1) & 0x01:
-                # QOS 1
-                yield from self.outgoing_queue.put(PubackPacket.build(message_id))
-            if (message.fixed_header.flags >> 1) & 0x02:
-                # QOS 2
-                yield from self.outgoing_queue.put(PubrecPacket.build(message_id))
-
-    @asyncio.coroutine
     def mqtt_deliver_next_message(self):
-        message = yield from self.application_messages.get()
-        message_id = message.fixed_header.packet_id
-        if (message.fixed_header.flags >> 1) & 0x02:
-            # QOS 2
-            yield from self.outgoing_queue.put(PubrecPacket.build(message_id))
-        return message
+        inflight_message = yield from self.delivered_message.get()
+        return inflight_message
 
     def handle_keepalive(self):
         pass
@@ -278,6 +268,46 @@ class ProtocolHandler:
         except KeyError as ke:
             self.logger.warn("Received PUBCOMP for unknown pending subscription with Id: %s" % packet_id)
 
+    @asyncio.coroutine
+    def handle_pubrel(self, pubrel: PubrecPacket):
+        packet_id = pubrel.variable_header.packet_id
+        try:
+            waiter = self._pubrel_waiters[packet_id]
+            waiter.set_result(pubrel)
+        except KeyError as ke:
+            self.logger.warn("Received PUBREL for unknown pending subscription with Id: %s" % packet_id)
+
+    @asyncio.coroutine
+    def handle_publish(self, publish : PublishPacket):
+        inflight_message = None
+        packet_id = publish.variable_header.packet_id
+        qos = (publish.fixed_header.flags >> 1) & 0x03
+        if packet_id in self.session.inflight_in:
+            inflight_message = self.session.inflight_in[packet_id]
+        else:
+            inflight_message = InFlightMessage(publish, qos)
+            self.session.inflight_in[packet_id] = inflight_message
+            inflight_message.publish()
+
+        if qos == 1:
+            puback = PubackPacket.build(packet_id)
+            yield from self.outgoing_queue.put(puback)
+            inflight_message.acknowledge()
+        if qos == 2:
+            pubrec = PubrecPacket.build(packet_id)
+            yield from self.outgoing_queue.put(pubrec)
+            inflight_message.receive()
+            waiter = futures.Future(loop=self._loop)
+            self._pubrel_waiters[packet_id] = waiter
+            yield from waiter
+            inflight_message.pubrel = waiter.result()
+            del self._pubrel_waiters[packet_id]
+            inflight_message.release()
+            pubcomp = PubcompPacket.build(packet_id)
+            yield from self.outgoing_queue.put(pubcomp)
+            inflight_message.complete()
+        yield from self.delivered_message.put(inflight_message)
+        del self.session.inflight_in[packet_id]
 
 class ClientProtocolHandler(ProtocolHandler):
     def __init__(self, session: Session, config, loop=None):

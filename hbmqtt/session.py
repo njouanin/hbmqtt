@@ -27,6 +27,9 @@ class Session:
         self.scheme = None
         self._packet_id = 0
 
+        self.inflight_out = dict()
+        self.inflight_in = dict()
+
     @property
     def next_packet_id(self):
         self._packet_id += 1
