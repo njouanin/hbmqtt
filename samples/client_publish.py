@@ -2,6 +2,12 @@ import logging
 from hbmqtt.client._client import MQTTClient
 import asyncio
 
+
+#
+# This sample shows how to publish messages to broker using different QOS
+# Debug outputs shows the message flows
+#
+
 logger = logging.getLogger(__name__)
 
 C = MQTTClient()
@@ -15,6 +21,7 @@ def test_coro():
         asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
     ]
     yield from asyncio.wait(tasks)
+
     logger.info("messages published")
     yield from C.disconnect()
 
