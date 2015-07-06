@@ -19,3 +19,9 @@ class PubackPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = variable_header
         self.payload = None
+
+    @classmethod
+    def build(cls, packet_id: int):
+        v_header = PacketIdVariableHeader(packet_id)
+        packet = PubackPacket(variable_header=v_header, payload=None)
+        return packet
