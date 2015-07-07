@@ -1,4 +1,6 @@
-__author__ = 'nico'
+# Copyright (c) 2015 Nicolas JOUANIN
+#
+# See the file license.txt for copying permission.
 
 import logging
 import asyncio
@@ -32,7 +34,7 @@ def gen_client_id():
 class MQTTClient:
     states = ['new', 'connecting', 'connected', 'disconnected']
 
-    def __init__(self, client_id=None, config={}, loop=None):
+    def __init__(self, client_id=None, config=None, loop=None):
         """
 
         :param config: Example yaml config
@@ -112,12 +114,12 @@ class MQTTClient:
         try:
             yield from self._handler.mqtt_disconnect()
             yield from self._handler.stop()
-        except Exception as e:
-            self.logger.warn("Unhandled exception: %s" % e)
-            raise ClientException("Unhandled exception: %s" % e)
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise ClientException("Client instance can't be disconnected: %s" % me)
+        except Exception as e:
+            self.logger.warn("Unhandled exception: %s" % e)
+            raise ClientException("Unhandled exception: %s" % e)
         self.session = None
 
     @asyncio.coroutine
@@ -260,4 +262,3 @@ class MQTTClient:
             s.will_topic = None
             s.will_message = None
         return s
-
