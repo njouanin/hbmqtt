@@ -79,4 +79,5 @@ class Broker:
 
     @asyncio.coroutine
     def client_connected(self, reader, writer):
-        pass
+        (remote_address, remote_port) = writer.get_extra_info('peername')
+        self.logger.debug("Connection from %s:%d" % (remote_address, remote_port))
