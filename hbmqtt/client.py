@@ -65,7 +65,8 @@ class MQTTClient:
         """
         self.logger = logging.getLogger(__name__)
         self.config = _defaults
-        self.config.update(config)
+        if config is not None:
+            self.config.update(config)
         if client_id is not None:
             self.client_id = client_id
         else:
