@@ -9,10 +9,7 @@ from transitions import Machine, MachineError
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session, SessionState
 from hbmqtt.mqtt.connack import ReturnCode
-from hbmqtt.mqtt.subscribe import SubscribePacket
-from hbmqtt.mqtt.suback import SubackPacket
-from hbmqtt.errors import MQTTException
-from hbmqtt.mqtt.protocol import ClientProtocolHandler
+from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 
 _defaults = {
     'keep_alive': 10,
