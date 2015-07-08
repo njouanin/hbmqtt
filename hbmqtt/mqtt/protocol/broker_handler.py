@@ -8,7 +8,7 @@ from hbmqtt.mqtt.protocol.handler import ProtocolHandler
 from hbmqtt.mqtt.packet import MQTTFixedHeader
 from hbmqtt.mqtt.packet import PacketType
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
-from hbmqtt.mqtt.connack import ConnackPacket
+from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
@@ -41,3 +41,9 @@ class BrokerProtocolHandler(ProtocolHandler):
     def handle_disconnect(self, disconnect: DisconnectPacket):
         if self._disconnect_waiter is not None:
             self._disconnect_waiter.set_result(disconnect)
+
+    @asyncio.coroutine
+    def handle_connect(self, connect: ConnectPacket):
+        # TODO : implements this correcly (manage authentication, cleansession, ...)
+        self.logger.debug("Connect received")
+        yield from self.outgoing_queue.put(ConnackPacket.build(0, ReturnCode.CONNECTION_ACCEPTED))
