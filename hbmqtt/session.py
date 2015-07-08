@@ -21,7 +21,7 @@ class Session:
         self.will_qos = None
         self.will_retain = None
         self.will_topic = None
-        self.keep_alive = None
+        self.keep_alive = 0
         self.username = None
         self.password = None
         self.scheme = None
