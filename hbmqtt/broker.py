@@ -93,8 +93,8 @@ class Broker:
         new_session.writer = writer
         handler = BrokerProtocolHandler(new_session, self._loop)
         self._handlers.append(handler)
-        yield from handler.start()
         self.logger.debug("Start messages handling")
-        yield from handler.wait_disconnect()
+        yield from handler.start()
         self.logger.debug("Wait for disconnect")
+        yield from handler.wait_disconnect()
         yield from handler.stop()
