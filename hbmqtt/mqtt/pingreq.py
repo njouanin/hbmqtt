@@ -12,7 +12,7 @@ class PingReqPacket(MQTTPacket):
         if fixed is None:
             header = MQTTFixedHeader(PacketType.PINGREQ, 0x00)
         else:
-            if fixed.packet_type is not PacketType.DISCONNECT:
+            if fixed.packet_type is not PacketType.PINGREQ:
                 raise HBMQTTException("Invalid fixed packet type %s for PingReqPacket init" % fixed.packet_type)
             header = fixed
         super().__init__(header)
