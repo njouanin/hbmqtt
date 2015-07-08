@@ -60,3 +60,9 @@ class ConnackPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = variable_header
         self.payload = None
+
+    @classmethod
+    def build(cls, session_parent, return_code):
+        v_header = ConnackVariableHeader(session_parent, return_code)
+        packet = ConnackPacket(variable_header=v_header)
+        return packet
