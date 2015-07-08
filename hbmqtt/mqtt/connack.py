@@ -34,11 +34,11 @@ class ConnackVariableHeader(MQTTVariableHeader):
         out = b''
         # Connect acknowledge flags
         if self.session_parent:
-            out += '\x01'
+            out += b'\x01'
         else:
-            out += '\x00'
+            out += b'\x00'
         # return code
-        out += int_to_bytes(self.return_code)
+        out += int_to_bytes(self.return_code.value)
 
         return out
 
@@ -62,7 +62,7 @@ class ConnackPacket(MQTTPacket):
         self.payload = None
 
     @classmethod
-    def build(cls, session_parent, return_code):
+    def build(cls, session_parent, return_code: ReturnCode):
         v_header = ConnackVariableHeader(session_parent, return_code)
         packet = ConnackPacket(variable_header=v_header)
         return packet
