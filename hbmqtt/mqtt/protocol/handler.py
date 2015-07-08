@@ -9,7 +9,9 @@ from hbmqtt.mqtt import packet_class
 from hbmqtt.errors import NoDataException
 from hbmqtt.mqtt.packet import PacketType
 from hbmqtt.mqtt.connack import ConnackPacket
+from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
+from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.publish import PublishPacket
 from hbmqtt.mqtt.pubrel import PubrelPacket
 from hbmqtt.mqtt.puback import PubackPacket
@@ -163,12 +165,16 @@ class ProtocolHandler:
                         asyncio.Task(self.handle_pubrel(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBCOMP:
                         asyncio.Task(self.handle_pubcomp(packet))
+                    elif packet.fixed_header.packet_type == PacketType.PINGREQ:
+                        asyncio.Task(self.handle_pingreq(packet))
                     elif packet.fixed_header.packet_type == PacketType.PINGRESP:
                         asyncio.Task(self.handle_pingresp(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBLISH:
                         asyncio.Task(self.handle_publish(packet))
                     elif packet.fixed_header.packet_type == PacketType.DISCONNECT:
                         asyncio.Task(self.handle_disconnect(packet))
+                    elif packet.fixed_header.packet_type == PacketType.CONNECT:
+                        asyncio.Task(self.handle_connect(packet))
                     else:
                         self.logger.warn("Unhandled packet type: %s" % packet.fixed_header.packet_type)
                 else:
@@ -232,6 +238,10 @@ class ProtocolHandler:
         pass
 
     @asyncio.coroutine
+    def handle_connect(self, connect: ConnectPacket):
+        pass
+
+    @asyncio.coroutine
     def handle_suback(self, suback: SubackPacket):
         pass
 
@@ -241,6 +251,10 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def handle_pingresp(self, pingresp: PingRespPacket):
+        pass
+
+    @asyncio.coroutine
+    def handle_pingreq(self, pingreq: PingReqPacket):
         pass
 
     @asyncio.coroutine
