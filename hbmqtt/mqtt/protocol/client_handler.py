@@ -19,8 +19,8 @@ from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.session import Session
 
 class ClientProtocolHandler(ProtocolHandler):
-    def __init__(self, session: Session, config, loop=None):
-        super().__init__(session, config, loop)
+    def __init__(self, session: Session, loop=None):
+        super().__init__(session, loop)
         self._ping_task = None
         self._connack_waiter = None
         self._pingresp_queue = asyncio.Queue()

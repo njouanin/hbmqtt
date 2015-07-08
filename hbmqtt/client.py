@@ -18,7 +18,6 @@ _defaults = {
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False,
-    'subscriptions-polling-interval': 1,
 }
 
 
@@ -188,7 +187,7 @@ class MQTTClient:
         try:
             self.session.reader, self.session.writer = \
                 yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port)
-            self._handler = ClientProtocolHandler(self.session, self.config)
+            self._handler = ClientProtocolHandler(self.session)
             yield from self._handler.start()
 
             return_code = yield from self._handler.mqtt_connect()
@@ -251,7 +250,7 @@ class MQTTClient:
             s.cleansession = cleansession
         else:
             s.cleansession = self.config.get('cleansession', True)
-        s.keep_alive = self.config['keep_alive']
+        s.keep_alive = self.config['keep_alive'] - self.config['ping_delay']
         if 'will' in self.config:
             s.will_flag = True
             s.will_retain = self.config['will']['retain']

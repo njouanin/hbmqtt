@@ -49,10 +49,9 @@ class ProtocolHandler:
     Class implementing the MQTT communication protocol using asyncio features
     """
 
-    def __init__(self, session: Session, config, loop=None):
+    def __init__(self, session: Session, loop=None):
         self.logger = logging.getLogger(__name__)
         self.session = session
-        self.config = config
         if loop is None:
             self._loop = asyncio.get_event_loop()
         else:
@@ -182,10 +181,12 @@ class ProtocolHandler:
     @asyncio.coroutine
     def _writer_coro(self):
         self.logger.debug("Starting writer coro")
-        keepalive_timeout = self.session.keep_alive - self.config['ping_delay']
         while self._running:
             try:
                 self._writer_ready.set()
+                keepalive_timeout = self.session.keep_alive
+                if keepalive_timeout <= 0:
+                    keepalive_timeout = None
                 packet = yield from asyncio.wait_for(self.outgoing_queue.get(), keepalive_timeout)
                 yield from packet.to_stream(self.session.writer)
                 self.logger.debug(" -out-> " + repr(packet))
