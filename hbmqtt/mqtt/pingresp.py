@@ -18,3 +18,7 @@ class PingRespPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = None
         self.payload = None
+
+    @classmethod
+    def build(cls):
+        return cls()

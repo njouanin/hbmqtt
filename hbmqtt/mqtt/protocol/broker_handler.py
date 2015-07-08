@@ -47,3 +47,7 @@ class BrokerProtocolHandler(ProtocolHandler):
         # TODO : implements this correcly (manage authentication, cleansession, ...)
         self.logger.debug("Connect received")
         yield from self.outgoing_queue.put(ConnackPacket.build(0, ReturnCode.CONNECTION_ACCEPTED))
+
+    @asyncio.coroutine
+    def handle_pingreq(self, pingreq: PingReqPacket):
+        yield from self.outgoing_queue.put(PingRespPacket.build())
