@@ -17,6 +17,7 @@ from hbmqtt.mqtt.pubrec import PubrecPacket
 from hbmqtt.mqtt.pubcomp import PubcompPacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
+from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.session import Session
 from transitions import Machine
 
@@ -63,7 +64,9 @@ class ProtocolHandler:
 
         self._running = False
 
-        self.session.local_address, self.session.local_port = self.session.writer.get_extra_info('sockname')
+        extra_info = self.session.writer.get_extra_info('sockname')
+        self.session.local_address = extra_info[0]
+        self.session.local_port = extra_info[1]
 
         self.incoming_queues = dict()
         self.application_messages = asyncio.Queue()
@@ -164,6 +167,8 @@ class ProtocolHandler:
                         asyncio.Task(self.handle_pingresp(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBLISH:
                         asyncio.Task(self.handle_publish(packet))
+                    elif packet.fixed_header.packet_type == PacketType.DISCONNECT:
+                        asyncio.Task(self.handle_disconnect(packet))
                     else:
                         self.logger.warn("Unhandled packet type: %s" % packet.fixed_header.packet_type)
                 else:
@@ -236,6 +241,10 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def handle_pingresp(self, pingresp: PingRespPacket):
+        pass
+
+    @asyncio.coroutine
+    def handle_disconnect(self, disconnect: DisconnectPacket):
         pass
 
     @asyncio.coroutine

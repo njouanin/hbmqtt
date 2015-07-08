@@ -5,6 +5,8 @@ import logging
 import asyncio
 
 from transitions import Machine, MachineError
+from hbmqtt.session import Session
+from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
 
 
 _defaults = {
@@ -32,7 +34,7 @@ class Broker:
             self._loop = asyncio.get_event_loop()
 
         self._server = None
-
+        self._handlers = []
         self._init_states()
 
     def _init_states(self):
@@ -79,5 +81,20 @@ class Broker:
 
     @asyncio.coroutine
     def client_connected(self, reader, writer):
-        (remote_address, remote_port) = writer.get_extra_info('peername')
+        self.logger.info(repr(writer.get_extra_info('peername')))
+        extra_info = writer.get_extra_info('peername')
+        remote_address = extra_info[0]
+        remote_port = extra_info[1]
         self.logger.debug("Connection from %s:%d" % (remote_address, remote_port))
+        new_session = Session()
+        new_session.remote_address = remote_address
+        new_session.remote_port = remote_port
+        new_session.reader = reader
+        new_session.writer = writer
+        handler = BrokerProtocolHandler(new_session, self._loop)
+        self._handlers.append(handler)
+        yield from handler.start()
+        self.logger.debug("Start messages handling")
+        yield from handler.wait_disconnect()
+        self.logger.debug("Wait for disconnect")
+        yield from handler.stop()
