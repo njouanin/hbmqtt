@@ -21,3 +21,12 @@ def format_client_message(session=None, address=None, port=None, id=None):
         return "(client @=%s:%d id=%s)" % (session.remote_address, session.remote_port, session.client_id)
     else:
         return "(client @=%s:%d id=%s)" % (address, port, id)
+
+
+def gen_client_id():
+    """
+    Generates unique client ID
+    :return:
+    """
+    import uuid
+    return str(uuid.uuid4())

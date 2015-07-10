@@ -25,11 +25,6 @@ class ClientException(BaseException):
     pass
 
 
-def gen_client_id():
-    import uuid
-    return str(uuid.uuid4())
-
-
 class MQTTClient:
     states = ['new', 'connecting', 'connected', 'disconnected']
 
@@ -69,6 +64,7 @@ class MQTTClient:
         if client_id is not None:
             self.client_id = client_id
         else:
+            from hbmqtt.utils import gen_client_id
             self.client_id = gen_client_id()
             self.logger.debug("Using generated client ID : %s" % self.client_id)
 
