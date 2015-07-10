@@ -5,18 +5,12 @@ import logging
 import asyncio
 from asyncio import futures
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
-from hbmqtt.mqtt.packet import MQTTFixedHeader
-from hbmqtt.mqtt.packet import PacketType
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
-from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
-from hbmqtt.mqtt.subscribe import SubscribePacket
-from hbmqtt.mqtt.suback import SubackPacket
-from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
-from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.session import Session
+from hbmqtt.utils import format_client_message
 
 class BrokerProtocolHandler(ProtocolHandler):
     def __init__(self, session: Session, loop=None):
@@ -44,9 +38,10 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def handle_connect(self, connect: ConnectPacket):
-        # TODO : implements this correcly (manage authentication, cleansession, ...)
-        self.logger.debug("Connect received")
-        yield from self.outgoing_queue.put(ConnackPacket.build(0, ReturnCode.CONNECTION_ACCEPTED))
+        # Broker handler shouldn't received CONNECT message during messages handling
+        # as CONNECT messages are managed by the broker on client connection
+        self.logger.error('[MQTT-3.1.0-2] %s : CONNECT message received during messages handling' % (format_client_message(self.session)))
+        self._disconnect_waiter.set_result(None)
 
     @asyncio.coroutine
     def handle_pingreq(self, pingreq: PingReqPacket):

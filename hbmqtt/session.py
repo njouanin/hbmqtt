@@ -26,6 +26,7 @@ class Session:
         self.password = None
         self.scheme = None
         self._packet_id = 0
+        self.parent = 0
 
         self.inflight_out = dict()
         self.inflight_in = dict()
