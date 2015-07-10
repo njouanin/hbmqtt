@@ -189,7 +189,8 @@ class MQTTClient:
             return_code = yield from self._handler.mqtt_connect()
 
             if return_code is not ReturnCode.CONNECTION_ACCEPTED:
-                raise ClientException("Connection rejected with code '%s'" % hex(return_code))
+                yield from self._handler.stop()
+                raise ClientException("Connection rejected with code '%s'" % return_code)
 
             self.session.state = SessionState.CONNECTED
             self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
