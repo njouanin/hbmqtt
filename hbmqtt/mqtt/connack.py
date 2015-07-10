@@ -2,7 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
+from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader
 from hbmqtt.codecs import int_to_bytes, read_or_raise, bytes_to_int
 from hbmqtt.errors import HBMQTTException
 from enum import Enum
@@ -43,7 +43,8 @@ class ConnackVariableHeader(MQTTVariableHeader):
         return out
 
     def __repr__(self):
-        return type(self).__name__ + '(session_parent={0}, return_code={1})'.format(hex(self.session_parent), hex(self.return_code.value))
+        return type(self).__name__ + '(session_parent={0}, return_code={1})'\
+            .format(hex(self.session_parent), hex(self.return_code.value))
 
 
 class ConnackPacket(MQTTPacket):
@@ -62,7 +63,7 @@ class ConnackPacket(MQTTPacket):
         self.payload = None
 
     @classmethod
-    def build(cls, session_parent, return_code: ReturnCode):
+    def build(cls, session_parent=None, return_code: ReturnCode=None):
         v_header = ConnackVariableHeader(session_parent, return_code)
         packet = ConnackPacket(variable_header=v_header)
         return packet
