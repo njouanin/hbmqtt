@@ -43,40 +43,40 @@ class ConnectPacketTest(unittest.TestCase):
         data = b'\x10\x3e\x00\x04MQTT\x04\xcf\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        message = self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        self.assertTrue(message.variable_header.reserved_flag)
 
     def test_decode_fail_miss_clientId(self):
         data = b'\x10\x0a\x00\x04MQTT\x04\xce\x00\x00'
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        message = self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        self.assertIs(message.payload.client_id, None)
 
     def test_decode_fail_miss_willtopic(self):
         data = b'\x10\x16\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789'
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        message = self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        self.assertIs(message.payload.will_topic, None)
 
     def test_decode_fail_miss_username(self):
         data = b'\x10\x2e\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage'
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        message = self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        self.assertIs(message.payload.username, None)
 
     def test_decode_fail_miss_password(self):
         data = b'\x10\x34\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user'
         stream = asyncio.StreamReader(loop=self.loop)
         stream.feed_data(data)
         stream.feed_eof()
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        message = self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        self.assertIs(message.payload.password, None)
 
     def test_encode(self):
         header = MQTTFixedHeader(PacketType.CONNECT, 0x00, 0)
