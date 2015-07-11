@@ -14,8 +14,8 @@ from hbmqtt.utils import format_client_message, gen_client_id
 
 
 _defaults = {
-        'bind-address': 'localhost',
-        'bind-port': 1883
+    'bind-address': 'localhost',
+    'bind-port': 1883
 }
 
 
@@ -62,7 +62,10 @@ class Broker:
             raise BrokerException("Broker instance can't be started: %s" % me)
 
         try:
-            self._server = yield from asyncio.start_server(self.client_connected, self.config['bind-address'], self.config['bind-port'], loop=self._loop)
+            self._server = yield from asyncio.start_server(self.client_connected,
+                                                           self.config['bind-address'],
+                                                           self.config['bind-port'],
+                                                           loop=self._loop)
             self.logger.info("Broker listening on %s:%d" % (self.config['bind-address'], self.config['bind-port']))
             self.machine.starting_success()
         except Exception as e:
@@ -83,7 +86,6 @@ class Broker:
         self.logger.info("Broker closed")
         self.machine.stopping_success()
 
-
     @asyncio.coroutine
     def client_connected(self, reader, writer):
         self.logger.info(repr(writer.get_extra_info('peername')))
@@ -98,34 +100,36 @@ class Broker:
             connect = yield from ConnectPacket.from_stream(reader)
             self.check_connect(connect)
         except HBMQTTException as exc:
-            self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" % (format_client_message(address=remote_address, port=remote_port), exc))
+            self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
+                             (format_client_message(address=remote_address, port=remote_port), exc))
             writer.close()
             return
         except BrokerException as be:
-            self.logger.error('Invalid connection from %s : %s' % (format_client_message(address=remote_address, port=remote_port), be))
+            self.logger.error('Invalid connection from %s : %s' %
+                              (format_client_message(address=remote_address, port=remote_port), be))
             writer.close()
             return
 
+        connack = None
         if connect.variable_header.proto_level != 4:
             # only MQTT 3.1.1 supported
-            self.logger.error('Invalid protocol from %s: %d' % (format_client_message(address=remote_address, port=remote_port), connect.variable_header.protocol_level))
-            connack = ConnackPacket.build(0, ReturnCode.UNACCEPTABLE_PROTOCOL_VERSION) #[MQTT-3.2.2-4] session_parent=0
-            self.logger.debug(" -out-> " + repr(connack))
-            yield from connack.to_stream(writer)
-            writer.close()
-            return
-
-        if connect.variable_header.username_flag and connect.payload.username is None:
-            self.logger.error('Invalid username from %s' % (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD) #[MQTT-3.2.2-4] session_parent=0
-            self.logger.debug(" -out-> " + repr(connack))
-            yield from connack.to_stream(writer)
-            writer.close()
-            return
-
-        if connect.variable_header.password_flag and connect.payload.password is None:
+            self.logger.error('Invalid protocol from %s: %d' %
+                              (format_client_message(address=remote_address, port=remote_port),
+                               connect.variable_header.protocol_level))
+            connack = ConnackPacket.build(0, ReturnCode.UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
+        elif connect.variable_header.username_flag and connect.payload.username is None:
+            self.logger.error('Invalid username from %s' %
+                              (format_client_message(address=remote_address, port=remote_port)))
+            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
+        elif connect.variable_header.password_flag and connect.payload.password is None:
             self.logger.error('Invalid password %s' % (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD) #[MQTT-3.2.2-4] session_parent=0
+            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
+        elif connect.variable_header.clean_session_flag == False and connect.payload.client_id is None:
+            self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' %
+                              format_client_message(address=remote_address, port=remote_port))
+            connack = ConnackPacket.build(0, ReturnCode.IDENTIFIER_REJECTED)
+            self.logger.debug(" -out-> " + repr(connack))
+        if connack is not None:
             self.logger.debug(" -out-> " + repr(connack))
             yield from connack.to_stream(writer)
             writer.close()
@@ -141,13 +145,6 @@ class Broker:
         else:
             # Get session from cache
             client_id = connect.payload.client_id
-            if client_id is None:
-                self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' % format_client_message(address=remote_address, port=remote_port))
-                connack = ConnackPacket.build(0, ReturnCode.IDENTIFIER_REJECTED)
-                self.logger.debug(" -out-> " + repr(connack))
-                yield from connack.to_stream(writer)
-                writer.close()
-                return
             if client_id in self._sessions:
                 new_session = self._sessions[client_id]
                 new_session.parent = 1
