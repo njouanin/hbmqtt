@@ -55,3 +55,9 @@ class SubackPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = variable_header
         self.payload = payload
+
+    @classmethod
+    def build(cls, packet_id, return_codes):
+        variable_header = cls.VARIABLE_HEADER(packet_id)
+        payload = cls.PAYLOAD(return_codes)
+        return cls(variable_header=variable_header, payload=payload)
