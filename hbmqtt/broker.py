@@ -15,7 +15,8 @@ from hbmqtt.utils import format_client_message, gen_client_id
 
 _defaults = {
     'bind-address': 'localhost',
-    'bind-port': 1883
+    'bind-port': 1883,
+    'timeout-disconnect-delay': 1
 }
 
 
@@ -169,7 +170,7 @@ class Broker:
         new_session.username = connect.payload.username
         new_session.password = connect.payload.password
         new_session.client_id = connect.payload.client_id
-        new_session.keep_alive = connect.variable_header.keep_alive
+        new_session.keep_alive = connect.variable_header.keep_alive + self.config['timeout-disconnect-delay']
 
         new_session.reader = reader
         new_session.writer = writer

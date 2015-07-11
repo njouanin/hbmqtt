@@ -19,6 +19,7 @@ from hbmqtt.mqtt.pubrec import PubrecPacket
 from hbmqtt.mqtt.pubcomp import PubcompPacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.subscribe import SubscribePacket
+from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.session import Session
@@ -146,7 +147,10 @@ class ProtocolHandler:
         while self._running:
             try:
                 self._reader_ready.set()
-                fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.session.reader), 5)
+                keepalive_timeout = self.session.keep_alive
+                if keepalive_timeout <= 0:
+                    keepalive_timeout = None
+                fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.session.reader), keepalive_timeout)
                 if fixed_header:
                     cls = packet_class(fixed_header)
                     packet = yield from cls.from_stream(self.session.reader, fixed_header=fixed_header)
@@ -156,6 +160,8 @@ class ProtocolHandler:
                         asyncio.Task(self.handle_connack(packet))
                     elif packet.fixed_header.packet_type == PacketType.SUBSCRIBE:
                         asyncio.Task(self.handle_subscribe(packet))
+                    elif packet.fixed_header.packet_type == PacketType.UNSUBSCRIBE:
+                        asyncio.Task(self.handle_unsubscribe(packet))
                     elif packet.fixed_header.packet_type == PacketType.SUBACK:
                         asyncio.Task(self.handle_suback(packet))
                     elif packet.fixed_header.packet_type == PacketType.UNSUBACK:
@@ -185,6 +191,7 @@ class ProtocolHandler:
                     break
             except asyncio.TimeoutError:
                 self.logger.debug("Input stream read timeout")
+                self.handle_read_timeout()
             except NoDataException as nde:
                 self.logger.debug("No data available")
             except Exception as e:
@@ -209,8 +216,7 @@ class ProtocolHandler:
             except asyncio.TimeoutError as ce:
                 self.logger.debug("Output queue get timeout")
                 if self._running:
-                    self.logger.debug("PING for keepalive")
-                    self.handle_keepalive()
+                    self.handle_write_timeout()
             except Exception as e:
                 self.logger.warn("Unhandled exception in writer coro: %s" % e)
                 break
@@ -233,8 +239,11 @@ class ProtocolHandler:
         inflight_message = yield from self.delivered_message.get()
         return inflight_message
 
-    def handle_keepalive(self):
-        self.logger.warn('keepalive unhandled')
+    def handle_write_timeout(self):
+        self.logger.warn('write timeout unhandled')
+
+    def handle_read_timeout(self):
+        self.logger.warn('read timeout unhandled')
 
     @asyncio.coroutine
     def handle_connack(self, connack: ConnackPacket):
@@ -247,6 +256,10 @@ class ProtocolHandler:
     @asyncio.coroutine
     def handle_subscribe(self, subscribe: SubscribePacket):
         self.logger.warn('SUBSCRIBE unhandled')
+
+    @asyncio.coroutine
+    def handle_unsubscribe(self, subscribe: UnsubscribePacket):
+        self.logger.warn('UNSUBSCRIBE unhandled')
 
     @asyncio.coroutine
     def handle_suback(self, suback: SubackPacket):

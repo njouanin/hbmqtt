@@ -34,12 +34,20 @@ class BrokerProtocolHandler(ProtocolHandler):
     @asyncio.coroutine
     def stop(self):
         yield from super().stop()
+        if self._disconnect_waiter is not None and not self._disconnect_waiter.done():
+            self._disconnect_waiter.set_result(None)
 
     @asyncio.coroutine
     def wait_disconnect(self):
         if self._disconnect_waiter is None:
             self._disconnect_waiter = futures.Future(loop=self._loop)
         yield from self._disconnect_waiter
+
+    def handle_write_timeout(self):
+        pass
+
+    def handle_read_timeout(self):
+        asyncio.Task(self.stop())
 
     @asyncio.coroutine
     def handle_disconnect(self, disconnect: DisconnectPacket):

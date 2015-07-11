@@ -40,8 +40,11 @@ class ClientProtocolHandler(ProtocolHandler):
             except Exception:
                 pass
 
-    def handle_keepalive(self):
+    def handle_write_timeout(self):
         self._ping_task = self._loop.call_soon(asyncio.async, self.mqtt_ping())
+
+    def handle_read_timeout(self):
+        pass
 
     @asyncio.coroutine
     def mqtt_subscribe(self, topics, packet_id):
