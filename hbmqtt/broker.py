@@ -139,9 +139,11 @@ class Broker:
         if connect.variable_header.clean_session_flag:
             client_id = connect.payload.client_id
             if client_id is not None and client_id in self._sessions:
+                # Delete existing session
                 del self._sessions[client_id]
             new_session = Session()
             new_session.parent = 0
+            self._sessions[client_id] = new_session
         else:
             # Get session from cache
             client_id = connect.payload.client_id
