@@ -2,6 +2,7 @@
 #
 # See the file license.txt for copying permission.
 from enum import Enum
+from transitions import Machine, MachineError
 
 class SessionState(Enum):
     NEW = 0
@@ -9,8 +10,10 @@ class SessionState(Enum):
     DISCONNECTED = 2
 
 class Session:
+    states = ['new', 'connected', 'disconnected']
+
     def __init__(self):
-        self.state = SessionState.NEW
+        self._init_states()
         self.reader = None
         self.writer = None
         self.remote_address = None
@@ -33,6 +36,12 @@ class Session:
 
         self.inflight_out = dict()
         self.inflight_in = dict()
+
+    def _init_states(self):
+        self.machine = Machine(states=Session.states, initial='new')
+        self.machine.add_transition(trigger='connect', source='new', dest='connected')
+        self.machine.add_transition(trigger='connect', source='disconnected', dest='connected')
+        self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
 
     @property
     def next_packet_id(self):

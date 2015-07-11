@@ -184,6 +184,7 @@ class Broker:
             writer.close()
             return
 
+        new_session.machine.connect()
         handler = BrokerProtocolHandler(new_session, self._loop)
         self._handlers.append(handler)
         self.logger.debug("Start messages handling")
@@ -192,6 +193,7 @@ class Broker:
         yield from handler.wait_disconnect()
         self.logger.debug("Client disconnected")
         yield from handler.stop()
+        new_session.machine.disconnect()
 
     @asyncio.coroutine
     def check_connect(self, connect: ConnectPacket):

@@ -116,7 +116,7 @@ class MQTTClient:
         except Exception as e:
             self.logger.warn("Unhandled exception: %s" % e)
             raise ClientException("Unhandled exception: %s" % e)
-        self.session = None
+        self.session.machine.disconnect()
 
     @asyncio.coroutine
     def ping(self):
@@ -192,7 +192,7 @@ class MQTTClient:
                 yield from self._handler.stop()
                 raise ClientException("Connection rejected with code '%s'" % return_code)
 
-            self.session.state = SessionState.CONNECTED
+            self.session.machine.connect()
             self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
             return return_code
         except Exception as e:
