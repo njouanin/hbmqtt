@@ -18,6 +18,7 @@ from hbmqtt.mqtt.puback import PubackPacket
 from hbmqtt.mqtt.pubrec import PubrecPacket
 from hbmqtt.mqtt.pubcomp import PubcompPacket
 from hbmqtt.mqtt.suback import SubackPacket
+from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.session import Session
@@ -153,6 +154,8 @@ class ProtocolHandler:
 
                     if packet.fixed_header.packet_type == PacketType.CONNACK:
                         asyncio.Task(self.handle_connack(packet))
+                    elif packet.fixed_header.packet_type == PacketType.SUBSCRIBE:
+                        asyncio.Task(self.handle_subscribe(packet))
                     elif packet.fixed_header.packet_type == PacketType.SUBACK:
                         asyncio.Task(self.handle_suback(packet))
                     elif packet.fixed_header.packet_type == PacketType.UNSUBACK:
@@ -231,35 +234,39 @@ class ProtocolHandler:
         return inflight_message
 
     def handle_keepalive(self):
-        pass
+        self.logger.warn('keepalive unhandled')
 
     @asyncio.coroutine
     def handle_connack(self, connack: ConnackPacket):
-        pass
+        self.logger.warn('CONNACK unhandled')
 
     @asyncio.coroutine
     def handle_connect(self, connect: ConnectPacket):
-        pass
+        self.logger.warn('CONNECT unhandled')
+
+    @asyncio.coroutine
+    def handle_subscribe(self, subscribe: SubscribePacket):
+        self.logger.warn('SUBSCRIBE unhandled')
 
     @asyncio.coroutine
     def handle_suback(self, suback: SubackPacket):
-        pass
+        self.logger.warn('SUBACK unhandled')
 
     @asyncio.coroutine
     def handle_unsuback(self, unsuback: UnsubackPacket):
-        pass
+        self.logger.warn('UNSUBACK unhandled')
 
     @asyncio.coroutine
     def handle_pingresp(self, pingresp: PingRespPacket):
-        pass
+        self.logger.warn('PINGRESP unhandled')
 
     @asyncio.coroutine
     def handle_pingreq(self, pingreq: PingReqPacket):
-        pass
+        self.logger.warn('PINGREQ unhandled')
 
     @asyncio.coroutine
     def handle_disconnect(self, disconnect: DisconnectPacket):
-        pass
+        self.logger.warn('DISCONNECT unhandled')
 
     @asyncio.coroutine
     def handle_puback(self, puback: PubackPacket):
