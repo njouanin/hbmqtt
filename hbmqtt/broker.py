@@ -6,7 +6,7 @@ import asyncio
 
 from transitions import Machine, MachineError
 from hbmqtt.session import Session
-from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
+from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler, Subscription
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
 from hbmqtt.errors import HBMQTTException
@@ -41,6 +41,7 @@ class Broker:
         self._handlers = []
         self._init_states()
         self._sessions = dict()
+        self._topics = dict()
 
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
@@ -192,7 +193,24 @@ class Broker:
         self.logger.debug("Start messages handling")
         yield from handler.start()
         self.logger.debug("Wait for disconnect")
-        yield from handler.wait_disconnect()
+
+        connected = True
+        wait_disconnect = asyncio.Task(handler.wait_disconnect())
+        wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
+        while connected:
+            done, pending = yield from asyncio.wait([wait_disconnect, wait_subscription],
+                                                    return_when=asyncio.FIRST_COMPLETED)
+            if wait_disconnect in done:
+                connected = False
+                wait_subscription.cancel()
+            elif wait_subscription in done:
+                subscription = wait_subscription.result()
+                return_codes = []
+                for topic in subscription.topics:
+                    return_codes.append(self.add_subscription(topic, handler))
+                yield from handler.mqtt_acknowledge_subscription(subscription.packet_id, return_codes)
+                wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
+
         self.logger.debug("Client disconnected")
         yield from handler.stop()
         new_session.machine.disconnect()
@@ -212,3 +230,16 @@ class Broker:
     def authenticate(self, session: Session):
         # TODO : Handle client authentication here
         return True
+
+    def add_subscription(self, topic, handler):
+        try:
+            filter = topic['filter']
+            qos = topic['qos']
+            if 'max-qos' in self.config and qos > self.config['max-qos']:
+                qos = self.config['max-qos']
+            if filter not in self._topics:
+                self._topics[filter] = []
+            self._topics[filter].append({'handler': handler, 'qos': qos})
+            return qos
+        except KeyError:
+            return 0x80

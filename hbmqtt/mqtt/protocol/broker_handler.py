@@ -9,13 +9,23 @@ from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPay
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
+from hbmqtt.mqtt.subscribe import SubscribePacket
+from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.session import Session
 from hbmqtt.utils import format_client_message
+
+
+class Subscription:
+    def __init__(self, packet_id, topics):
+        self.packet_id = packet_id
+        self.topics = topics
+
 
 class BrokerProtocolHandler(ProtocolHandler):
     def __init__(self, session: Session, loop=None):
         super().__init__(session, loop)
         self._disconnect_waiter = None
+        self._pending_subscriptions = asyncio.Queue()
 
     @asyncio.coroutine
     def start(self):
@@ -46,3 +56,18 @@ class BrokerProtocolHandler(ProtocolHandler):
     @asyncio.coroutine
     def handle_pingreq(self, pingreq: PingReqPacket):
         yield from self.outgoing_queue.put(PingRespPacket.build())
+
+    @asyncio.coroutine
+    def handle_subscribe(self, subscribe: SubscribePacket):
+        subscription = Subscription(subscribe.variable_header.packet_id, subscribe.payload.topics)
+        yield from self._pending_subscriptions.put(subscription)
+
+    @asyncio.coroutine
+    def get_next_pending_subscription(self):
+        subscription = yield from self._pending_subscriptions.get()
+        return subscription
+
+    @asyncio.coroutine
+    def mqtt_acknowledge_subscription(self, packet_id, return_codes):
+        suback = SubackPacket.build(packet_id, return_codes)
+        yield from self.outgoing_queue.put(suback)
