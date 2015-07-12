@@ -16,11 +16,10 @@ from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
-from hbmqtt.session import Session
 
 class ClientProtocolHandler(ProtocolHandler):
-    def __init__(self, session: Session, loop=None):
-        super().__init__(session, loop)
+    def __init__(self, loop=None):
+        super().__init__(loop)
         self._ping_task = None
         self._connack_waiter = None
         self._pingresp_queue = asyncio.Queue()

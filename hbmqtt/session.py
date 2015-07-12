@@ -3,6 +3,7 @@
 # See the file license.txt for copying permission.
 from enum import Enum
 from transitions import Machine, MachineError
+from asyncio import Queue
 
 class SessionState(Enum):
     NEW = 0
@@ -33,9 +34,11 @@ class Session:
         self.scheme = None
         self._packet_id = 0
         self.parent = 0
+        self.handler = None
 
         self.inflight_out = dict()
         self.inflight_in = dict()
+        self.retained_messages = Queue()
 
     def _init_states(self):
         self.machine = Machine(states=Session.states, initial='new')

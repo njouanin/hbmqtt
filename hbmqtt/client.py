@@ -183,7 +183,8 @@ class MQTTClient:
         try:
             self.session.reader, self.session.writer = \
                 yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port)
-            self._handler = ClientProtocolHandler(self.session)
+            self._handler = ClientProtocolHandler()
+            self._handler.attach_to_session(self.session)
             yield from self._handler.start()
 
             return_code = yield from self._handler.mqtt_connect()

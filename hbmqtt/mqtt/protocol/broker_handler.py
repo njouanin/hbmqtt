@@ -12,7 +12,6 @@ from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
-from hbmqtt.session import Session
 from hbmqtt.utils import format_client_message
 
 
@@ -29,8 +28,8 @@ class UnSubscription:
 
 
 class BrokerProtocolHandler(ProtocolHandler):
-    def __init__(self, session: Session, loop=None):
-        super().__init__(session, loop)
+    def __init__(self, loop=None):
+        super().__init__(loop)
         self._disconnect_waiter = None
         self._pending_subscriptions = asyncio.Queue()
         self._pending_unsubscriptions = asyncio.Queue()
@@ -38,6 +37,8 @@ class BrokerProtocolHandler(ProtocolHandler):
     @asyncio.coroutine
     def start(self):
         yield from super().start()
+        if self._disconnect_waiter is None:
+            self._disconnect_waiter = futures.Future(loop=self._loop)
 
     @asyncio.coroutine
     def stop(self):
@@ -47,8 +48,6 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def wait_disconnect(self):
-        if self._disconnect_waiter is None:
-            self._disconnect_waiter = futures.Future(loop=self._loop)
         yield from self._disconnect_waiter
 
     def handle_write_timeout(self):

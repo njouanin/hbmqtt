@@ -54,9 +54,9 @@ class ProtocolHandler:
     Class implementing the MQTT communication protocol using asyncio features
     """
 
-    def __init__(self, session: Session, loop=None):
+    def __init__(self, loop=None):
         self.logger = logging.getLogger(__name__)
-        self.session = session
+        self.session = None
         if loop is None:
             self._loop = asyncio.get_event_loop()
         else:
@@ -68,10 +68,6 @@ class ProtocolHandler:
 
         self._running = False
 
-        extra_info = self.session.writer.get_extra_info('sockname')
-        self.session.local_address = extra_info[0]
-        self.session.local_port = extra_info[1]
-
         self.incoming_queues = dict()
         self.application_messages = asyncio.Queue()
         for p in PacketType:
@@ -82,6 +78,17 @@ class ProtocolHandler:
         self._pubrel_waiters = dict()
         self._pubcomp_waiters = dict()
         self.delivered_message = asyncio.Queue()
+
+    def attach_to_session(self, session:Session):
+        self.session = session
+        self.session.handler = self
+        extra_info = self.session.writer.get_extra_info('sockname')
+        self.session.local_address = extra_info[0]
+        self.session.local_port = extra_info[1]
+
+    def detach_from_session(self):
+        self.session.handler = None
+        self.session = None
 
     @asyncio.coroutine
     def start(self):
@@ -139,6 +146,7 @@ class ProtocolHandler:
     def stop(self):
         self._running = False
         self.session.reader.feed_eof()
+        yield from self.outgoing_queue.put("STOP")
         yield from asyncio.wait([self._writer_task, self._reader_task], loop=self._loop)
 
     @asyncio.coroutine
@@ -209,6 +217,9 @@ class ProtocolHandler:
                 if keepalive_timeout <= 0:
                     keepalive_timeout = None
                 packet = yield from asyncio.wait_for(self.outgoing_queue.get(), keepalive_timeout)
+                if packet == "STOP":
+                    self.logger.debug("Writer interruption")
+                    break
                 yield from packet.to_stream(self.session.writer)
                 self.logger.debug(" -out-> " + repr(packet))
                 yield from self.session.writer.drain()
@@ -322,29 +333,34 @@ class ProtocolHandler:
         inflight_message = None
         packet_id = publish.variable_header.packet_id
         qos = (publish.fixed_header.flags >> 1) & 0x03
-        if packet_id in self.session.inflight_in:
-            inflight_message = self.session.inflight_in[packet_id]
-        else:
-            inflight_message = InFlightMessage(publish, qos)
-            self.session.inflight_in[packet_id] = inflight_message
-            inflight_message.publish()
 
-        if qos == 1:
-            puback = PubackPacket.build(packet_id)
-            yield from self.outgoing_queue.put(puback)
-            inflight_message.acknowledge()
-        if qos == 2:
-            pubrec = PubrecPacket.build(packet_id)
-            yield from self.outgoing_queue.put(pubrec)
-            inflight_message.receive()
-            waiter = futures.Future(loop=self._loop)
-            self._pubrel_waiters[packet_id] = waiter
-            yield from waiter
-            inflight_message.pubrel = waiter.result()
-            del self._pubrel_waiters[packet_id]
-            inflight_message.release()
-            pubcomp = PubcompPacket.build(packet_id)
-            yield from self.outgoing_queue.put(pubcomp)
-            inflight_message.complete()
-        yield from self.delivered_message.put(inflight_message)
-        del self.session.inflight_in[packet_id]
+        if qos == 0:
+            inflight_message = InFlightMessage(publish, qos)
+            yield from self.delivered_message.put(inflight_message)
+        else:
+            if packet_id in self.session.inflight_in:
+                inflight_message = self.session.inflight_in[packet_id]
+            else:
+                inflight_message = InFlightMessage(publish, qos)
+                self.session.inflight_in[packet_id] = inflight_message
+                inflight_message.publish()
+
+            if qos == 1:
+                puback = PubackPacket.build(packet_id)
+                yield from self.outgoing_queue.put(puback)
+                inflight_message.acknowledge()
+            if qos == 2:
+                pubrec = PubrecPacket.build(packet_id)
+                yield from self.outgoing_queue.put(pubrec)
+                inflight_message.receive()
+                waiter = futures.Future(loop=self._loop)
+                self._pubrel_waiters[packet_id] = waiter
+                yield from waiter
+                inflight_message.pubrel = waiter.result()
+                del self._pubrel_waiters[packet_id]
+                inflight_message.release()
+                pubcomp = PubcompPacket.build(packet_id)
+                yield from self.outgoing_queue.put(pubcomp)
+                inflight_message.complete()
+            yield from self.delivered_message.put(inflight_message)
+            del self.session.inflight_in[packet_id]
