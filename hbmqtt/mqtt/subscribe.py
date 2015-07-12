@@ -36,6 +36,9 @@ class SubscribePayload(MQTTPayload):
                 break
         return cls(topics)
 
+    def __repr__(self):
+        return type(self).__name__ + '(topics={0!r})'.format(self.topics)
+
 
 class SubscribePacket(MQTTPacket):
     VARIABLE_HEADER = PacketIdVariableHeader
