@@ -236,10 +236,15 @@ class Broker:
                 data = publish_packet.payload.data
                 asyncio.Task(self.broadcast_application_message(client_session, topic_name, data, retained=False))
                 if publish_packet.retain_flag:
-                    # If retained flag set, store the message for further subscriptions
-                    self.logger.debug("Retaining message from packet %s" % repr(publish_packet))
-                    retained_message = RetainedApplicationMessage(client_session, topic_name, data)
-                    self._global_retained_messages[topic_name] = retained_message
+                    if publish_packet.payload.data is not None and publish_packet.payload.data != b'':
+                        # If retained flag set, store the message for further subscriptions
+                        self.logger.debug("Retaining message from packet %s" % repr(publish_packet))
+                        retained_message = RetainedApplicationMessage(client_session, topic_name, data)
+                        self._global_retained_messages[topic_name] = retained_message
+                    else:
+                        # [MQTT-3.3.1-10]
+                        self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
+                        del self._global_retained_messages[topic_name]
                 wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message())
 
         self.logger.debug("Client disconnecting")
