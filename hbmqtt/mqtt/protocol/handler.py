@@ -79,7 +79,7 @@ class ProtocolHandler:
         self._pubcomp_waiters = dict()
         self.delivered_message = asyncio.Queue()
 
-    def attach_to_session(self, session:Session):
+    def attach_to_session(self, session: Session):
         self.session = session
         self.session.handler = self
         extra_info = self.session.writer.get_extra_info('sockname')
@@ -93,8 +93,8 @@ class ProtocolHandler:
     @asyncio.coroutine
     def start(self):
         self._running = True
-        self._reader_task = asyncio.async(self._reader_coro(), loop=self._loop)
-        self._writer_task = asyncio.async(self._writer_coro(), loop=self._loop)
+        self._reader_task = asyncio.Task(self._reader_coro(), loop=self._loop)
+        self._writer_task = asyncio.Task(self._writer_coro(), loop=self._loop)
         yield from asyncio.wait(
             [self._reader_ready.wait(), self._writer_ready.wait()], loop=self._loop)
         self.logger.debug("Handler tasks started")

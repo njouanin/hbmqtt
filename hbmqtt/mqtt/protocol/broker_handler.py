@@ -12,6 +12,7 @@ from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
+from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.utils import format_client_message
 
 
@@ -82,7 +83,7 @@ class BrokerProtocolHandler(ProtocolHandler):
     @asyncio.coroutine
     def handle_unsubscribe(self, unsubscribe: UnsubscribePacket):
         unsubscription = UnSubscription(unsubscribe.variable_header.packet_id, unsubscribe.payload.topics)
-        yield from self._pending_subscriptions.put(unsubscription)
+        yield from self._pending_unsubscriptions.put(unsubscription)
 
     @asyncio.coroutine
     def get_next_pending_subscription(self):
@@ -98,3 +99,8 @@ class BrokerProtocolHandler(ProtocolHandler):
     def mqtt_acknowledge_subscription(self, packet_id, return_codes):
         suback = SubackPacket.build(packet_id, return_codes)
         yield from self.outgoing_queue.put(suback)
+
+    @asyncio.coroutine
+    def mqtt_acknowledge_unsubscription(self, packet_id):
+        unsuback = UnsubackPacket.build(packet_id)
+        yield from self.outgoing_queue.put(unsuback)

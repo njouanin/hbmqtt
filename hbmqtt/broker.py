@@ -211,23 +211,31 @@ class Broker:
         connected = True
         wait_disconnect = asyncio.Task(handler.wait_disconnect())
         wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
+        wait_unsubscription = asyncio.Task(handler.get_next_pending_unsubscription())
         wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message())
         while connected:
-            done, pending = yield from asyncio.wait([wait_disconnect, wait_subscription, wait_deliver],
-                                                    return_when=asyncio.FIRST_COMPLETED)
+            done, pending = yield from asyncio.wait(
+                [wait_disconnect, wait_subscription, wait_unsubscription, wait_deliver],
+                return_when=asyncio.FIRST_COMPLETED)
             if wait_disconnect in done:
                 connected = False
                 wait_subscription.cancel()
+                wait_unsubscription.cancel()
                 wait_deliver.cancel()
+            elif wait_unsubscription in done:
+                unsubscription = wait_unsubscription.result()
+                for topic in unsubscription.topics:
+                    self.del_subscription(topic, client_session)
+                yield from handler.mqtt_acknowledge_unsubscription(unsubscription.packet_id)
+                wait_unsubscription = asyncio.Task(handler.get_next_pending_unsubscription())
             elif wait_subscription in done:
                 subscription = wait_subscription.result()
                 return_codes = []
                 for topic in subscription.topics:
                     return_codes.append(self.add_subscription(topic, client_session))
                 yield from handler.mqtt_acknowledge_subscription(subscription.packet_id, return_codes)
-                i=0
-                for topic in subscription.topics:
-                    if return_codes[i] != 0x80:
+                for index, topic in enumerate(subscription.topics):
+                    if return_codes[index] != 0x80:
                         yield from self.publish_retained_messages_for_subscription(topic, client_session)
                 wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
             elif wait_deliver in done:
@@ -296,6 +304,18 @@ class Broker:
             return qos
         except KeyError:
             return 0x80
+
+    def del_subscription(self, a_filter, session):
+        try:
+            sessions = self._topics[a_filter]
+            for index, s in enumerate(sessions):
+                if s['session'].client_id == session.client_id:
+                    self.logger.debug("Removing subscription on topic '%s' for client %s" %
+                                      (a_filter, format_client_message(session=session)))
+                    sessions.pop(index)
+        except KeyError:
+            # Unsubscribe topic not found in current subscribed topics
+            pass
 
     def matches(self, topic, filter):
         import re
