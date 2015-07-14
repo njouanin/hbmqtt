@@ -25,10 +25,11 @@ class BrokerException(BaseException):
 
 
 class RetainedApplicationMessage:
-    def __init__(self, source_session, topic, data):
+    def __init__(self, source_session, topic, data, qos):
         self.source_session = source_session
         self.topic = topic
         self.data = data
+        self.qos = qos
 
 
 class Broker:
@@ -147,6 +148,8 @@ class Broker:
             return
 
         client_session = None
+        self.logger.debug("Clean session={0}".format(connect.variable_header.clean_session_flag))
+        self.logger.debug("known sessions={0}".format(self._sessions))
         if connect.variable_header.clean_session_flag:
             client_id = connect.payload.client_id
             if client_id is not None and client_id in self._sessions:
@@ -159,6 +162,7 @@ class Broker:
             # Get session from cache
             client_id = connect.payload.client_id
             if client_id in self._sessions:
+                self.logger.debug("Found old session %s" % repr(self._sessions[client_id]))
                 client_session = self._sessions[client_id]
                 client_session.parent = 1
             else:
@@ -219,16 +223,13 @@ class Broker:
                 return_when=asyncio.FIRST_COMPLETED)
             if wait_disconnect in done:
                 connected = False
-                wait_subscription.cancel()
-                wait_unsubscription.cancel()
-                wait_deliver.cancel()
-            elif wait_unsubscription in done:
+            if wait_unsubscription in done:
                 unsubscription = wait_unsubscription.result()
                 for topic in unsubscription.topics:
                     self.del_subscription(topic, client_session)
                 yield from handler.mqtt_acknowledge_unsubscription(unsubscription.packet_id)
                 wait_unsubscription = asyncio.Task(handler.get_next_pending_unsubscription())
-            elif wait_subscription in done:
+            if wait_subscription in done:
                 subscription = wait_subscription.result()
                 return_codes = []
                 for topic in subscription.topics:
@@ -238,7 +239,8 @@ class Broker:
                     if return_codes[index] != 0x80:
                         yield from self.publish_retained_messages_for_subscription(topic, client_session)
                 wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
-            elif wait_deliver in done:
+                self.logger.debug(repr(self._topics))
+            if wait_deliver in done:
                 publish_packet = wait_deliver.result().packet
                 topic_name = publish_packet.variable_header.topic_name
                 data = publish_packet.payload.data
@@ -254,6 +256,9 @@ class Broker:
                         self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
                         del self._global_retained_messages[topic_name]
                 wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message())
+        wait_subscription.cancel()
+        wait_unsubscription.cancel()
+        wait_deliver.cancel()
 
         self.logger.debug("Client disconnecting")
         try:
@@ -341,24 +346,33 @@ class Broker:
                         handler = d['session'].handler
                         packet_id = handler.session.next_packet_id
                         publish_tasks.append(
-                            asyncio.Task(handler.mqtt_publish(topic, data, packet_id, False, qos, retained)))
+                            asyncio.Task(handler.mqtt_publish(topic, data, packet_id, False, qos, retained))
+                        )
                     else:
                         self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
                                           (format_client_message(session=source_session),
                                            topic, format_client_message(session=target_session)))
-                        retained_message = RetainedApplicationMessage(source_session, topic, data)
-                        target_session.retained_messages.put(retained_message)
+                        retained_message = RetainedApplicationMessage(source_session, topic, data, qos)
+                        publish_tasks.append(
+                            asyncio.Task(target_session.retained_messages.put(retained_message))
+                        )
         if len(publish_tasks) > 0:
             asyncio.wait(publish_tasks)
 
     @asyncio.coroutine
     def publish_session_retained_messages(self, session):
-        self.logger.debug("Begin broadcasting messages retained for session %s" % format_client_message(session=session))
+        self.logger.debug("Begin publish messages retained for session %s" % format_client_message(session=session))
+        self.logger.debug("{0} messages retained".format(session.retained_messages.qsize()))
+        publish_tasks = []
         while not session.retained_messages.empty():
             retained = yield from session.retained_messages.get()
-            yield from self.broadcast_application_message(
-                retained.source_session, retained.topic, retained.data, False)
-        self.logger.debug("End broadcasting messages retained for session %s" % format_client_message(session=session))
+            packet_id = session.next_packet_id
+            publish_tasks.append(asyncio.Task(
+                session.handler.mqtt_publish(
+                    retained.topic, retained.data, packet_id, False, retained.qos, True)))
+        if len(publish_tasks) > 0:
+            asyncio.wait(publish_tasks)
+        self.logger.debug("End publish messages retained for session %s" % format_client_message(session=session))
 
     @asyncio.coroutine
     def publish_retained_messages_for_subscription(self, subscription, session):
