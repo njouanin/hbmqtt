@@ -50,3 +50,6 @@ class Session:
     def next_packet_id(self):
         self._packet_id += 1
         return self._packet_id
+
+    def __repr__(self):
+        return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.machine.state)
