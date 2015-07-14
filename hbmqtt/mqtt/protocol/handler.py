@@ -4,7 +4,7 @@
 import logging
 import asyncio
 from asyncio import futures
-from hbmqtt.mqtt.packet import MQTTFixedHeader
+from hbmqtt.mqtt.packet import MQTTFixedHeader, MQTTPacket
 from hbmqtt.mqtt import packet_class
 from hbmqtt.errors import NoDataException
 from hbmqtt.mqtt.packet import PacketType
@@ -217,7 +217,7 @@ class ProtocolHandler:
                 if keepalive_timeout <= 0:
                     keepalive_timeout = None
                 packet = yield from asyncio.wait_for(self.outgoing_queue.get(), keepalive_timeout)
-                if packet == "STOP":
+                if not isinstance(packet, MQTTPacket):
                     self.logger.debug("Writer interruption")
                     break
                 yield from packet.to_stream(self.session.writer)
@@ -237,6 +237,8 @@ class ProtocolHandler:
             while True:
                 try:
                     packet = self.outgoing_queue.get_nowait()
+                    if not isinstance(packet, MQTTPacket):
+                        break
                     yield from packet.to_stream(self.session.writer)
                     self.logger.debug(" -out-> " + repr(packet))
                 except asyncio.QueueEmpty:
