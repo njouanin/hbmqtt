@@ -196,6 +196,7 @@ class ProtocolHandler:
                         self.logger.warn("Unhandled packet type: %s" % packet.fixed_header.packet_type)
                 else:
                     self.logger.debug("No more data, stopping reader coro")
+                    yield from self.handle_connection_closed()
                     break
             except asyncio.TimeoutError:
                 self.logger.debug("Input stream read timeout")
@@ -230,6 +231,7 @@ class ProtocolHandler:
                     self.handle_write_timeout()
             except Exception as e:
                 self.logger.warn("Unhandled exception in writer coro: %s" % e)
+                yield from self.handle_connection_closed()
                 break
         self.logger.debug("Writer coro stopping")
         # Flush queue before stopping
@@ -293,6 +295,10 @@ class ProtocolHandler:
     @asyncio.coroutine
     def handle_disconnect(self, disconnect: DisconnectPacket):
         self.logger.warn('DISCONNECT unhandled')
+
+    @asyncio.coroutine
+    def handle_connection_closed(self):
+        self.logger.warn('Connection closed unhandled')
 
     @asyncio.coroutine
     def handle_puback(self, puback: PubackPacket):

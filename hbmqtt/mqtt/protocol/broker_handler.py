@@ -47,9 +47,13 @@ class BrokerProtocolHandler(ProtocolHandler):
             self._disconnect_waiter.set_result(None)
 
     @asyncio.coroutine
-    def handle_disconnect(self, disconnect: DisconnectPacket):
+    def handle_disconnect(self, disconnect):
         if self._disconnect_waiter is not None:
             self._disconnect_waiter.set_result(disconnect)
+
+    @asyncio.coroutine
+    def handle_connection_closed(self):
+        yield from self.handle_disconnect(None)
 
     @asyncio.coroutine
     def handle_connect(self, connect: ConnectPacket):

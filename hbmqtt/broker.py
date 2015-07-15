@@ -228,6 +228,18 @@ class Broker:
                 [wait_disconnect, wait_subscription, wait_unsubscription, wait_deliver],
                 return_when=asyncio.FIRST_COMPLETED)
             if wait_disconnect in done:
+                result = wait_disconnect.result()
+                self.logger.debug("Result from wait_diconnect: %s" % result)
+                if result is None:
+                    self.logger.debug("Will flag: %s" % client_session.will_flag)
+                    #Connection closed anormally, send will message
+                    if client_session.will_flag:
+                        self.logger.debug("Client %s disconnected abnormally, sending will message" %
+                                          format_client_message(client_session))
+                        yield from self.broadcast_application_message(
+                            client_session, client_session.will_topic,
+                            client_session.will_message,
+                            client_session.will_qos)
                 connected = False
             if wait_unsubscription in done:
                 unsubscription = wait_unsubscription.result()
@@ -250,7 +262,7 @@ class Broker:
                 publish_packet = wait_deliver.result().packet
                 topic_name = publish_packet.variable_header.topic_name
                 data = publish_packet.payload.data
-                asyncio.Task(self.broadcast_application_message(client_session, topic_name, data))
+                yield from self.broadcast_application_message(client_session, topic_name, data)
                 if publish_packet.retain_flag:
                     if publish_packet.payload.data is not None and publish_packet.payload.data != b'':
                         # If retained flag set, store the message for further subscriptions
@@ -296,13 +308,14 @@ class Broker:
 
     def add_subscription(self, subscription, session):
         import re
-        wildcard_pattern = re.compile('(/.+?\+)|(/\+.+?)|(/.+?\+.+?)')
+        #wildcard_pattern = re.compile('(/.+?\+)|(/\+.+?)|(/.+?\+.+?)')
+        wildcard_pattern = re.compile('.*?/?\+/?.*?')
         try:
             a_filter = subscription['filter']
             if '#' in a_filter and not a_filter.endswith('#'):
                 # [MQTT-4.7.1-2] Wildcard character '#' is only allowed as last character in filter
                 return 0x80
-            if '+' in a_filter and wildcard_pattern.match(a_filter):
+            if '+' in a_filter and not wildcard_pattern.match(a_filter):
                 # [MQTT-4.7.1-3] + wildcard character must occupy entire level
                 return 0x80
 
@@ -342,33 +355,42 @@ class Broker:
             return False
 
     @asyncio.coroutine
-    def broadcast_application_message(self, source_session, topic, data):
+    def broadcast_application_message(self, source_session, topic, data, force_qos=None):
+        self.logger.debug("Broadcasting message from %s on topic %s" %
+                          (format_client_message(session=source_session), topic)
+                          )
+        self.logger.debug("Current subscriptions: %s" % repr(self._subscriptions))
         publish_tasks = []
-        for k_filter in self._subscriptions:
-            if self.matches(topic, k_filter):
-                subscriptions = self._subscriptions[k_filter]
-                for subscription in subscriptions:
-                    target_session = subscription.session
-                    qos = subscription.qos
-                    if target_session.machine.state == 'connected':
-                        self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
-                                          (format_client_message(session=source_session),
-                                           topic, format_client_message(session=target_session)))
-                        handler = subscription.session.handler
-                        packet_id = handler.session.next_packet_id
-                        publish_tasks.append(
-                            asyncio.Task(handler.mqtt_publish(topic, data, packet_id, False, qos, retain=False))
-                        )
-                    else:
-                        self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
-                                          (format_client_message(session=source_session),
-                                           topic, format_client_message(session=target_session)))
-                        retained_message = RetainedApplicationMessage(source_session, topic, data, qos)
-                        publish_tasks.append(
-                            asyncio.Task(target_session.retained_messages.put(retained_message))
-                        )
-        if len(publish_tasks) > 0:
-            asyncio.wait(publish_tasks)
+        try:
+            for k_filter in self._subscriptions:
+                if self.matches(topic, k_filter):
+                    subscriptions = self._subscriptions[k_filter]
+                    for subscription in subscriptions:
+                        target_session = subscription.session
+                        qos = subscription.qos
+                        if force_qos is not None:
+                            qos = force_qos
+                        if target_session.machine.state == 'connected':
+                            self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
+                                              (format_client_message(session=source_session),
+                                               topic, format_client_message(session=target_session)))
+                            handler = subscription.session.handler
+                            packet_id = handler.session.next_packet_id
+                            publish_tasks.append(
+                                asyncio.Task(handler.mqtt_publish(topic, data, packet_id, False, qos, retain=False))
+                            )
+                        else:
+                            self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
+                                              (format_client_message(session=source_session),
+                                               topic, format_client_message(session=target_session)))
+                            retained_message = RetainedApplicationMessage(source_session, topic, data, qos)
+                            publish_tasks.append(
+                                asyncio.Task(target_session.retained_messages.put(retained_message))
+                            )
+            if len(publish_tasks) > 0:
+                asyncio.wait(publish_tasks)
+        except Exception as e:
+            self.logger.warn("Message broadcasting failed: %s", e)
 
     @asyncio.coroutine
     def publish_session_retained_messages(self, session):
