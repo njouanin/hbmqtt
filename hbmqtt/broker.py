@@ -24,8 +24,14 @@ class BrokerException(BaseException):
     pass
 
 
+class Subscription:
+    def __init__(self, session, qos):
+        self.session = session
+        self.qos = qos
+
+
 class RetainedApplicationMessage:
-    def __init__(self, source_session, topic, data, qos):
+    def __init__(self, source_session, topic, data, qos=None):
         self.source_session = source_session
         self.topic = topic
         self.data = data
@@ -49,8 +55,8 @@ class Broker:
         self._server = None
         self._init_states()
         self._sessions = dict()
-        self._topics = dict()
-        self._global_retained_messages=dict()
+        self._subscriptions = dict()
+        self._global_retained_messages = dict()
 
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
@@ -225,26 +231,26 @@ class Broker:
                 connected = False
             if wait_unsubscription in done:
                 unsubscription = wait_unsubscription.result()
-                for topic in unsubscription.topics:
+                for topic in unsubscription['topics']:
                     self.del_subscription(topic, client_session)
-                yield from handler.mqtt_acknowledge_unsubscription(unsubscription.packet_id)
+                yield from handler.mqtt_acknowledge_unsubscription(unsubscription['packet_id'])
                 wait_unsubscription = asyncio.Task(handler.get_next_pending_unsubscription())
             if wait_subscription in done:
-                subscription = wait_subscription.result()
+                subscriptions = wait_subscription.result()
                 return_codes = []
-                for topic in subscription.topics:
-                    return_codes.append(self.add_subscription(topic, client_session))
-                yield from handler.mqtt_acknowledge_subscription(subscription.packet_id, return_codes)
-                for index, topic in enumerate(subscription.topics):
+                for subscription in subscriptions['topics']:
+                    return_codes.append(self.add_subscription(subscription, client_session))
+                yield from handler.mqtt_acknowledge_subscription(subscriptions['packet_id'], return_codes)
+                for index, subscription in enumerate(subscriptions['topics']):
                     if return_codes[index] != 0x80:
-                        yield from self.publish_retained_messages_for_subscription(topic, client_session)
+                        yield from self.publish_retained_messages_for_subscription(subscription, client_session)
                 wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
-                self.logger.debug(repr(self._topics))
+                self.logger.debug(repr(self._subscriptions))
             if wait_deliver in done:
                 publish_packet = wait_deliver.result().packet
                 topic_name = publish_packet.variable_header.topic_name
                 data = publish_packet.payload.data
-                asyncio.Task(self.broadcast_application_message(client_session, topic_name, data, retained=False))
+                asyncio.Task(self.broadcast_application_message(client_session, topic_name, data))
                 if publish_packet.retain_flag:
                     if publish_packet.payload.data is not None and publish_packet.payload.data != b'':
                         # If retained flag set, store the message for further subscriptions
@@ -288,36 +294,41 @@ class Broker:
         # TODO : Handle client authentication here
         return True
 
-    def add_subscription(self, topic, session):
+    def add_subscription(self, subscription, session):
         import re
         wildcard_pattern = re.compile('(/.+?\+)|(/\+.+?)|(/.+?\+.+?)')
         try:
-            filter = topic['filter']
-            if '#' in filter and not filter.endswith('#'):
+            a_filter = subscription['filter']
+            if '#' in a_filter and not a_filter.endswith('#'):
                 # [MQTT-4.7.1-2] Wildcard character '#' is only allowed as last character in filter
                 return 0x80
-            if '+' in filter and wildcard_pattern.match(filter):
+            if '+' in a_filter and wildcard_pattern.match(a_filter):
                 # [MQTT-4.7.1-3] + wildcard character must occupy entire level
                 return 0x80
 
-            qos = topic['qos']
+            qos = subscription['qos']
             if 'max-qos' in self.config and qos > self.config['max-qos']:
                 qos = self.config['max-qos']
-            if filter not in self._topics:
-                self._topics[filter] = []
-            self._topics[filter].append({'session': session, 'qos': qos})
+            if a_filter not in self._subscriptions:
+                self._subscriptions[a_filter] = []
+            already_subscribed = next(
+                (s for s in self._subscriptions[a_filter] if s.session.client_id == session.client_id), None)
+            if not already_subscribed:
+                self._subscriptions[a_filter].append(Subscription(session, qos))
+            else:
+                self.logger.debug("Client %s has already subscribed to %s" % (format_client_message(session=session), a_filter))
             return qos
         except KeyError:
             return 0x80
 
     def del_subscription(self, a_filter, session):
         try:
-            sessions = self._topics[a_filter]
-            for index, s in enumerate(sessions):
-                if s['session'].client_id == session.client_id:
+            subscriptions = self._subscriptions[a_filter]
+            for index, subscription in enumerate(subscriptions):
+                if subscription.session.client_id == session.client_id:
                     self.logger.debug("Removing subscription on topic '%s' for client %s" %
                                       (a_filter, format_client_message(session=session)))
-                    sessions.pop(index)
+                    subscriptions.pop(index)
         except KeyError:
             # Unsubscribe topic not found in current subscribed topics
             pass
@@ -331,22 +342,22 @@ class Broker:
             return False
 
     @asyncio.coroutine
-    def broadcast_application_message(self, source_session, topic, data, retained):
+    def broadcast_application_message(self, source_session, topic, data):
         publish_tasks = []
-        for k_filter in self._topics:
+        for k_filter in self._subscriptions:
             if self.matches(topic, k_filter):
-                handlers = self._topics[k_filter]
-                for d in handlers:
-                    target_session = d['session']
-                    qos = d['qos']
+                subscriptions = self._subscriptions[k_filter]
+                for subscription in subscriptions:
+                    target_session = subscription.session
+                    qos = subscription.qos
                     if target_session.machine.state == 'connected':
                         self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
                                           (format_client_message(session=source_session),
                                            topic, format_client_message(session=target_session)))
-                        handler = d['session'].handler
+                        handler = subscription.session.handler
                         packet_id = handler.session.next_packet_id
                         publish_tasks.append(
-                            asyncio.Task(handler.mqtt_publish(topic, data, packet_id, False, qos, retained))
+                            asyncio.Task(handler.mqtt_publish(topic, data, packet_id, False, qos, retain=False))
                         )
                     else:
                         self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
@@ -361,8 +372,9 @@ class Broker:
 
     @asyncio.coroutine
     def publish_session_retained_messages(self, session):
-        self.logger.debug("Begin publish messages retained for session %s" % format_client_message(session=session))
-        self.logger.debug("{0} messages retained".format(session.retained_messages.qsize()))
+        self.logger.debug("Publishing %d messages retained for session %s" %
+                          (session.retained_messages.qsize(), format_client_message(session=session))
+                          )
         publish_tasks = []
         while not session.retained_messages.empty():
             retained = yield from session.retained_messages.get()
@@ -372,7 +384,6 @@ class Broker:
                     retained.topic, retained.data, packet_id, False, retained.qos, True)))
         if len(publish_tasks) > 0:
             asyncio.wait(publish_tasks)
-        self.logger.debug("End publish messages retained for session %s" % format_client_message(session=session))
 
     @asyncio.coroutine
     def publish_retained_messages_for_subscription(self, subscription, session):

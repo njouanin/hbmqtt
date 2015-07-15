@@ -16,18 +16,6 @@ from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.utils import format_client_message
 
 
-class Subscription:
-    def __init__(self, packet_id, topics):
-        self.packet_id = packet_id
-        self.topics = topics
-
-
-class UnSubscription:
-    def __init__(self, packet_id, topics):
-        self.packet_id = packet_id
-        self.topics = topics
-
-
 class BrokerProtocolHandler(ProtocolHandler):
     def __init__(self, loop=None):
         super().__init__(loop)
@@ -67,7 +55,8 @@ class BrokerProtocolHandler(ProtocolHandler):
     def handle_connect(self, connect: ConnectPacket):
         # Broker handler shouldn't received CONNECT message during messages handling
         # as CONNECT messages are managed by the broker on client connection
-        self.logger.error('[MQTT-3.1.0-2] %s : CONNECT message received during messages handling' % (format_client_message(self.session)))
+        self.logger.error('[MQTT-3.1.0-2] %s : CONNECT message received during messages handling' %
+                          (format_client_message(self.session)))
         if self._disconnect_waiter is not None and not self._disconnect_waiter.done():
             self._disconnect_waiter.set_result(None)
 
@@ -77,12 +66,12 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def handle_subscribe(self, subscribe: SubscribePacket):
-        subscription = Subscription(subscribe.variable_header.packet_id, subscribe.payload.topics)
+        subscription = {'packet_id': subscribe.variable_header.packet_id, 'topics': subscribe.payload.topics}
         yield from self._pending_subscriptions.put(subscription)
 
     @asyncio.coroutine
     def handle_unsubscribe(self, unsubscribe: UnsubscribePacket):
-        unsubscription = UnSubscription(unsubscribe.variable_header.packet_id, unsubscribe.payload.topics)
+        unsubscription = {'packet_id': unsubscribe.variable_header.packet_id, 'topics': unsubscribe.payload.topics}
         yield from self._pending_unsubscriptions.put(unsubscription)
 
     @asyncio.coroutine
