@@ -88,7 +88,7 @@ class ConnectVariableHeader(MQTTVariableHeader):
 
     @will_qos.setter
     def will_qos(self, val: int):
-        self.flags &= (0x00 << 3)
+        self.flags &= 0xe7  # Reset QOS flags
         self.flags |= (val << 3)
 
     @classmethod
