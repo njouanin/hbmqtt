@@ -254,6 +254,7 @@ class MQTTClient:
             s.will_retain = self.config['will']['retain']
             s.will_topic = self.config['will']['topic']
             s.will_message = self.config['will']['message']
+            s.will_qos = self.config['will']['qos']
         else:
             s.will_flag = False
             s.will_retain = False
