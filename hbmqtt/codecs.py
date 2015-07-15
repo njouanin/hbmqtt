@@ -69,8 +69,24 @@ def decode_string(reader) -> bytes:
     byte_str = yield from read_or_raise(reader, str_length)
     return byte_str.decode(encoding='utf-8')
 
+@asyncio.coroutine
+def decode_data_with_length(reader) -> bytes:
+    """
+    Read data from a reader. Data is prefixed with 2 bytes length
+    :param reader: Stream reader
+    :return: bytes read from stream (without length)
+    """
+    length_bytes = yield from read_or_raise(reader, 2)
+    bytes_length = bytes_to_int(length_bytes)
+    data = yield from read_or_raise(reader, bytes_length)
+    return data
+
 def encode_string(string: str) -> bytes:
     data = string.encode(encoding='utf-8')
+    data_length = len(data)
+    return int_to_bytes(data_length, 2) + data
+
+def encode_data_with_length(data: bytes) -> bytes:
     data_length = len(data)
     return int_to_bytes(data_length, 2) + data
 

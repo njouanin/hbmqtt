@@ -156,7 +156,7 @@ class ConnectPayload(MQTTPayload):
         if variable_header.will_flag:
             try:
                 payload.will_topic = yield from decode_string(reader)
-                payload.will_message = yield from decode_string(reader)
+                payload.will_message = yield from decode_data_with_length(reader)
             except NoDataException:
                 payload.will_topic = None
                 payload.will_message = None
@@ -182,7 +182,7 @@ class ConnectPayload(MQTTPayload):
         # Will topic / message
         if variable_header.will_flag:
             out += encode_string(self.will_topic)
-            out += encode_string(self.will_message)
+            out += encode_data_with_length(self.will_message)
         # username
         if variable_header.username_flag:
             out += encode_string(self.username)

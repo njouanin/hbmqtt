@@ -28,7 +28,7 @@ class ConnectPacketTest(unittest.TestCase):
         self.assertFalse(message.variable_header.reserved_flag)
         self.assertEqual(message.payload.client_id, '0123456789')
         self.assertEqual(message.payload.will_topic, 'WillTopic')
-        self.assertEqual(message.payload.will_message, 'WillMessage')
+        self.assertEqual(message.payload.will_message, b'WillMessage')
         self.assertEqual(message.payload.username, 'user')
         self.assertEqual(message.payload.password, 'password')
 
@@ -101,7 +101,7 @@ class ConnectPacketTest(unittest.TestCase):
     def test_encode(self):
         header = MQTTFixedHeader(PacketType.CONNECT, 0x00, 0)
         variable_header = ConnectVariableHeader(0xce, 0, 'MQTT', 4)
-        payload = ConnectPayload('0123456789', 'WillTopic', 'WillMessage', 'user', 'password')
+        payload = ConnectPayload('0123456789', 'WillTopic', b'WillMessage', 'user', 'password')
         message = ConnectPacket(header, variable_header, payload)
         encoded = message.to_bytes()
         self.assertEqual(encoded, b'\x10\x3e\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password')
