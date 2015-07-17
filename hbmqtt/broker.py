@@ -240,6 +240,11 @@ class Broker:
                             client_session, client_session.will_topic,
                             client_session.will_message,
                             client_session.will_qos)
+                        if client_session.will_retain:
+                            self.retain_message(client_session,
+                                                client_session.will_topic,
+                                                client_session.will_message,
+                                                client_session.will_qos)
                 connected = False
             if wait_unsubscription in done:
                 unsubscription = wait_unsubscription.result()
@@ -264,15 +269,7 @@ class Broker:
                 data = publish_packet.payload.data
                 yield from self.broadcast_application_message(client_session, topic_name, data)
                 if publish_packet.retain_flag:
-                    if publish_packet.payload.data is not None and publish_packet.payload.data != b'':
-                        # If retained flag set, store the message for further subscriptions
-                        self.logger.debug("Retaining message from packet %s" % repr(publish_packet))
-                        retained_message = RetainedApplicationMessage(client_session, topic_name, data)
-                        self._global_retained_messages[topic_name] = retained_message
-                    else:
-                        # [MQTT-3.3.1-10]
-                        self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
-                        del self._global_retained_messages[topic_name]
+                    self.retain_message(client_session, topic_name, data)
                 wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message())
         wait_subscription.cancel()
         wait_unsubscription.cancel()
@@ -305,6 +302,17 @@ class Broker:
     def authenticate(self, session: Session):
         # TODO : Handle client authentication here
         return True
+
+    def retain_message(self, source_session, topic_name, data, qos=None):
+        if data is not None and data != b'':
+            # If retained flag set, store the message for further subscriptions
+            self.logger.debug("Retaining message on topic %s" % topic_name)
+            retained_message = RetainedApplicationMessage(source_session, topic_name, data, qos)
+            self._global_retained_messages[topic_name] = retained_message
+        else:
+            # [MQTT-3.3.1-10]
+            self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
+            del self._global_retained_messages[topic_name]
 
     def add_subscription(self, subscription, session):
         import re
