@@ -229,9 +229,11 @@ class ProtocolHandler:
                 self.logger.debug("Output queue get timeout")
                 if self._running:
                     self.handle_write_timeout()
+            except ConnectionResetError as cre:
+                yield from self.handle_connection_closed()
+                break
             except Exception as e:
                 self.logger.warn("Unhandled exception in writer coro: %s" % e)
-                yield from self.handle_connection_closed()
                 break
         self.logger.debug("Writer coro stopping")
         # Flush queue before stopping
