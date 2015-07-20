@@ -5,11 +5,6 @@ from enum import Enum
 from transitions import Machine, MachineError
 from asyncio import Queue
 
-class SessionState(Enum):
-    NEW = 0
-    CONNECTED = 1
-    DISCONNECTED = 2
-
 class Session:
     states = ['new', 'connected', 'disconnected']
 

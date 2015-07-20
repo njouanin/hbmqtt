@@ -6,10 +6,10 @@ import logging
 import asyncio
 from urllib.parse import urlparse
 
-from transitions import Machine, MachineError
+from transitions import MachineError
 
 from hbmqtt.utils import not_in_dict_or_none
-from hbmqtt.session import Session, SessionState
+from hbmqtt.session import Session
 from hbmqtt.mqtt.connack import ReturnCode
 from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 
@@ -38,7 +38,7 @@ class MQTTClient:
                 password: yyy
                 # OR
                 uri: mqtt:xxx@yyy//localhost:1883/
-                # OR a mix ot both
+                # OR a mix or both
             keep_alive: 60
             cleansession: true
             will:
@@ -84,7 +84,7 @@ class MQTTClient:
             self._disconnect_task = asyncio.Task(self.handle_connection_close())
             return return_code
         except MachineError:
-            msg = "Connect call incompatible with client current state '%s'" % self.machine.current_state
+            msg = "Connect call incompatible with client current state '%s'" % self.session.machine.state
             self.logger.warn(msg)
             self.session.machine.connect_fail()
             raise ClientException(msg)
@@ -125,7 +125,7 @@ class MQTTClient:
             self.session.machine.connect_success()
             return return_code
         except MachineError:
-            msg = "Connect call incompatible with client current state '%s'" % self.machine.current_state
+            msg = "Connect call incompatible with client current state '%s'" % self.session.machine.state
             self.logger.warn(msg)
             self.session.machine.connect_fail()
             raise ClientException(msg)
@@ -164,23 +164,11 @@ class MQTTClient:
             return _qos, _retain
         (app_qos, app_retain) = get_retain_and_qos()
         if app_qos == 0:
-            yield from self._publish_qos_0(topic, message, dup, app_retain)
+            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x00, app_retain)
         if app_qos == 1:
-            yield from self._publish_qos_1(topic, message, dup, app_retain)
+            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x01, app_retain)
         if app_qos == 2:
-            yield from self._publish_qos_2(topic, message, dup, app_retain)
-
-    @asyncio.coroutine
-    def _publish_qos_0(self, topic, message, dup, retain):
-        yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x00, retain)
-
-    @asyncio.coroutine
-    def _publish_qos_1(self, topic, message, dup, retain):
-        yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x01, retain)
-
-    @asyncio.coroutine
-    def _publish_qos_2(self, topic, message, dup, retain):
-        yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x02, retain)
+            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x02, app_retain)
 
     @asyncio.coroutine
     def subscribe(self, topics):
