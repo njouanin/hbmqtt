@@ -1,4 +1,6 @@
-__author__ = 'nico'
+# Copyright (c) 2015 Nicolas JOUANIN
+#
+# See the file license.txt for copying permission.
 
 
 def not_in_dict_or_none(dict, key):
@@ -12,3 +14,19 @@ def not_in_dict_or_none(dict, key):
         return True
     else:
         return False
+
+
+def format_client_message(session=None, address=None, port=None, id=None):
+    if session:
+        return "(client @=%s:%d id=%s)" % (session.remote_address, session.remote_port, session.client_id)
+    else:
+        return "(client @=%s:%d id=%s)" % (address, port, id)
+
+
+def gen_client_id():
+    """
+    Generates unique client ID
+    :return:
+    """
+    import uuid
+    return str(uuid.uuid4())

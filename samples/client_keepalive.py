@@ -1,6 +1,8 @@
 import logging
-from hbmqtt.client._client import MQTTClient
 import asyncio
+
+from hbmqtt.client import MQTTClient
+
 
 #
 # This sample shows a client running idle.
@@ -18,7 +20,7 @@ C = MQTTClient(config=config)
 
 @asyncio.coroutine
 def test_coro():
-    yield from C.connect(uri='mqtt://iot.eclipse.org:1883/', username=None, password=None)
+    yield from C.connect(uri='mqtt://localhost:1883/', username=None, password=None)
     yield from asyncio.sleep(18)
 
     yield from C.disconnect()

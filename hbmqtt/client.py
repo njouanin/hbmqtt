@@ -1,25 +1,23 @@
-__author__ = 'nico'
+# Copyright (c) 2015 Nicolas JOUANIN
+#
+# See the file license.txt for copying permission.
 
 import logging
 import asyncio
 from urllib.parse import urlparse
 
-from transitions import Machine, MachineError
+from transitions import MachineError
 
 from hbmqtt.utils import not_in_dict_or_none
-from hbmqtt.session import Session, SessionState
+from hbmqtt.session import Session
 from hbmqtt.mqtt.connack import ReturnCode
-from hbmqtt.mqtt.subscribe import SubscribePacket
-from hbmqtt.mqtt.suback import SubackPacket
-from hbmqtt.errors import MQTTException
-from hbmqtt.mqtt.protocol import ClientProtocolHandler
+from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 
 _defaults = {
     'keep_alive': 10,
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False,
-    'subscriptions-polling-interval': 1,
 }
 
 
@@ -27,15 +25,8 @@ class ClientException(BaseException):
     pass
 
 
-def gen_client_id():
-    import uuid
-    return str(uuid.uuid4())
-
-
 class MQTTClient:
-    states = ['new', 'connecting', 'connected', 'disconnected']
-
-    def __init__(self, client_id=None, config={}, loop=None):
+    def __init__(self, client_id=None, config=None, loop=None):
         """
 
         :param config: Example yaml config
@@ -47,7 +38,7 @@ class MQTTClient:
                 password: yyy
                 # OR
                 uri: mqtt:xxx@yyy//localhost:1883/
-                # OR a mix ot both
+                # OR a mix or both
             keep_alive: 60
             cleansession: true
             will:
@@ -66,62 +57,82 @@ class MQTTClient:
         """
         self.logger = logging.getLogger(__name__)
         self.config = _defaults
-        self.config.update(config)
+        if config is not None:
+            self.config.update(config)
         if client_id is not None:
             self.client_id = client_id
         else:
+            from hbmqtt.utils import gen_client_id
             self.client_id = gen_client_id()
             self.logger.debug("Using generated client ID : %s" % self.client_id)
 
-        self._init_states()
         if loop is not None:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
         self.session = None
         self._handler = None
-
-    def _init_states(self):
-        self.machine = Machine(states=MQTTClient.states, initial='new')
-        self.machine.add_transition(trigger='connect', source='new', dest='connecting')
-        self.machine.add_transition(trigger='connect', source='disconnected', dest='connecting')
-        self.machine.add_transition(trigger='connect_fail', source='connecting', dest='disconnected')
-        self.machine.add_transition(trigger='connect_success', source='connecting', dest='connected')
-        self.machine.add_transition(trigger='disconnect', source='idle', dest='disconnected')
-        self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
+        self._disconnect_task = None
 
     @asyncio.coroutine
     def connect(self, host=None, port=None, username=None, password=None, uri=None, cleansession=None):
         try:
-            self.machine.connect()
             self.session = self._initsession(host, port, username, password, uri, cleansession)
             self.logger.debug("Connect with session parameters: %s" % self.session)
 
             return_code = yield from self._connect_coro()
-            self.machine.connect_success()
+            self._disconnect_task = asyncio.Task(self.handle_connection_close())
             return return_code
         except MachineError:
-            msg = "Connect call incompatible with client current state '%s'" % self.machine.current_state
+            msg = "Connect call incompatible with client current state '%s'" % self.session.machine.state
             self.logger.warn(msg)
-            self.machine.connect_fail()
+            self.session.machine.connect_fail()
             raise ClientException(msg)
         except Exception as e:
-            self.machine.connect_fail()
+            self.session.machine.connect_fail()
             self.logger.warn("Connection failed: %s " % e)
             raise ClientException("Connection failed: %s " % e)
 
     @asyncio.coroutine
     def disconnect(self):
         try:
+            self.session.machine.disconnect()
+            if not self._disconnect_task.done():
+                self._disconnect_task.cancel()
             yield from self._handler.mqtt_disconnect()
             yield from self._handler.stop()
+            self._handler.detach_from_session()
+        except MachineError as me:
+            if self.session.machine.state == "disconnected":
+                self.logger.warn("Client session is already disconnected")
+            else:
+                self.logger.debug("Invalid method call at this moment: %s" % me)
+                raise ClientException("Client instance can't be disconnected: %s" % me)
         except Exception as e:
             self.logger.warn("Unhandled exception: %s" % e)
             raise ClientException("Unhandled exception: %s" % e)
-        except MachineError as me:
-            self.logger.debug("Invalid method call at this moment: %s" % me)
-            raise ClientException("Client instance can't be disconnected: %s" % me)
-        self.session = None
+
+    @asyncio.coroutine
+    def reconnect(self, cleansession=None):
+        try:
+            self.session.machine.connect()
+            self.session.clclean_session = cleansession
+            self.logger.debug("Reconnecting with session parameters: %s" % self.session)
+
+            return_code = yield from self._connect_coro()
+            asyncio.Task(self.handle_connection_close())
+
+            self.session.machine.connect_success()
+            return return_code
+        except MachineError:
+            msg = "Connect call incompatible with client current state '%s'" % self.session.machine.state
+            self.logger.warn(msg)
+            self.session.machine.connect_fail()
+            raise ClientException(msg)
+        except Exception as e:
+            self.session.machine.connect_fail()
+            self.logger.warn("Connection failed: %s " % e)
+            raise ClientException("Connection failed: %s " % e)
 
     @asyncio.coroutine
     def ping(self):
@@ -153,23 +164,11 @@ class MQTTClient:
             return _qos, _retain
         (app_qos, app_retain) = get_retain_and_qos()
         if app_qos == 0:
-            yield from self._publish_qos_0(topic, message, dup, app_retain)
+            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x00, app_retain)
         if app_qos == 1:
-            yield from self._publish_qos_1(topic, message, dup, app_retain)
+            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x01, app_retain)
         if app_qos == 2:
-            yield from self._publish_qos_2(topic, message, dup, app_retain)
-
-    @asyncio.coroutine
-    def _publish_qos_0(self, topic, message, dup, retain):
-        yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x00, retain)
-
-    @asyncio.coroutine
-    def _publish_qos_1(self, topic, message, dup, retain):
-        yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x01, retain)
-
-    @asyncio.coroutine
-    def _publish_qos_2(self, topic, message, dup, retain):
-        yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x02, retain)
+            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x02, app_retain)
 
     @asyncio.coroutine
     def subscribe(self, topics):
@@ -188,22 +187,33 @@ class MQTTClient:
         try:
             self.session.reader, self.session.writer = \
                 yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port)
-            self._handler = ClientProtocolHandler(self.session, self.config)
+            self._handler = ClientProtocolHandler(loop=self._loop)
+            self._handler.attach_to_session(self.session)
             yield from self._handler.start()
 
             return_code = yield from self._handler.mqtt_connect()
 
             if return_code is not ReturnCode.CONNECTION_ACCEPTED:
-                raise ClientException("Connection rejected with code '%s'" % hex(return_code))
-
-            self.session.state = SessionState.CONNECTED
-            self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
+                yield from self._handler.stop()
+                self.session.machine.disconnect()
+                self.logger.warn("Connection rejected with code '%s'" % return_code)
+            else:
+                self.session.machine.connect()
+                self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
             return return_code
         except Exception as e:
-            self.session.state = SessionState.DISCONNECTED
             raise e
 
-    def _initsession(self, host=None, port=None, username=None, password=None, uri=None, cleansession=None) -> dict:
+    @asyncio.coroutine
+    def handle_connection_close(self):
+        self.logger.debug("Watch broker disconnection")
+        yield from self._handler.wait_disconnect()
+        self.logger.debug("Handle broker disconnection")
+        yield from self._handler.stop()
+        self._handler.detach_from_session()
+        self.session.machine.disconnect()
+
+    def _initsession(self, host=None, port=None, username=None, password=None, uri=None, cleansession=None) -> Session:
         # Load config
         broker_conf = self.config.get('broker', dict()).copy()
         if 'mqtt' not in broker_conf:
@@ -251,12 +261,13 @@ class MQTTClient:
             s.cleansession = cleansession
         else:
             s.cleansession = self.config.get('cleansession', True)
-        s.keep_alive = self.config['keep_alive']
+        s.keep_alive = self.config['keep_alive'] - self.config['ping_delay']
         if 'will' in self.config:
             s.will_flag = True
             s.will_retain = self.config['will']['retain']
             s.will_topic = self.config['will']['topic']
             s.will_message = self.config['will']['message']
+            s.will_qos = self.config['will']['qos']
         else:
             s.will_flag = False
             s.will_retain = False
@@ -264,3 +275,8 @@ class MQTTClient:
             s.will_message = None
         return s
 
+    def session_state(self):
+        if self.session:
+            return self.session.machine.state
+        else:
+            return None

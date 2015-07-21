@@ -20,3 +20,8 @@ class UnsubackPacket(MQTTPacket):
         super().__init__(header)
         self.variable_header = variable_header
         self.payload = payload
+
+    @classmethod
+    def build(cls, packet_id):
+        variable_header = PacketIdVariableHeader(packet_id)
+        return cls(variable_header=variable_header)
