@@ -97,12 +97,12 @@ class ProtocolHandler:
         self._writer_task = asyncio.Task(self._writer_coro(), loop=self._loop)
         yield from asyncio.wait(
             [self._reader_ready.wait(), self._writer_ready.wait()], loop=self._loop)
-        self.logger.debug("Handler tasks started")
+        self.logger.debug("%s Handler tasks started" % self.session.client_id)
 
     @asyncio.coroutine
     def mqtt_publish(self, topic, message, packet_id, dup, qos, retain):
         if packet_id in self.session.inflight_out:
-            self.logger.warn("A message with the same packet ID is already in flight")
+            self.logger.warn("%s A message with the same packet ID is already in flight" % self.session.client_id)
         packet = PublishPacket.build(topic, message, packet_id, dup, qos, retain)
         yield from self.outgoing_queue.put(packet)
         inflight_message = InFlightMessage(packet, qos)
@@ -151,7 +151,7 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def _reader_coro(self):
-        self.logger.debug("Starting reader coro")
+        self.logger.debug("%s Starting reader coro" % self.session.client_id)
         while self._running:
             try:
                 self._reader_ready.set()
@@ -162,55 +162,56 @@ class ProtocolHandler:
                 if fixed_header:
                     cls = packet_class(fixed_header)
                     packet = yield from cls.from_stream(self.session.reader, fixed_header=fixed_header)
-                    self.logger.debug(" <-in-- " + repr(packet))
+                    self.logger.debug("%s <-in-- %s" % (self.session.client_id, repr(packet)))
 
                     if packet.fixed_header.packet_type == PacketType.CONNACK:
-                        asyncio.Task(self.handle_connack(packet))
+                        yield from self.handle_connack(packet)
                     elif packet.fixed_header.packet_type == PacketType.SUBSCRIBE:
-                        asyncio.Task(self.handle_subscribe(packet))
+                        yield from self.handle_subscribe(packet)
                     elif packet.fixed_header.packet_type == PacketType.UNSUBSCRIBE:
-                        asyncio.Task(self.handle_unsubscribe(packet))
+                        yield from self.handle_unsubscribe(packet)
                     elif packet.fixed_header.packet_type == PacketType.SUBACK:
-                        asyncio.Task(self.handle_suback(packet))
+                        yield from self.handle_suback(packet)
                     elif packet.fixed_header.packet_type == PacketType.UNSUBACK:
-                        asyncio.Task(self.handle_unsuback(packet))
+                        yield from self.handle_unsuback(packet)
                     elif packet.fixed_header.packet_type == PacketType.PUBACK:
-                        asyncio.Task(self.handle_puback(packet))
+                        yield from self.handle_puback(packet)
                     elif packet.fixed_header.packet_type == PacketType.PUBREC:
-                        asyncio.Task(self.handle_pubrec(packet))
+                        yield from self.handle_pubrec(packet)
                     elif packet.fixed_header.packet_type == PacketType.PUBREL:
-                        asyncio.Task(self.handle_pubrel(packet))
+                        yield from self.handle_pubrel(packet)
                     elif packet.fixed_header.packet_type == PacketType.PUBCOMP:
-                        asyncio.Task(self.handle_pubcomp(packet))
+                        yield from self.handle_pubcomp(packet)
                     elif packet.fixed_header.packet_type == PacketType.PINGREQ:
-                        asyncio.Task(self.handle_pingreq(packet))
+                        yield from self.handle_pingreq(packet)
                     elif packet.fixed_header.packet_type == PacketType.PINGRESP:
-                        asyncio.Task(self.handle_pingresp(packet))
+                        yield from self.handle_pingresp(packet)
                     elif packet.fixed_header.packet_type == PacketType.PUBLISH:
-                        asyncio.Task(self.handle_publish(packet))
+                        yield from self.handle_publish(packet)
                     elif packet.fixed_header.packet_type == PacketType.DISCONNECT:
-                        asyncio.Task(self.handle_disconnect(packet))
+                        yield from self.handle_disconnect(packet)
                     elif packet.fixed_header.packet_type == PacketType.CONNECT:
-                        asyncio.Task(self.handle_connect(packet))
+                        yield from self.handle_connect(packet)
                     else:
-                        self.logger.warn("Unhandled packet type: %s" % packet.fixed_header.packet_type)
+                        self.logger.warn("%s Unhandled packet type: %s" %
+                                         (self.session.client_id, packet.fixed_header.packet_type))
                 else:
-                    self.logger.debug("No more data, stopping reader coro")
+                    self.logger.debug("%s No more data, stopping reader coro" % self.session.client_id)
                     yield from self.handle_connection_closed()
                     break
             except asyncio.TimeoutError:
-                self.logger.debug("Input stream read timeout")
+                self.logger.debug("%s Input stream read timeout" % self.session.client_id)
                 self.handle_read_timeout()
             except NoDataException as nde:
-                self.logger.debug("No data available")
+                self.logger.debug("%s No data available" % self.session.client_id)
             except Exception as e:
-                self.logger.warn("Unhandled exception in reader coro: %s" % e)
+                self.logger.warn("%s Unhandled exception in reader coro: %s" % (self.session.client_id, e))
                 break
-        self.logger.debug("Reader coro stopped")
+        self.logger.debug("%s Reader coro stopped" % self.session.client_id)
 
     @asyncio.coroutine
     def _writer_coro(self):
-        self.logger.debug("Starting writer coro")
+        self.logger.debug("%s Starting writer coro" % self.session.client_id)
         while self._running:
             try:
                 self._writer_ready.set()
@@ -219,23 +220,22 @@ class ProtocolHandler:
                     keepalive_timeout = None
                 packet = yield from asyncio.wait_for(self.outgoing_queue.get(), keepalive_timeout)
                 if not isinstance(packet, MQTTPacket):
-                    self.logger.debug("Writer interruption")
+                    self.logger.debug("%s Writer interruption" % self.session.client_id)
                     break
                 yield from packet.to_stream(self.session.writer)
-                self.logger.debug(" -out-> " + repr(packet))
+                self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
                 yield from self.session.writer.drain()
-                #self.outgoing_queue.task_done() # to be used with Python 3.5
             except asyncio.TimeoutError as ce:
-                self.logger.debug("Output queue get timeout")
+                self.logger.debug("%s Output queue get timeout" % self.session.client_id)
                 if self._running:
                     self.handle_write_timeout()
             except ConnectionResetError as cre:
                 yield from self.handle_connection_closed()
                 break
             except Exception as e:
-                self.logger.warn("Unhandled exception in writer coro: %s" % e)
+                self.logger.warn("%sUnhandled exception in writer coro: %s" % (self.session.client_id, e))
                 break
-        self.logger.debug("Writer coro stopping")
+        self.logger.debug("%s Writer coro stopping" % self.session.client_id)
         # Flush queue before stopping
         if not self.outgoing_queue.empty():
             while True:
@@ -244,12 +244,12 @@ class ProtocolHandler:
                     if not isinstance(packet, MQTTPacket):
                         break
                     yield from packet.to_stream(self.session.writer)
-                    self.logger.debug(" -out-> " + repr(packet))
+                    self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
                 except asyncio.QueueEmpty:
                     break
                 except Exception as e:
-                    self.logger.warn("Unhandled exception in writer coro: %s" % e)
-        self.logger.debug("Writer coro stopped")
+                    self.logger.warn("%s Unhandled exception in writer coro: %s" % (self.session.client_id, e))
+        self.logger.debug("%s Writer coro stopped" % self.session.client_id)
 
     @asyncio.coroutine
     def mqtt_deliver_next_message(self):
@@ -257,50 +257,50 @@ class ProtocolHandler:
         return inflight_message
 
     def handle_write_timeout(self):
-        self.logger.warn('write timeout unhandled')
+        self.logger.warn('%s write timeout unhandled' % self.session.client_id)
 
     def handle_read_timeout(self):
-        self.logger.warn('read timeout unhandled')
+        self.logger.warn('%s read timeout unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_connack(self, connack: ConnackPacket):
-        self.logger.warn('CONNACK unhandled')
+        self.logger.warn('%s CONNACK unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_connect(self, connect: ConnectPacket):
-        self.logger.warn('CONNECT unhandled')
+        self.logger.warn('%s CONNECT unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_subscribe(self, subscribe: SubscribePacket):
-        self.logger.warn('SUBSCRIBE unhandled')
+        self.logger.warn('%s SUBSCRIBE unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_unsubscribe(self, subscribe: UnsubscribePacket):
-        self.logger.warn('UNSUBSCRIBE unhandled')
+        self.logger.warn('%s UNSUBSCRIBE unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_suback(self, suback: SubackPacket):
-        self.logger.warn('SUBACK unhandled')
+        self.logger.warn('%s SUBACK unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_unsuback(self, unsuback: UnsubackPacket):
-        self.logger.warn('UNSUBACK unhandled')
+        self.logger.warn('%s UNSUBACK unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_pingresp(self, pingresp: PingRespPacket):
-        self.logger.warn('PINGRESP unhandled')
+        self.logger.warn('%s PINGRESP unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_pingreq(self, pingreq: PingReqPacket):
-        self.logger.warn('PINGREQ unhandled')
+        self.logger.warn('%s PINGREQ unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_disconnect(self, disconnect: DisconnectPacket):
-        self.logger.warn('DISCONNECT unhandled')
+        self.logger.warn('%s DISCONNECT unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_connection_closed(self):
-        self.logger.warn('Connection closed unhandled')
+        self.logger.warn('%s Connection closed unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_puback(self, puback: PubackPacket):
@@ -309,7 +309,8 @@ class ProtocolHandler:
             waiter = self._puback_waiters[packet_id]
             waiter.set_result(puback)
         except KeyError as ke:
-            self.logger.warn("Received PUBACK for unknown pending subscription with Id: %s" % packet_id)
+            self.logger.warn("%s Received PUBACK for unknown pending subscription with Id: %s" %
+                             (self.session.client_id, packet_id))
 
     @asyncio.coroutine
     def handle_pubrec(self, pubrec: PubrecPacket):
