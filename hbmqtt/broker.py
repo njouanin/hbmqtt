@@ -251,12 +251,14 @@ class Broker:
                 if not (wait_unsubscription.done() or wait_subscription.done() or wait_deliver.done):
                     connected = False
             if wait_unsubscription in done:
+                self.logger.debug("%s handling unsubscription" % client_session.client_id)
                 unsubscription = wait_unsubscription.result()
                 for topic in unsubscription['topics']:
                     self.del_subscription(topic, client_session)
                 yield from handler.mqtt_acknowledge_unsubscription(unsubscription['packet_id'])
                 wait_unsubscription = asyncio.Task(handler.get_next_pending_unsubscription())
             if wait_subscription in done:
+                self.logger.debug("%s handling subscription" % client_session.client_id)
                 subscriptions = wait_subscription.result()
                 return_codes = []
                 for subscription in subscriptions['topics']:
@@ -268,6 +270,7 @@ class Broker:
                 wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
                 self.logger.debug(repr(self._subscriptions))
             if wait_deliver in done:
+                self.logger.debug("%s handling message delivery" % client_session.client_id)
                 publish_packet = wait_deliver.result().packet
                 topic_name = publish_packet.variable_header.topic_name
                 data = publish_packet.payload.data
