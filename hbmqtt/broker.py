@@ -390,9 +390,8 @@ class Broker:
                                               (format_client_message(session=source_session),
                                                topic, format_client_message(session=target_session)))
                             handler = subscription.session.handler
-                            packet_id = handler.session.next_packet_id
                             publish_tasks.append(
-                                asyncio.Task(handler.mqtt_publish(topic, data, packet_id, False, qos, retain=False))
+                                asyncio.Task(handler.mqtt_publish(topic, data, qos, retain=False))
                             )
                         else:
                             self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
@@ -418,10 +417,9 @@ class Broker:
         publish_tasks = []
         while not session.retained_messages.empty():
             retained = yield from session.retained_messages.get()
-            packet_id = session.next_packet_id
             publish_tasks.append(asyncio.Task(
                 session.handler.mqtt_publish(
-                    retained.topic, retained.data, packet_id, False, retained.qos, True)))
+                    retained.topic, retained.data, False, retained.qos, True)))
         if len(publish_tasks) > 0:
             asyncio.wait(publish_tasks)
 
@@ -435,10 +433,9 @@ class Broker:
             if self.matches(d_topic, subscription['filter']):
                 self.logger.debug("%s and %s match" % (d_topic, subscription['filter']))
                 retained = self._global_retained_messages[d_topic]
-                packet_id = session.next_packet_id
                 publish_tasks.append(asyncio.Task(
                     session.handler.mqtt_publish(
-                        retained.topic, retained.data, packet_id, False, subscription['qos'], True)))
+                        retained.topic, retained.data, subscription['qos'], True)))
         if len(publish_tasks) > 0:
             asyncio.wait(publish_tasks)
         self.logger.debug("End broadcasting messages retained due to subscription on '%s' from %s" %

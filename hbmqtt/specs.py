@@ -1,8 +1,7 @@
-__author__ = 'nico'
+# Copyright (c) 2015 Nicolas JOUANIN
+#
+# See the file license.txt for copying permission.
 
-from enum import Enum
-
-class Qos(Enum):
-    Qos_0 = 0x00
-    Qos_1 = 0x01
-    Qos_2 = 0x02
+QOS_0 = 0x00
+QOS_1 = 0x01
+QOS_2 = 0x02
