@@ -165,33 +165,33 @@ class ProtocolHandler:
                     self.logger.debug("%s <-in-- %s" % (self.session.client_id, repr(packet)))
 
                     if packet.fixed_header.packet_type == PacketType.CONNACK:
-                        yield from self.handle_connack(packet)
+                        asyncio.Task(self.handle_connack(packet))
                     elif packet.fixed_header.packet_type == PacketType.SUBSCRIBE:
-                        yield from self.handle_subscribe(packet)
+                        asyncio.Task(self.handle_subscribe(packet))
                     elif packet.fixed_header.packet_type == PacketType.UNSUBSCRIBE:
-                        yield from self.handle_unsubscribe(packet)
+                        asyncio.Task(self.handle_unsubscribe(packet))
                     elif packet.fixed_header.packet_type == PacketType.SUBACK:
-                        yield from self.handle_suback(packet)
+                        asyncio.Task(self.handle_suback(packet))
                     elif packet.fixed_header.packet_type == PacketType.UNSUBACK:
-                        yield from self.handle_unsuback(packet)
+                        asyncio.Task(self.handle_unsuback(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBACK:
-                        yield from self.handle_puback(packet)
+                        asyncio.Task(self.handle_puback(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBREC:
-                        yield from self.handle_pubrec(packet)
+                        asyncio.Task(self.handle_pubrec(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBREL:
-                        yield from self.handle_pubrel(packet)
+                        asyncio.Task(self.handle_pubrel(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBCOMP:
-                        yield from self.handle_pubcomp(packet)
+                        asyncio.Task(self.handle_pubcomp(packet))
                     elif packet.fixed_header.packet_type == PacketType.PINGREQ:
-                        yield from self.handle_pingreq(packet)
+                        asyncio.Task(self.handle_pingreq(packet))
                     elif packet.fixed_header.packet_type == PacketType.PINGRESP:
-                        yield from self.handle_pingresp(packet)
+                        asyncio.Task(self.handle_pingresp(packet))
                     elif packet.fixed_header.packet_type == PacketType.PUBLISH:
-                        yield from self.handle_publish(packet)
+                        asyncio.Task(self.handle_publish(packet))
                     elif packet.fixed_header.packet_type == PacketType.DISCONNECT:
-                        yield from self.handle_disconnect(packet)
+                        asyncio.Task(self.handle_disconnect(packet))
                     elif packet.fixed_header.packet_type == PacketType.CONNECT:
-                        yield from self.handle_connect(packet)
+                        asyncio.Task(self.handle_connect(packet))
                     else:
                         self.logger.warn("%s Unhandled packet type: %s" %
                                          (self.session.client_id, packet.fixed_header.packet_type))
