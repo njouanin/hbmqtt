@@ -164,10 +164,7 @@ class ProtocolHandler:
         self._running = False
 
         self.outgoing_queue = asyncio.Queue()
-        self._puback_waiters = dict()
-        self._pubrec_waiters = dict()
         self._pubrel_waiters = dict()
-        self._pubcomp_waiters = dict()
         self.delivered_message = asyncio.Queue()
 
     def attach_to_session(self, session: Session):
