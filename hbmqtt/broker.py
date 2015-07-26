@@ -271,7 +271,7 @@ class Broker:
                 self.logger.debug(repr(self._subscriptions))
             if wait_deliver in done:
                 self.logger.debug("%s handling message delivery" % client_session.client_id)
-                publish_packet = wait_deliver.result().packet
+                publish_packet = wait_deliver.result().publish_packet
                 topic_name = publish_packet.variable_header.topic_name
                 data = publish_packet.payload.data
                 yield from self.broadcast_application_message(client_session, topic_name, data)
