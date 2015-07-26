@@ -21,12 +21,13 @@ def uptime_coro():
     # Subscribe to '$SYS/broker/uptime' with QOS=1
     yield from C.subscribe([
                  {'filter': '$SYS/broker/uptime', 'qos': 0x01},
-                 {'filter': '$SYS/broker/load/#', 'qos': 0x00},
+                 {'filter': '$SYS/broker/load/#', 'qos': 0x02},
              ])
     logger.info("Subscribed")
-    for i in range(1, 10):
-        inflight = yield from C.deliver_message()
-        print(inflight.packet.payload.data)
+    for i in range(1, 100):
+        packet = yield from C.deliver_message()
+        print("%d %s : %s" % (i, packet.variable_header.topic_name, str(packet.payload.data)))
+        yield from C.acknowledge_delivery(packet.variable_header.packet_id)
     yield from C.unsubscribe(['$SYS/broker/uptime'])
     logger.info("UnSubscribed")
     yield from C.disconnect()

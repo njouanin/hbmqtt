@@ -31,9 +31,17 @@ class Session:
         self.parent = 0
         self.handler = None
 
+        # Used to store outgoing InflightMessage while publish protocol flows
         self.outgoing_msg = dict()
+
+        # Used to store incoming InflightMessage while publish protocol flows
         self.incoming_msg = dict()
+
+        # Stores messages retained for this session
         self.retained_messages = Queue()
+
+        # Stores PUBLISH messages ID received in order and ready for application process
+        self.delivered_message_queue = Queue()
 
     def _init_states(self):
         self.machine = Machine(states=Session.states, initial='new')

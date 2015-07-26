@@ -271,12 +271,15 @@ class Broker:
                 self.logger.debug(repr(self._subscriptions))
             if wait_deliver in done:
                 self.logger.debug("%s handling message delivery" % client_session.client_id)
-                publish_packet = wait_deliver.result().publish_packet
+                publish_packet = wait_deliver.result()
+                packet_id = publish_packet.variable_header.packet_id
                 topic_name = publish_packet.variable_header.topic_name
                 data = publish_packet.payload.data
                 yield from self.broadcast_application_message(client_session, topic_name, data)
                 if publish_packet.retain_flag:
                     self.retain_message(client_session, topic_name, data)
+                # Acknowledge message delivery
+                yield from handler.mqtt_acknowledge_delivery(packet_id)
                 wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message())
         wait_subscription.cancel()
         wait_unsubscription.cancel()

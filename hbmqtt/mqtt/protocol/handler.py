@@ -4,7 +4,6 @@
 import logging
 import asyncio
 from datetime import datetime
-from asyncio import futures
 from hbmqtt.mqtt.packet import MQTTFixedHeader, MQTTPacket
 from hbmqtt.mqtt import packet_class
 from hbmqtt.errors import NoDataException, HBMQTTException
@@ -25,131 +24,7 @@ from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.session import Session
 from hbmqtt.specs import *
-from transitions import Machine, MachineError
-
-
-class InFlightMessage:
-    states = ['new', 'published', 'acknowledged', 'received', 'released', 'completed']
-
-    def __init__(self, packet, qos, ack_timeout=0, loop=None):
-        if loop is None:
-            self._loop = asyncio.get_event_loop()
-        else:
-            self._loop = loop
-        self.publish_packet = packet
-        self.qos = qos
-        self.publish_ts = None
-        self.puback_ts = None
-        self.pubrec_ts = None
-        self.pubrel_ts = None
-        self.pubcomp_ts = None
-        self.nb_retries = 0
-        self._ack_waiter = asyncio.Future(loop=self._loop)
-        self._ack_timeout = ack_timeout
-        self._ack_timeout_handle = None
-        self._init_states()
-
-    def _init_states(self):
-        self.machine = Machine(model=self, states=InFlightMessage.states, initial='new')
-        self.machine.add_transition(trigger='publish', source='new', dest='published')
-        self.machine.add_transition(trigger='publish', source='published', dest='published')
-        self.machine.add_transition(trigger='publish', source='received', dest='published')
-        self.machine.add_transition(trigger='publish', source='released', dest='published')
-        if self.qos == 0x01:
-            self.machine.add_transition(trigger='acknowledge', source='published', dest='acknowledged')
-        if self.qos == 0x02:
-            self.machine.add_transition(trigger='receive', source='published', dest='received')
-            self.machine.add_transition(trigger='release', source='received', dest='released')
-            self.machine.add_transition(trigger='complete', source='released', dest='completed')
-
-    @asyncio.coroutine
-    def wait_acknowledge(self):
-        return (yield from self._ack_waiter)
-
-    def received_puback(self):
-        try:
-            self.acknowledge()
-            self.puback_ts = datetime.now()
-            self.cancel_ack_timeout()
-            self._ack_waiter.set_result(True)
-        except MachineError:
-            raise HBMQTTException(
-                'Invalid call to method received_puback on inflight messages with QOS=%d, state=%s' %
-                (self.qos, self.state))
-
-    def received_pubrec(self):
-        try:
-            self.receive()
-            self.pubrec_ts = datetime.now()
-            self.publish_packet = None  # Discard message
-            self.reset_ack_timeout()
-        except MachineError:
-            raise HBMQTTException(
-                'Invalid call to method received_pubrec on inflight messages with QOS=%d, state=%s' %
-                (self.qos, self.state))
-
-    def received_pubcomp(self):
-        try:
-            self.complete()
-            self.pubcomp_ts = datetime.now()
-            self.cancel_ack_timeout()
-            self._ack_waiter.set_result(True)
-        except MachineError:
-            raise HBMQTTException(
-                'Invalid call to method received_pubcomp on inflight messages with QOS=%d, state=%s' %
-                (self.qos, self.state))
-
-    def sent_pubrel(self):
-        try:
-            self.release()
-            self.pubrel_ts = datetime.now()
-        except MachineError:
-            raise HBMQTTException(
-                'Invalid call to method sent_pubrel on inflight messages with QOS=%d, state=%s' %
-                (self.qos, self.state))
-
-    def retry_publish(self):
-        try:
-            self.publish()
-            self.nb_retries += 1
-            self.publish_ts = datetime.now()
-            self.start_ack_timeout()
-        except MachineError:
-            raise HBMQTTException(
-                'Invalid call to method retry_publish on inflight messages with QOS=%d, state=%s' %
-                (self.qos, self.state))
-
-    def sent_publish(self):
-        try:
-            self.publish()
-            self.publish_ts = datetime.now()
-            self.start_ack_timeout()
-        except MachineError:
-            raise HBMQTTException(
-                'Invalid call to method sent_publish on inflight messages with QOS=%d, state=%s' %
-                (self.qos, self.state))
-
-    def start_ack_timeout(self):
-        def cb_timeout():
-            self._ack_waiter.set_result(False)
-        if self._ack_timeout:
-            self._ack_timeout_handle = self._loop.call_later(self._ack_timeout, cb_timeout)
-
-    def cancel_ack_timeout(self):
-        if self._ack_timeout_handle:
-            self._ack_timeout_handle.cancel()
-
-    def reset_ack_timeout(self):
-        self.cancel_ack_timeout()
-        self.start_ack_timeout()
-
-
-class IncomingInFlightMessage(InFlightMessage):
-    pass
-
-
-class OutgoingInFlightMessage(InFlightMessage):
-    pass
+from hbmqtt.mqtt.protocol.inflight import *
 
 
 class ProtocolHandler:
@@ -173,7 +48,6 @@ class ProtocolHandler:
 
         self.outgoing_queue = asyncio.Queue()
         self._pubrel_waiters = dict()
-        self.delivered_message = asyncio.Queue()
 
     def attach_to_session(self, session: Session):
         self.session = session
@@ -247,6 +121,11 @@ class ProtocolHandler:
         self.session.reader.feed_eof()
         yield from self.outgoing_queue.put("STOP")
         yield from asyncio.wait([self._writer_task, self._reader_task], loop=self._loop)
+        # Stop incoming messages flow waiter
+        for packet_id in self.session.incoming_msg:
+            self.session.incoming_msg[packet_id].cancel()
+        for packet_id in self.session.outgoing_msg:
+            self.session.outgoing_msg[packet_id].cancel()
 
     @asyncio.coroutine
     def _reader_coro(self):
@@ -352,8 +231,21 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def mqtt_deliver_next_message(self):
-        inflight_message = yield from self.delivered_message.get()
-        return inflight_message
+        packet_id = yield from self.session.delivered_message_queue.get()
+        message = self.session.incoming_msg[packet_id]
+        if message.qos == QOS_0:
+            del self.session.incoming_msg[packet_id]
+            self.logger.debug("Discarded incoming message %s" % packet_id)
+        return message.publish_packet
+
+    @asyncio.coroutine
+    def mqtt_acknowledge_delivery(self, packet_id):
+        try:
+            message = self.session.incoming_msg[packet_id]
+            message.acknowledge_delivery()
+            self.logger.debug('Message delivery acknowledged, packed_id=%d' % packet_id)
+        except KeyError:
+            pass
 
     def handle_write_timeout(self):
         self.logger.warn('%s write timeout unhandled' % self.session.client_id)
@@ -435,44 +327,68 @@ class ProtocolHandler:
     def handle_pubrel(self, pubrel: PubrecPacket):
         packet_id = pubrel.variable_header.packet_id
         try:
-            waiter = self._pubrel_waiters[packet_id]
-            waiter.set_result(pubrel)
+            inflight_message = self.session.incoming_msg[packet_id]
+            inflight_message.received_pubrel()
         except KeyError as ke:
             self.logger.warn("Received PUBREL for unknown pending subscription with Id: %s" % packet_id)
 
     @asyncio.coroutine
     def handle_publish(self, publish_packet: PublishPacket):
-        inflight_message = None
+        incoming_message = None
         packet_id = publish_packet.variable_header.packet_id
         qos = publish_packet.qos
 
         if qos == 0:
-            inflight_message = IncomingInFlightMessage(publish_packet, qos)
-            yield from self.delivered_message.put(inflight_message)
-        else:
-            if packet_id in self.session.incoming_msg:
-                inflight_message = self.session.incoming_msg[packet_id]
+            if publish_packet.dup_flag:
+                self.logger.warn("[MQTT-3.3.1-2] DUP flag must set to 0 for QOS 0 message. Message ignored: %s" %
+                                 repr(publish_packet))
             else:
-                inflight_message = InFlightMessage(publish_packet, qos)
-                self.session.incoming_msg[packet_id] = inflight_message
-                inflight_message.publish()
+                incoming_message = IncomingInFlightMessage(publish_packet, qos)
+                incoming_message.received_publish()
+                self.session.incoming_msg[packet_id] = incoming_message
+                yield from self.session.delivered_message_queue.put(packet_id)
+        else:
+            # Check if publish is a retry
+            if packet_id in self.session.incoming_msg:
+                incoming_message = self.session.incoming_msg[packet_id]
+            else:
+                incoming_message = IncomingInFlightMessage(publish_packet, qos)
+                self.session.incoming_msg[packet_id] = incoming_message
+                incoming_message.publish()
 
             if qos == 1:
-                puback = PubackPacket.build(packet_id)
-                yield from self.outgoing_queue.put(puback)
-                inflight_message.acknowledge()
+                # Initiate delivery
+                yield from self.session.delivered_message_queue.put(packet_id)
+                ack = yield from incoming_message.wait_acknowledge()
+                if ack:
+                    # Send PUBACK
+                    puback = PubackPacket.build(packet_id)
+                    yield from self.outgoing_queue.put(puback)
+                    #Discard message
+                    del self.session.incoming_msg[packet_id]
+                    self.logger.debug("Discarded incoming message %d" % packet_id)
+                else:
+                    raise HBMQTTException("Something wrong, ack is False")
             if qos == 2:
+                # Send PUBREC
                 pubrec = PubrecPacket.build(packet_id)
                 yield from self.outgoing_queue.put(pubrec)
-                inflight_message.receive()
-                waiter = futures.Future(loop=self._loop)
-                self._pubrel_waiters[packet_id] = waiter
-                yield from waiter
-                inflight_message.pubrel = waiter.result()
-                del self._pubrel_waiters[packet_id]
-                inflight_message.release()
-                pubcomp = PubcompPacket.build(packet_id)
-                yield from self.outgoing_queue.put(pubcomp)
-                inflight_message.complete()
-            yield from self.delivered_message.put(inflight_message)
-            del self.session.incoming_msg[packet_id]
+                incoming_message.sent_pubrec()
+                # Wait for pubrel
+                ack = yield from incoming_message.wait_pubrel()
+                if ack:
+                    # Initiate delivery
+                    yield from self.session.delivered_message_queue.put(packet_id)
+                else:
+                    raise HBMQTTException("Something wrong, ack is False")
+                ack = yield from incoming_message.wait_acknowledge()
+                if ack:
+                    # Send PUBCOMP
+                    pubcomp = PubcompPacket.build(packet_id)
+                    yield from self.outgoing_queue.put(pubcomp)
+                    incoming_message.sent_pubcomp()
+                    #Discard message
+                    del self.session.incoming_msg[packet_id]
+                    self.logger.debug("Discarded incoming message %d" % packet_id)
+                else:
+                    raise HBMQTTException("Something wrong, ack is False")
