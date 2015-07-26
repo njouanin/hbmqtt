@@ -444,7 +444,7 @@ class ProtocolHandler:
     def handle_publish(self, publish_packet: PublishPacket):
         inflight_message = None
         packet_id = publish_packet.variable_header.packet_id
-        qos = (publish_packet.fixed_header.flags >> 1) & 0x03
+        qos = publish_packet.qos
 
         if qos == 0:
             inflight_message = IncomingInFlightMessage(publish_packet, qos)
