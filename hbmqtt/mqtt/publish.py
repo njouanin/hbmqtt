@@ -61,7 +61,6 @@ class PublishPacket(MQTTPacket):
     RETAIN_FLAG = 0x01
     QOS_FLAG = 0x06
 
-
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PublishVariableHeader=None, payload=None):
         if fixed is None:
             header = MQTTFixedHeader(PacketType.PUBLISH, 0x00)
