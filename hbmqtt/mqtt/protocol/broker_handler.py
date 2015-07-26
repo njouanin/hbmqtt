@@ -37,7 +37,7 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def wait_disconnect(self):
-        yield from self._disconnect_waiter
+        return (yield from self._disconnect_waiter)
 
     def handle_write_timeout(self):
         pass
@@ -48,7 +48,7 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def handle_disconnect(self, disconnect):
-        if self._disconnect_waiter is not None and not self._disconnect_waiter.done():
+        if self._disconnect_waiter and not self._disconnect_waiter.done():
             self._disconnect_waiter.set_result(disconnect)
 
     @asyncio.coroutine

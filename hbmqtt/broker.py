@@ -223,33 +223,29 @@ class Broker:
         wait_subscription = asyncio.Task(handler.get_next_pending_subscription())
         wait_unsubscription = asyncio.Task(handler.get_next_pending_unsubscription())
         wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message())
-        disconnect_event = False
         while connected:
             done, pending = yield from asyncio.wait(
                 [wait_disconnect, wait_subscription, wait_unsubscription, wait_deliver],
                 return_when=asyncio.FIRST_COMPLETED)
             if wait_disconnect in done:
-                if not disconnect_event:
-                    result = wait_disconnect.result()
-                    self.logger.debug("%s Result from wait_diconnect: %s" % (client_session.client_id, result))
-                    if result is None:
-                        self.logger.debug("Will flag: %s" % client_session.will_flag)
-                        #Connection closed anormally, send will message
-                        if client_session.will_flag:
-                            self.logger.debug("Client %s disconnected abnormally, sending will message" %
-                                              format_client_message(client_session))
-                            yield from self.broadcast_application_message(
-                                client_session, client_session.will_topic,
-                                client_session.will_message,
-                                client_session.will_qos)
-                            if client_session.will_retain:
-                                self.retain_message(client_session,
-                                                    client_session.will_topic,
-                                                    client_session.will_message,
-                                                    client_session.will_qos)
-                    disconnect_event = True
-                if not (wait_unsubscription.done() or wait_subscription.done() or wait_deliver.done):
-                    connected = False
+                result = wait_disconnect.result()
+                self.logger.debug("%s Result from wait_diconnect: %s" % (client_session.client_id, result))
+                if result is None:
+                    self.logger.debug("Will flag: %s" % client_session.will_flag)
+                    #Connection closed anormally, send will message
+                    if client_session.will_flag:
+                        self.logger.debug("Client %s disconnected abnormally, sending will message" %
+                                          format_client_message(client_session))
+                        yield from self.broadcast_application_message(
+                            client_session, client_session.will_topic,
+                            client_session.will_message,
+                            client_session.will_qos)
+                        if client_session.will_retain:
+                            self.retain_message(client_session,
+                                                client_session.will_topic,
+                                                client_session.will_message,
+                                                client_session.will_qos)
+                connected = False
             if wait_unsubscription in done:
                 self.logger.debug("%s handling unsubscription" % client_session.client_id)
                 unsubscription = wait_unsubscription.result()
@@ -422,7 +418,7 @@ class Broker:
             retained = yield from session.retained_messages.get()
             publish_tasks.append(asyncio.Task(
                 session.handler.mqtt_publish(
-                    retained.topic, retained.data, False, retained.qos, True)))
+                    retained.topic, retained.data, retained.qos, True)))
         if len(publish_tasks) > 0:
             asyncio.wait(publish_tasks)
 
