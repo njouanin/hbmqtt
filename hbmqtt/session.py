@@ -1,9 +1,9 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from enum import Enum
 from transitions import Machine, MachineError
 from asyncio import Queue
+
 
 class Session:
     states = ['new', 'connected', 'disconnected']
