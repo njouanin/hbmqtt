@@ -31,8 +31,8 @@ class Session:
         self.parent = 0
         self.handler = None
 
-        self.inflight_out = dict()
-        self.inflight_in = dict()
+        self.outgoing_msg = dict()
+        self.incoming_msg = dict()
         self.retained_messages = Queue()
 
     def _init_states(self):
