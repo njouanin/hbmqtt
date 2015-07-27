@@ -37,7 +37,7 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def wait_disconnect(self):
-        yield from self._disconnect_waiter
+        return (yield from self._disconnect_waiter)
 
     def handle_write_timeout(self):
         pass
@@ -48,7 +48,7 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def handle_disconnect(self, disconnect):
-        if self._disconnect_waiter is not None:
+        if self._disconnect_waiter and not self._disconnect_waiter.done():
             self._disconnect_waiter.set_result(disconnect)
 
     @asyncio.coroutine
@@ -59,8 +59,8 @@ class BrokerProtocolHandler(ProtocolHandler):
     def handle_connect(self, connect: ConnectPacket):
         # Broker handler shouldn't received CONNECT message during messages handling
         # as CONNECT messages are managed by the broker on client connection
-        self.logger.error('[MQTT-3.1.0-2] %s : CONNECT message received during messages handling' %
-                          (format_client_message(self.session)))
+        self.logger.error('%s [MQTT-3.1.0-2] %s : CONNECT message received during messages handling' %
+                          (self.session.client_id, format_client_message(self.session)))
         if self._disconnect_waiter is not None and not self._disconnect_waiter.done():
             self._disconnect_waiter.set_result(None)
 

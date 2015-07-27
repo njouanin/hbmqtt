@@ -1,9 +1,9 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from enum import Enum
 from transitions import Machine, MachineError
 from asyncio import Queue
+
 
 class Session:
     states = ['new', 'connected', 'disconnected']
@@ -24,6 +24,7 @@ class Session:
         self.will_retain = None
         self.will_topic = None
         self.keep_alive = 0
+        self.publish_retry_delay = 0
         self.username = None
         self.password = None
         self.scheme = None
@@ -31,9 +32,17 @@ class Session:
         self.parent = 0
         self.handler = None
 
-        self.inflight_out = dict()
-        self.inflight_in = dict()
+        # Used to store outgoing InflightMessage while publish protocol flows
+        self.outgoing_msg = dict()
+
+        # Used to store incoming InflightMessage while publish protocol flows
+        self.incoming_msg = dict()
+
+        # Stores messages retained for this session
         self.retained_messages = Queue()
+
+        # Stores PUBLISH messages ID received in order and ready for application process
+        self.delivered_message_queue = Queue()
 
     def _init_states(self):
         self.machine = Machine(states=Session.states, initial='new')

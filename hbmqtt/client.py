@@ -143,7 +143,7 @@ class MQTTClient:
         self._handler.mqtt_ping()
 
     @asyncio.coroutine
-    def publish(self, topic, message, dup=False, qos=None, retain=None):
+    def publish(self, topic, message, qos=None, retain=None):
         def get_retain_and_qos():
             if qos:
                 _qos = qos
@@ -164,11 +164,11 @@ class MQTTClient:
             return _qos, _retain
         (app_qos, app_retain) = get_retain_and_qos()
         if app_qos == 0:
-            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x00, app_retain)
+            yield from self._handler.mqtt_publish(topic, message, 0x00, app_retain)
         if app_qos == 1:
-            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x01, app_retain)
+            yield from self._handler.mqtt_publish(topic, message, 0x01, app_retain)
         if app_qos == 2:
-            yield from self._handler.mqtt_publish(topic, message, self.session.next_packet_id, dup, 0x02, app_retain)
+            yield from self._handler.mqtt_publish(topic, message, 0x02, app_retain)
 
     @asyncio.coroutine
     def subscribe(self, topics):
@@ -181,6 +181,10 @@ class MQTTClient:
     @asyncio.coroutine
     def deliver_message(self):
         return (yield from self._handler.mqtt_deliver_next_message())
+
+    @asyncio.coroutine
+    def acknowledge_delivery(self, packet_id):
+        yield from self._handler.mqtt_acknowledge_delivery(packet_id)
 
     @asyncio.coroutine
     def _connect_coro(self):
