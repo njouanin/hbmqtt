@@ -77,8 +77,6 @@ class ProtocolHandler:
         :return:
         """
         self.logger.debug("Begin messages delivery retries")
-        self.logger.debug("%d outgoing messages" % len(self.session.outgoing_msg))
-        self.logger.debug("%d incoming messages" % len(self.session.incoming_msg))
         ack_packets = []
         for packet_id in self.session.outgoing_msg:
             message = self.session.outgoing_msg[packet_id]
@@ -98,6 +96,7 @@ class ProtocolHandler:
                 message.sent_pubrel()
         for packet_id in ack_packets:
             del self.session.outgoing_msg[packet_id]
+        self.logger.debug("%d messages redelivered" % len(ack_packets))
         self.logger.debug("End messages delivery retries")
 
     @asyncio.coroutine
@@ -143,7 +142,6 @@ class ProtocolHandler:
                 keepalive_timeout = self.session.keep_alive
                 if keepalive_timeout <= 0:
                     keepalive_timeout = None
-                self.logger.debug("Read keepalive timeout=%s s" % str(keepalive_timeout))
                 fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.session.reader), keepalive_timeout)
                 if fixed_header:
                     cls = packet_class(fixed_header)
