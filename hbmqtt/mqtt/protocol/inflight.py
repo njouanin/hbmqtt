@@ -113,6 +113,7 @@ class OutgoingInFlightMessage(InFlightMessage):
     def retry_publish(self):
         try:
             self.publish()
+            self._ack_waiter = asyncio.Future(loop=self._loop)
             self.nb_retries += 1
             self.publish_ts = datetime.now()
             self.start_ack_timeout()

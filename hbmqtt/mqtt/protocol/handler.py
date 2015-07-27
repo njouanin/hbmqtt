@@ -77,9 +77,13 @@ class ProtocolHandler:
         :return:
         """
         self.logger.debug("Begin messages delivery retries")
+        self.logger.debug("%d outgoing messages" % len(self.session.outgoing_msg))
+        self.logger.debug("%d incoming messages" % len(self.session.incoming_msg))
+        ack_packets = []
         for packet_id in self.session.outgoing_msg:
             message = self.session.outgoing_msg[packet_id]
-            if message.is_new():
+            self.logger.debug(message.state)
+            if message.is_new() or message.is_published():
                 self.logger.debug("Retrying publish message Id=%d", packet_id)
                 message.publish_packet.dup_flag = True
                 ack = False
@@ -87,11 +91,13 @@ class ProtocolHandler:
                     yield from self.outgoing_queue.put(message.publish_packet)
                     message.retry_publish()
                     ack = yield from message.wait_acknowledge()
-                del self.session.outgoing_msg[packet_id]
+                ack_packets.append(packet_id)
             if message.is_received():
                 self.logger.debug("Retrying pubrel message Id=%d", packet_id)
                 yield from self.outgoing_queue.put(PubrelPacket.build(packet_id))
                 message.sent_pubrel()
+        for packet_id in ack_packets:
+            del self.session.outgoing_msg[packet_id]
         self.logger.debug("End messages delivery retries")
 
     @asyncio.coroutine
@@ -109,6 +115,7 @@ class ProtocolHandler:
             while not ack:
                 #Retry publish
                 packet = PublishPacket.build(topic, message, packet_id, True, qos, retain)
+                self.logger.debug("Retry delivery of packet %s" % repr(packet))
                 inflight_message.publish_packet = packet
                 yield from self.outgoing_queue.put(packet)
                 inflight_message.retry_publish()
@@ -351,7 +358,10 @@ class ProtocolHandler:
                 # Assign packet_id as it's needed internally
                 packet_id = self.session.next_packet_id
                 publish_packet.variable_header.packet_id = packet_id
-                incoming_message = IncomingInFlightMessage(publish_packet, qos)
+                incoming_message = IncomingInFlightMessage(publish_packet,
+                                                           qos,
+                                                           self.session.publish_retry_delay,
+                                                           self._loop)
                 incoming_message.received_publish()
                 self.session.incoming_msg[packet_id] = incoming_message
                 yield from self.session.delivered_message_queue.put(packet_id)
@@ -360,7 +370,10 @@ class ProtocolHandler:
             if packet_id in self.session.incoming_msg:
                 incoming_message = self.session.incoming_msg[packet_id]
             else:
-                incoming_message = IncomingInFlightMessage(publish_packet, qos)
+                incoming_message = IncomingInFlightMessage(publish_packet,
+                                                           qos,
+                                                           self.session.publish_retry_delay,
+                                                           self._loop)
                 self.session.incoming_msg[packet_id] = incoming_message
                 incoming_message.publish()
 
