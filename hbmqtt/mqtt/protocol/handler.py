@@ -348,6 +348,9 @@ class ProtocolHandler:
                 self.logger.warn("[MQTT-3.3.1-2] DUP flag must set to 0 for QOS 0 message. Message ignored: %s" %
                                  repr(publish_packet))
             else:
+                # Assign packet_id as it's needed internally
+                packet_id = self.session.next_packet_id
+                publish_packet.variable_header.packet_id = packet_id
                 incoming_message = IncomingInFlightMessage(publish_packet, qos)
                 incoming_message.received_publish()
                 self.session.incoming_msg[packet_id] = incoming_message
