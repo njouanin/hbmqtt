@@ -46,6 +46,32 @@ class Broker:
     states = ['new', 'starting', 'started', 'not_started', 'stopping', 'stopped', 'not_stopped', 'stopped']
 
     def __init__(self, config=None, loop=None):
+        """
+
+        :param config: Example Yaml config
+            listeners:
+                - default:  #Mandatory
+                    max-connections: 50000
+                    type: tcp
+                - my-tcp-1:
+                    bind: 127.0.0.1:1883
+                - my-tcp-2:
+                    bind: 1.2.3.4:1883
+                    max-connections: 1000
+                - my-tcp-ssl-1:
+                    bind: 127.0.0.1:1884
+                    ssl: on
+                    cafile: /some/cafile
+                    certfile: /some/certfile
+                - my-ws-1:
+                    bind: 0.0.0.0:8080
+                    type: ws
+            timeout-disconnect-delay: 2
+            publish-retry-delay: 5
+
+        :param loop:
+        :return:
+        """
         self.logger = logging.getLogger(__name__)
         self.config = _defaults
         if config is not None:
@@ -61,6 +87,14 @@ class Broker:
         self._sessions = dict()
         self._subscriptions = dict()
         self._global_retained_messages = dict()
+
+    def _build_listeners_config(self, broker_config):
+        try:
+            listeners_config = broker_config['listeners']
+        except KeyError:
+            raise HBMQTTException("Listener config not found")
+
+        
 
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
