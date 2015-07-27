@@ -16,7 +16,7 @@ from hbmqtt.utils import format_client_message, gen_client_id
 _defaults = {
     'bind-address': 'localhost',
     'bind-port': 1883,
-    'timeout-disconnect-delay': 10
+    'timeout-disconnect-delay': 2
 }
 
 

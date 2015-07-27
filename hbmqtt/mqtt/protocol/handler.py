@@ -136,6 +136,7 @@ class ProtocolHandler:
                 keepalive_timeout = self.session.keep_alive
                 if keepalive_timeout <= 0:
                     keepalive_timeout = None
+                self.logger.debug("Read keepalive timeout=%s s" % str(keepalive_timeout))
                 fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.session.reader), keepalive_timeout)
                 if fixed_header:
                     cls = packet_class(fixed_header)
