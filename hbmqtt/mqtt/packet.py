@@ -3,41 +3,19 @@
 # See the file license.txt for copying permission.
 from enum import Enum
 
-from hbmqtt.errors import CodecException, MQTTException
+from hbmqtt.errors import CodecException, MQTTException, HBMQTTException
 from hbmqtt.codecs import *
 import abc
+import struct
 
 
-class PacketType(Enum):
-    RESERVED_0 = 0
-    CONNECT = 1
-    CONNACK = 2
-    PUBLISH = 3
-    PUBACK = 4
-    PUBREC = 5
-    PUBREL = 6
-    PUBCOMP = 7
-    SUBSCRIBE = 8
-    SUBACK = 9
-    UNSUBSCRIBE = 10
-    UNSUBACK = 11
-    PINGREQ = 12
-    PINGRESP = 13
-    DISCONNECT = 14
-    RESERVED_15 = 15
-
-
-def get_packet_type(byte):
-    return PacketType(byte)
+RESERVED_0, CONNECT, CONNACK, PUBLISH, PUBACK, PUBREC, PUBREL, PUBCOMP, SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK, \
+PINGREQ, PINGRESP, DISCONNECT, RESERVED_15 = range(0,15)
 
 
 class MQTTFixedHeader:
     def __init__(self, packet_type, flags=0, length=0):
-        if isinstance(packet_type, int):
-            enum_type = packet_type
-        else:
-            enum_type = get_packet_type(packet_type)
-        self.packet_type = enum_type
+        self.packet_type = packet_type
         self.remaining_length = length
         self.flags = flags
 
@@ -67,63 +45,50 @@ class MQTTFixedHeader:
 
         return out
 
-    @asyncio.coroutine
-    def to_stream(self, writer: asyncio.StreamWriter):
-        writer.write(self.to_bytes())
-        yield from writer.drain()
+    @property
+    def bytes_length(self):
+        return len(self.to_bytes())
 
     @classmethod
-    @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader):
+    def from_bytes(cls, data):
         """
         Read and decode MQTT message fixed header from stream
         :return: FixedHeader instance
         """
-
-        def decode_message_type(byte):
-            byte_type = (bytes_to_int(byte) & 0xf0) >> 4
-            return PacketType(byte_type)
-
-        def decode_flags(data):
-            byte = bytes_to_int(data)
-            return byte & 0x0f
-
         @asyncio.coroutine
-        def decode_remaining_length():
+        def decode_remaining_length(remain_length_bytes):
             """
             Decode message length according to MQTT specifications
             :return:
             """
             multiplier = 1
             value = 0
-            length_bytes = b''
-            while True:
-                encoded_byte = yield from read_or_raise(reader, 1)
-                length_bytes += encoded_byte
-                int_byte = bytes_to_int(encoded_byte)
-                value += (int_byte & 0x7f) * multiplier
-                if (int_byte & 0x80) == 0:
+            for i in range(0, 3):
+                (encoded_byte) = struct.unpack("!B", remain_length_bytes[i])
+                value += (encoded_byte & 0x7f) * multiplier
+                if (encoded_byte & 0x80) == 0:
                     break
                 else:
                     multiplier *= 128
                     if multiplier > 128 * 128 * 128:
-                        raise MQTTException("Invalid remaining length bytes:%s" % bytes_to_hex_str(length_bytes))
+                        raise MQTTException("Invalid remaining length bytes:%s" % bytes_to_hex_str(remain_length_bytes))
             return value
 
-        try:
-            b1 = yield from read_or_raise(reader, 1)
-            msg_type = decode_message_type(b1)
-            if msg_type is PacketType.RESERVED_0 or msg_type is PacketType.RESERVED_15:
-                raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
-            flags = decode_flags(b1)
+        if len(data) < 5:
+            raise HBMQTTException("5 bytes are required to read a fixed header, {0} given".format(len(data)))
+        (b1) = struct.unpack("!B", data[0])
+        msg_type = (b1 & 0xf0) >> 4
+        flags = b1 & 0x0f
+        remain_length = yield from decode_remaining_length(data[1:4])
 
-            remain_length = yield from decode_remaining_length()
-            return cls(msg_type, flags, remain_length)
-        except NoDataException:
-            return None
+        # Todo : move this control elsewhere
+        if msg_type is RESERVED_0 or msg_type is RESERVED_15:
+            raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
+        return cls(msg_type, flags, remain_length)
 
     def __repr__(self):
         return type(self).__name__ + '(type={0}, length={1}, flags={2})'.format(self.packet_type, self.remaining_length, hex(self.flags))
+
 
 class MQTTVariableHeader(metaclass=abc.ABCMeta):
     def __init__(self):
