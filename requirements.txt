@@ -1,2 +1,3 @@
 transitions==0.2.5
 blinker
+websockets
