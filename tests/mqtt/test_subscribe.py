@@ -6,6 +6,8 @@ import unittest
 from hbmqtt.mqtt.subscribe import SubscribePacket, SubscribePayload
 from hbmqtt.mqtt.packet import PacketIdVariableHeader
 from hbmqtt.codecs import *
+from hbmqtt.adapters import BufferReader
+
 
 class SubscribePacketTest(unittest.TestCase):
     def setUp(self):
@@ -13,9 +15,7 @@ class SubscribePacketTest(unittest.TestCase):
 
     def test_from_stream(self):
         data = b'\x80\x0e\x00\x0a\x00\x03a/b\x01\x00\x03c/d\x02'
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream.feed_data(data)
-        stream.feed_eof()
+        stream = BufferReader(data)
         message = self.loop.run_until_complete(SubscribePacket.from_stream(stream))
         self.assertEqual(message.payload.topics[0]['filter'], 'a/b')
         self.assertEqual(message.payload.topics[0]['qos'], 0x01)

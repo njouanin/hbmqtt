@@ -124,3 +124,38 @@ class StreamWriterAdapter(WriterAdapter):
     @asyncio.coroutine
     def drain(self):
         yield from self._writer.drain()
+
+
+class BufferReader(ReaderAdapter):
+    """
+    Byte Buffer reader adapter
+    This adapter simply adapt reading a byte buffer.
+    """
+    def __init__(self, data: bytes):
+        self._stream = io.BytesIO(data)
+
+    @asyncio.coroutine
+    def read(self, n=-1) -> bytes:
+        return self._stream.read(n)
+
+
+class BufferWriter(WriterAdapter):
+    """
+    ByteBuffer writer adapter
+    This adapter simply adapt writing to a byte buffer
+    """
+    def __init__(self):
+        self._stream = io.BytesIO(b'')
+
+    def write(self, data):
+        """
+        write some data to the protocol layer
+        """
+        self._stream.write(data)
+
+    @asyncio.coroutine
+    def drain(self):
+        self._stream = io.BytesIO(b'')
+
+    def get_buffer(self):
+        return self._stream.getbuffer()

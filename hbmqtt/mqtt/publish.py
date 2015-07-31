@@ -1,7 +1,7 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
+from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PUBLISH, MQTTVariableHeader, MQTTPayload
 from hbmqtt.errors import HBMQTTException, MQTTException
 from hbmqtt.codecs import *
 
@@ -63,9 +63,9 @@ class PublishPacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PublishVariableHeader=None, payload=None):
         if fixed is None:
-            header = MQTTFixedHeader(PacketType.PUBLISH, 0x00)
+            header = MQTTFixedHeader(PUBLISH, 0x00)
         else:
-            if fixed.packet_type is not PacketType.PUBLISH:
+            if fixed.packet_type is not PUBLISH:
                 raise HBMQTTException("Invalid fixed packet type %s for PublishPacket init" % fixed.packet_type)
             header = fixed
 
@@ -116,7 +116,7 @@ class PublishPacket(MQTTPacket):
         self.fixed_header.flags |= (val << 1)
 
     @classmethod
-    def build(cls, topic_name: str, message:bytes, packet_id: int, dup_flag, qos, retain):
+    def build(cls, topic_name: str, message: bytes, packet_id: int, dup_flag, qos, retain):
         v_header = PublishVariableHeader(topic_name, packet_id)
         payload = PublishPayload(message)
         packet = PublishPacket(variable_header=v_header, payload=payload)
