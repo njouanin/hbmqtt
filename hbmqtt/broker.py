@@ -8,9 +8,10 @@ from transitions import Machine, MachineError
 from hbmqtt.session import Session
 from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
 from hbmqtt.mqtt.connect import ConnectPacket
-from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
+from hbmqtt.mqtt.connack import *
 from hbmqtt.errors import HBMQTTException
 from hbmqtt.utils import format_client_message, gen_client_id
+from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, ReaderAdapter, WriterAdapter
 
 
 _defaults = {
@@ -94,8 +95,6 @@ class Broker:
         except KeyError:
             raise HBMQTTException("Listener config not found")
 
-        
-
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
         self.machine.add_transition(trigger='start', source='new', dest='starting')
@@ -116,7 +115,7 @@ class Broker:
             raise BrokerException("Broker instance can't be started: %s" % me)
 
         try:
-            self._server = yield from asyncio.start_server(self.client_connected,
+            self._server = yield from asyncio.start_server(self.stream_connected,
                                                            self.config['bind-address'],
                                                            self.config['bind-port'],
                                                            loop=self._loop)
@@ -141,10 +140,12 @@ class Broker:
         self.machine.stopping_success()
 
     @asyncio.coroutine
-    def client_connected(self, reader, writer):
-        extra_info = writer.get_extra_info('peername')
-        remote_address = extra_info[0]
-        remote_port = extra_info[1]
+    def stream_connected(self, reader, writer):
+        yield from self.client_connected(StreamReaderAdapter(reader), StreamWriterAdapter(writer))
+
+    @asyncio.coroutine
+    def client_connected(self, reader: ReaderAdapter, writer: WriterAdapter):
+        remote_address, remote_port = writer.get_peer_info()
         self.logger.debug("Connection from %s:%d" % (remote_address, remote_port))
 
         # Wait for first packet and expect a CONNECT
@@ -156,13 +157,13 @@ class Broker:
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))
-            writer.close()
+            yield from writer.close()
             self.logger.debug("Connection closed")
             return
         except BrokerException as be:
             self.logger.error('Invalid connection from %s : %s' %
                               (format_client_message(address=remote_address, port=remote_port), be))
-            writer.close()
+            yield from writer.close()
             self.logger.debug("Connection closed")
             return
 
@@ -172,23 +173,23 @@ class Broker:
             self.logger.error('Invalid protocol from %s: %d' %
                               (format_client_message(address=remote_address, port=remote_port),
                                connect.variable_header.protocol_level))
-            connack = ConnackPacket.build(0, ReturnCode.UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
+            connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.variable_header.username_flag and connect.payload.username is None:
             self.logger.error('Invalid username from %s' %
                               (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
+            connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.variable_header.password_flag and connect.payload.password is None:
             self.logger.error('Invalid password %s' % (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
+            connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.variable_header.clean_session_flag == False and connect.payload.client_id is None:
             self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' %
                               format_client_message(address=remote_address, port=remote_port))
-            connack = ConnackPacket.build(0, ReturnCode.IDENTIFIER_REJECTED)
+            connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
             self.logger.debug(" -out-> " + repr(connack))
         if connack is not None:
             self.logger.debug(" -out-> " + repr(connack))
             yield from connack.to_stream(writer)
-            writer.close()
+            yield from writer.close()
             return
 
         client_session = None
@@ -236,20 +237,20 @@ class Broker:
         client_session.writer = writer
 
         if self.authenticate(client_session):
-            connack = ConnackPacket.build(client_session.parent, ReturnCode.CONNECTION_ACCEPTED)
+            connack = ConnackPacket.build(client_session.parent, CONNECTION_ACCEPTED)
             self.logger.info('%s : connection accepted' % format_client_message(session=client_session))
             self.logger.debug(" -out-> " + repr(connack))
             yield from connack.to_stream(writer)
         else:
-            connack = ConnackPacket.build(client_session.parent, ReturnCode.NOT_AUTHORIZED)
+            connack = ConnackPacket.build(client_session.parent, NOT_AUTHORIZED)
             self.logger.info('%s : connection refused' % format_client_message(session=client_session))
             self.logger.debug(" -out-> " + repr(connack))
             yield from connack.to_stream(writer)
-            writer.close()
+            yield from writer.close()
             return
 
         client_session.machine.connect()
-        handler = BrokerProtocolHandler(self._loop)
+        handler = BrokerProtocolHandler(reader, writer, self._loop)
         handler.attach_to_session(client_session)
         self.logger.debug("%s Start messages handling" % client_session.client_id)
         yield from handler.start()
@@ -329,7 +330,7 @@ class Broker:
             handler.detach_from_session()
             handler = None
         client_session.machine.disconnect()
-        writer.close()
+        yield from writer.close()
         self.logger.debug("%s Session disconnected" % client_session.client_id)
 
     @asyncio.coroutine

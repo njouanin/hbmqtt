@@ -2,10 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import logging
-import asyncio
-from datetime import datetime
 from hbmqtt.mqtt import packet_class
-from hbmqtt.errors import NoDataException, HBMQTTException
 from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.mqtt.connect import ConnectPacket
