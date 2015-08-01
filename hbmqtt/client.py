@@ -10,8 +10,9 @@ from transitions import MachineError
 
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session
-from hbmqtt.mqtt.connack import ReturnCode
+from hbmqtt.mqtt.connack import CONNECTION_ACCEPTED
 from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
+from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter
 
 _defaults = {
     'keep_alive': 10,
@@ -189,15 +190,17 @@ class MQTTClient:
     @asyncio.coroutine
     def _connect_coro(self):
         try:
-            self.session.reader, self.session.writer = \
+            conn_reader, conn_writer = \
                 yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port)
-            self._handler = ClientProtocolHandler(loop=self._loop)
+            reader = StreamReaderAdapter(conn_reader)
+            writer = StreamWriterAdapter(conn_writer)
+            self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
             self._handler.attach_to_session(self.session)
             yield from self._handler.start()
 
             return_code = yield from self._handler.mqtt_connect()
 
-            if return_code is not ReturnCode.CONNECTION_ACCEPTED:
+            if return_code is not CONNECTION_ACCEPTED:
                 yield from self._handler.stop()
                 self.session.machine.disconnect()
                 self.logger.warn("Connection rejected with code '%s'" % return_code)

@@ -1,12 +1,9 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-import logging
-import asyncio
 from asyncio import futures
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
-from hbmqtt.mqtt.packet import MQTTFixedHeader
-from hbmqtt.mqtt.packet import PacketType
+from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
 from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
@@ -16,10 +13,12 @@ from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
+from hbmqtt.adapters import ReaderAdapter, WriterAdapter
+
 
 class ClientProtocolHandler(ProtocolHandler):
-    def __init__(self, loop=None):
-        super().__init__(loop)
+    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, loop=None):
+        super().__init__(reader, writer, loop)
         self._ping_task = None
         self._connack_waiter = None
         self._pingresp_queue = asyncio.Queue()
@@ -127,7 +126,7 @@ class ClientProtocolHandler(ProtocolHandler):
             else:
                 vh.will_flag = False
 
-            header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
+            header = MQTTFixedHeader(CONNECT, 0x00)
             packet = ConnectPacket(header, vh, payload)
             return packet
 

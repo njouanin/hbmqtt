@@ -14,8 +14,6 @@ class Session:
         self.writer = None
         self.remote_address = None
         self.remote_port = None
-        self.local_address = None
-        self.local_port = None
         self.client_id = None
         self.clean_session = None
         self.will_flag = False
