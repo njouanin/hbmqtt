@@ -26,6 +26,7 @@ class Session:
         self.username = None
         self.password = None
         self.scheme = None
+        self.cafile = None
         self._packet_id = 0
         self.parent = 0
         self.handler = None

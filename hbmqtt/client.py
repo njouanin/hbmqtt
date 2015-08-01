@@ -4,6 +4,7 @@
 
 import logging
 import asyncio
+import ssl
 from urllib.parse import urlparse
 
 from transitions import MachineError
@@ -40,6 +41,7 @@ class MQTTClient:
                 # OR
                 uri: mqtt:xxx@yyy//localhost:1883/
                 # OR a mix or both
+                cafile: somefile.cert  #Server authority file
             keep_alive: 60
             cleansession: true
             will:
@@ -76,9 +78,21 @@ class MQTTClient:
         self._disconnect_task = None
 
     @asyncio.coroutine
-    def connect(self, host=None, port=None, username=None, password=None, uri=None, cleansession=None):
+    def connect(self, scheme=None, host=None, port=None, username=None, password=None, uri=None, cleansession=None, cafile=None):
+        """
+        Connect to a remote broker
+        :param scheme: schema of the protocol to use. Can be ``mqtt`` for plain TCP (default), `mqtts`` for TLS or ``ws`` for websocket
+        :param host: remote broker hostname
+        :param port: remote broker port
+        :param username: username used or authentication
+        :param password: password used or authentication
+        :param uri: all previous arguments can be set 'in-one' using `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_.
+        :param cleansession: MQTT CONNECT clean session flaf
+        :param cafile: server certificate authority file
+        :return:
+        """
         try:
-            self.session = self._initsession(host, port, username, password, uri, cleansession)
+            self.session = self._initsession(scheme, host, port, username, password, uri, cleansession, cafile)
             self.logger.debug("Connect with session parameters: %s" % self.session)
 
             return_code = yield from self._connect_coro()
@@ -190,8 +204,14 @@ class MQTTClient:
     @asyncio.coroutine
     def _connect_coro(self):
         try:
+            sc = None
+            if self.session.scheme == 'mqtts':
+                if self.session.cafile is None or self.session.cafile == '':
+                    self.logger.warn("TLS connection can't be estabilshed, no certificate file (.cert) given")
+                    raise ClientException("TLS connection can't be estabilshed, no certificate file (.cert) given")
+                sc = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self.session.cafile)
             conn_reader, conn_writer = \
-                yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port)
+                yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, ssl=sc)
             reader = StreamReaderAdapter(conn_reader)
             writer = StreamWriterAdapter(conn_writer)
             self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
@@ -220,11 +240,16 @@ class MQTTClient:
         self._handler.detach_from_session()
         self.session.machine.disconnect()
 
-    def _initsession(self, host=None, port=None, username=None, password=None, uri=None, cleansession=None) -> Session:
+    def _initsession(self, scheme=None, host=None, port=None, username=None, password=None, uri=None, cleansession=None, cafile=None) -> Session:
         # Load config
         broker_conf = self.config.get('broker', dict()).copy()
-        if 'mqtt' not in broker_conf:
+        if scheme:
+            broker_conf['scheme'] = scheme
+        elif 'scheme' not in broker_conf:
             broker_conf['scheme'] = 'mqtt'
+        if cafile:
+            broker_conf['cafile'] = cafile
+
         if 'username' not in broker_conf:
             broker_conf['username'] = None
         if 'password' not in broker_conf:
@@ -253,6 +278,12 @@ class MQTTClient:
         if cleansession is not None:
             broker_conf['cleansession'] = cleansession
 
+        if 'port' not in broker_conf or broker_conf['port'] is None or broker_conf['port'] == 0:
+            if broker_conf['scheme'] == 'mqtt':
+                broker_conf['port'] = 1883
+            elif broker_conf['scheme'] == 'mqtts':
+                broker_conf['port'] = 8883
+
         for key in ['scheme', 'host', 'port']:
             if not_in_dict_or_none(broker_conf, key):
                 raise ClientException("Missing connection parameter '%s'" % key)
@@ -264,6 +295,7 @@ class MQTTClient:
         s.username = broker_conf['username']
         s.password = broker_conf['password']
         s.scheme = broker_conf['scheme']
+        s.cafile = broker_conf['cafile']
         if cleansession is not None:
             s.cleansession = cleansession
         else:
@@ -281,9 +313,3 @@ class MQTTClient:
             s.will_topic = None
             s.will_message = None
         return s
-
-    def session_state(self):
-        if self.session:
-            return self.session.machine.state
-        else:
-            return None
