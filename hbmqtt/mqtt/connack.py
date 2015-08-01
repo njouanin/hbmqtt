@@ -32,11 +32,11 @@ class ConnackVariableHeader(MQTTVariableHeader):
         out = bytearray(2)
         # Connect acknowledge flags
         if self.session_parent:
-            out[0] = b'\x01'
+            out[0] = 1
         else:
-            out[0] = b'\x00'
+            out[0] = 0
         # return code
-        out[1] = int_to_bytes(self.return_code)
+        out[1] = self.return_code
 
         return out
 
