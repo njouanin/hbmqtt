@@ -1,12 +1,10 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-import logging
 import asyncio
 from asyncio import futures
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
 from hbmqtt.mqtt.connect import ConnectPacket
-from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.mqtt.subscribe import SubscribePacket
