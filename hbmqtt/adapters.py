@@ -41,6 +41,16 @@ class WriterAdapter:
         Let the write buffer of the underlying transport a chance to be flushed.
         """
 
+    def get_peer_info(self):
+        """
+        Return peer socket info (remote address and remote port as tuple
+        """
+
+    @asyncio.coroutine
+    def close(self):
+        """
+        Close the protocol connection
+        """
 
 class WebSocketsReader(ReaderAdapter):
     """
@@ -94,6 +104,14 @@ class WebSocketsWriter(WriterAdapter):
         yield from self._protocol.send(self._stream.getbuffer())
         self._stream = io.BytesIO(b'')
 
+    def get_peer_info(self):
+        extra_info = self._protocol.writer.get_extra_info('peername')
+        return extra_info[0], extra_info[1]
+
+    @asyncio.coroutine
+    def close(self):
+        yield from self._protocol.close()
+
 
 class StreamReaderAdapter(ReaderAdapter):
     """
@@ -124,6 +142,14 @@ class StreamWriterAdapter(WriterAdapter):
     @asyncio.coroutine
     def drain(self):
         yield from self._writer.drain()
+
+    def get_peer_info(self):
+        extra_info = self._writer.get_extra_info('peername')
+        return extra_info[0], extra_info[1]
+
+    @asyncio.coroutine
+    def close(self):
+        self._writer.close()
 
 
 class BufferReader(ReaderAdapter):
@@ -159,3 +185,10 @@ class BufferWriter(WriterAdapter):
 
     def get_buffer(self):
         return self._stream.getbuffer()
+
+    def get_peer_info(self):
+        return "BufferWriter", 0
+
+    @asyncio.coroutine
+    def close(self):
+        self._stream.close()
