@@ -36,13 +36,13 @@ class ConnackVariableHeader(MQTTVariableHeader):
         else:
             out[0] = b'\x00'
         # return code
-        out[1] = int_to_bytes(self.return_code.value)
+        out[1] = int_to_bytes(self.return_code)
 
         return out
 
     def __repr__(self):
         return type(self).__name__ + '(session_parent={0}, return_code={1})'\
-            .format(hex(self.session_parent), hex(self.return_code.value))
+            .format(hex(self.session_parent), hex(self.return_code))
 
 
 class ConnackPacket(MQTTPacket):
