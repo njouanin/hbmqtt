@@ -93,16 +93,19 @@ class MQTTFixedHeader:
                         raise MQTTException("Invalid remaining length bytes:%s" % bytes_to_hex_str(buffer))
             return value
 
-        byte1 = yield from read_or_raise(reader, 1)
-        int1 = bytes_to_int(byte1)
-        msg_type = (int1 & 0xf0) >> 4
-        flags = int1 & 0x0f
-        remain_length = yield from decode_remaining_length()
+        try:
+            byte1 = yield from read_or_raise(reader, 1)
+            int1 = bytes_to_int(byte1)
+            msg_type = (int1 & 0xf0) >> 4
+            flags = int1 & 0x0f
+            remain_length = yield from decode_remaining_length()
 
-        # Todo : move this control elsewhere
-        if msg_type is RESERVED_0 or msg_type is RESERVED_15:
-            raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
-        return cls(msg_type, flags, remain_length)
+            # Todo : move this control elsewhere
+            if msg_type is RESERVED_0 or msg_type is RESERVED_15:
+                raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
+            return cls(msg_type, flags, remain_length)
+        except NoDataException:
+            return None
 
     def __repr__(self):
         return type(self).__name__ + '(type={0}, length={1}, flags={2})'.\
