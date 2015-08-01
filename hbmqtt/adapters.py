@@ -95,7 +95,7 @@ class WebSocketsWriter(WriterAdapter):
         self._stream = io.BytesIO(b'')
 
 
-class StreamProtocolReader(ReaderAdapter):
+class StreamReaderAdapter(ReaderAdapter):
     """
     Asyncio Streams API protocol adapter
     This adapter relies on StreamReader to read from a TCP socket.
