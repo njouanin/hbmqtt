@@ -33,12 +33,6 @@ class TestMQTTFixedHeaderTest(unittest.TestCase):
         self.assertFalse(header.flags & 0x01)
         self.assertEqual(header.remaining_length, 268435455)
 
-    def test_from_bytes_reserved(self):
-        data = b'\x0f\x7f'
-        stream = BufferReader(data)
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(MQTTFixedHeader.from_stream(stream))
-
     def test_from_bytes_ko_with_length(self):
         data = b'\x10\xff\xff\xff\xff\x7f'
         stream = BufferReader(data)
