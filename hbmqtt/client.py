@@ -203,6 +203,7 @@ class MQTTClient:
             sc = None
             reader = None
             writer = None
+            kwargs = dict()
 
             # Decode URI attributes
             uri_attributes = urlparse(self.session.broker_uri)
@@ -223,17 +224,24 @@ class MQTTClient:
                     cafile=self.session.cafile,
                     capath=self.session.capath,
                     cadata=self.session.cadata)
+                #sc.check_hostname = False
+                #sc.verify_mode = ssl.CERT_NONE
+                kwargs['ssl'] = sc
 
             # Open connection
-            if scheme in ('mqtt', 'mqtts'):
-                conn_reader, conn_writer = \
-                    yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, ssl=sc)
-                reader = StreamReaderAdapter(conn_reader)
-                writer = StreamWriterAdapter(conn_writer)
-            elif scheme == ('ws', 'wss'):
-                websocket = yield from websockets.connect(self.session.broker_uri, ssl=sc)
-                reader = WebSocketsReader(websocket)
-                writer = WebSocketsWriter(websocket)
+            try:
+                if scheme in ('mqtt', 'mqtts'):
+                    conn_reader, conn_writer = \
+                        yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, **kwargs)
+                    reader = StreamReaderAdapter(conn_reader)
+                    writer = StreamWriterAdapter(conn_writer)
+                elif scheme in ('ws', 'wss'):
+                    websocket = yield from websockets.connect(self.session.broker_uri, subprotocols=['mqtt'], **kwargs)
+                    reader = WebSocketsReader(websocket)
+                    writer = WebSocketsWriter(websocket)
+            except Exception as e:
+                self.logger.warn("connection failed: %s" % e)
+                raise ClientException("connection Failed: %s" % e)
 
             # Handle MQTT protocol
             self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)

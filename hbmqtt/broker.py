@@ -2,7 +2,8 @@
 #
 # See the file license.txt for copying permission.
 import logging
-import asyncio
+import ssl
+import websockets
 
 from transitions import Machine, MachineError
 from hbmqtt.session import Session
@@ -11,12 +12,16 @@ from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import *
 from hbmqtt.errors import HBMQTTException
 from hbmqtt.utils import format_client_message, gen_client_id
-from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, ReaderAdapter, WriterAdapter
+from hbmqtt.adapters import (
+    StreamReaderAdapter,
+    StreamWriterAdapter,
+    ReaderAdapter,
+    WriterAdapter,
+    WebSocketsReader,
+    WebSocketsWriter)
 
 
 _defaults = {
-    'bind-address': 'localhost',
-    'bind-port': 1883,
     'timeout-disconnect-delay': 2,
     'publish-retry-delay': 5,
 }
@@ -60,10 +65,13 @@ class Broker:
                     bind: 1.2.3.4:1883
                     max-connections: 1000
                 - my-tcp-ssl-1:
-                    bind: 127.0.0.1:1884
+                    bind: 127.0.0.1:8883
                     ssl: on
                     cafile: /some/cafile
+                    capath: /some/folder
+                    capath: certificate data
                     certfile: /some/certfile
+                    keyfile: /some/key
                 - my-ws-1:
                     bind: 0.0.0.0:8080
                     type: ws
@@ -77,23 +85,31 @@ class Broker:
         self.config = _defaults
         if config is not None:
             self.config.update(config)
+        self._build_listeners_config(self.config)
 
         if loop is not None:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
 
-        self._server = None
+        self._servers = []
         self._init_states()
         self._sessions = dict()
         self._subscriptions = dict()
         self._global_retained_messages = dict()
 
     def _build_listeners_config(self, broker_config):
+        self.listeners_config = dict()
         try:
             listeners_config = broker_config['listeners']
-        except KeyError:
-            raise HBMQTTException("Listener config not found")
+            defaults = listeners_config['default']
+            for listener in listeners_config:
+                if listener != 'default':
+                    config = dict(defaults)
+                    config.update(listeners_config[listener])
+                    self.listeners_config[listener] = config
+        except KeyError as ke:
+            raise BrokerException("Listener config not found invalid: %s" % ke)
 
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
@@ -115,12 +131,37 @@ class Broker:
             raise BrokerException("Broker instance can't be started: %s" % me)
 
         try:
-            self._server = yield from asyncio.start_server(self.stream_connected,
-                                                           self.config['bind-address'],
-                                                           self.config['bind-port'],
-                                                           loop=self._loop)
-            self.logger.info("Broker listening on %s:%d" % (self.config['bind-address'], self.config['bind-port']))
+            for listener_name in self.listeners_config:
+                listener = self.listeners_config[listener_name]
+                self.logger.info("Binding listener '%s' to %s" % (listener_name, listener['bind']))
+
+                # SSL Context
+                sc = None
+                if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+                    try:
+                        sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                        sc.load_cert_chain(listener['certfile'], listener['keyfile'])
+                        sc.verify_mode = ssl.CERT_OPTIONAL
+                    except KeyError as ke:
+                        raise BrokerException("'certfile' or 'keyfile' configuration parameter missing: %s" % ke)
+                    except FileNotFoundError as fnfe:
+                        raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
+                                          (listener['certfile'], listener['keyfile'], fnfe))
+
+                if listener['type'] == 'tcp':
+                    address, port = listener['bind'].split(':')
+                    server = yield from asyncio.start_server(self.stream_connected,
+                                                             address,
+                                                             port,
+                                                             ssl=sc,
+                                                             loop=self._loop)
+                    self._servers.append(server)
+                elif listener['type'] == 'ws':
+                    address, port = listener['bind'].split(':')
+                    server = yield from websockets.serve(self.ws_connected, address, port, ssl=sc, loop=self._loop)
+                    self._servers.append(server)
             self.machine.starting_success()
+            self.logger.debug("Broker started")
         except Exception as e:
             self.logger.error("Broker startup failed: %s" % e)
             self.machine.starting_fail()
@@ -133,14 +174,21 @@ class Broker:
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be stopped: %s" % me)
-        self._server.close()
+        for server in self._servers:
+            server.close()
+            yield from server.wait_closed()
         self.logger.debug("Broker closing")
-        yield from self._server.wait_closed()
         self.logger.info("Broker closed")
         self.machine.stopping_success()
 
     @asyncio.coroutine
+    def ws_connected(self, websocket, uri):
+        self.logger.debug("ws_connected")
+        yield from self.client_connected(WebSocketsReader(websocket), WebSocketsWriter(websocket))
+
+    @asyncio.coroutine
     def stream_connected(self, reader, writer):
+        self.logger.debug("stream_connected")
         yield from self.client_connected(StreamReaderAdapter(reader), StreamWriterAdapter(writer))
 
     @asyncio.coroutine
