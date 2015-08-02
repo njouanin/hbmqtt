@@ -100,9 +100,6 @@ class MQTTFixedHeader:
             flags = int1 & 0x0f
             remain_length = yield from decode_remaining_length()
 
-            # Todo : move this control elsewhere
-            if msg_type is RESERVED_0 or msg_type is RESERVED_15:
-                raise MQTTException("Usage of control packet type %s is forbidden" % msg_type)
             return cls(msg_type, flags, remain_length)
         except NoDataException:
             return None

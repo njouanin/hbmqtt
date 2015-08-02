@@ -140,45 +140,50 @@ class ProtocolHandler:
                     keepalive_timeout = None
                 fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.reader), keepalive_timeout)
                 if fixed_header:
-                    cls = packet_class(fixed_header)
-                    packet = yield from cls.from_stream(self.reader, fixed_header=fixed_header)
-                    self.logger.debug("%s <-in-- %s" % (self.session.client_id, repr(packet)))
-
-                    task = None
-                    if packet.fixed_header.packet_type == CONNACK:
-                        task = asyncio.Task(self.handle_connack(packet))
-                    elif packet.fixed_header.packet_type == SUBSCRIBE:
-                        task =  asyncio.Task(self.handle_subscribe(packet))
-                    elif packet.fixed_header.packet_type == UNSUBSCRIBE:
-                        task = asyncio.Task(self.handle_unsubscribe(packet))
-                    elif packet.fixed_header.packet_type == SUBACK:
-                        task = asyncio.Task(self.handle_suback(packet))
-                    elif packet.fixed_header.packet_type == UNSUBACK:
-                        task = asyncio.Task(self.handle_unsuback(packet))
-                    elif packet.fixed_header.packet_type == PUBACK:
-                        task = asyncio.Task(self.handle_puback(packet))
-                    elif packet.fixed_header.packet_type == PUBREC:
-                        task = asyncio.Task(self.handle_pubrec(packet))
-                    elif packet.fixed_header.packet_type == PUBREL:
-                        task = asyncio.Task(self.handle_pubrel(packet))
-                    elif packet.fixed_header.packet_type == PUBCOMP:
-                        task = asyncio.Task(self.handle_pubcomp(packet))
-                    elif packet.fixed_header.packet_type == PINGREQ:
-                        task = asyncio.Task(self.handle_pingreq(packet))
-                    elif packet.fixed_header.packet_type == PINGRESP:
-                        task = asyncio.Task(self.handle_pingresp(packet))
-                    elif packet.fixed_header.packet_type == PUBLISH:
-                        task = asyncio.Task(self.handle_publish(packet))
-                    elif packet.fixed_header.packet_type == DISCONNECT:
-                        task = asyncio.Task(self.handle_disconnect(packet))
-                    elif packet.fixed_header.packet_type == CONNECT:
-                        task = asyncio.Task(self.handle_connect(packet))
+                    if fixed_header.packet_type == RESERVED_0 or fixed_header.packet_type == RESERVED_15:
+                        self.logger.warn("%s Received reserved packet, which is forbidden: closing connection" %
+                                         (self.session.client_id))
+                        yield from self.handle_connection_closed()
                     else:
-                        self.logger.warn("%s Unhandled packet type: %s" %
-                                         (self.session.client_id, packet.fixed_header.packet_type))
-                    if task:
-                        # Wait for message handling ends
-                        asyncio.wait([task])
+                        cls = packet_class(fixed_header)
+                        packet = yield from cls.from_stream(self.reader, fixed_header=fixed_header)
+                        self.logger.debug("%s <-in-- %s" % (self.session.client_id, repr(packet)))
+
+                        task = None
+                        if packet.fixed_header.packet_type == CONNACK:
+                            task = asyncio.Task(self.handle_connack(packet))
+                        elif packet.fixed_header.packet_type == SUBSCRIBE:
+                            task =  asyncio.Task(self.handle_subscribe(packet))
+                        elif packet.fixed_header.packet_type == UNSUBSCRIBE:
+                            task = asyncio.Task(self.handle_unsubscribe(packet))
+                        elif packet.fixed_header.packet_type == SUBACK:
+                            task = asyncio.Task(self.handle_suback(packet))
+                        elif packet.fixed_header.packet_type == UNSUBACK:
+                            task = asyncio.Task(self.handle_unsuback(packet))
+                        elif packet.fixed_header.packet_type == PUBACK:
+                            task = asyncio.Task(self.handle_puback(packet))
+                        elif packet.fixed_header.packet_type == PUBREC:
+                            task = asyncio.Task(self.handle_pubrec(packet))
+                        elif packet.fixed_header.packet_type == PUBREL:
+                            task = asyncio.Task(self.handle_pubrel(packet))
+                        elif packet.fixed_header.packet_type == PUBCOMP:
+                            task = asyncio.Task(self.handle_pubcomp(packet))
+                        elif packet.fixed_header.packet_type == PINGREQ:
+                            task = asyncio.Task(self.handle_pingreq(packet))
+                        elif packet.fixed_header.packet_type == PINGRESP:
+                            task = asyncio.Task(self.handle_pingresp(packet))
+                        elif packet.fixed_header.packet_type == PUBLISH:
+                            task = asyncio.Task(self.handle_publish(packet))
+                        elif packet.fixed_header.packet_type == DISCONNECT:
+                            task = asyncio.Task(self.handle_disconnect(packet))
+                        elif packet.fixed_header.packet_type == CONNECT:
+                            task = asyncio.Task(self.handle_connect(packet))
+                        else:
+                            self.logger.warn("%s Unhandled packet type: %s" %
+                                             (self.session.client_id, packet.fixed_header.packet_type))
+                        if task:
+                            # Wait for message handling ends
+                            asyncio.wait([task])
                 else:
                     self.logger.debug("%s No more data (EOF received), stopping reader coro" % self.session.client_id)
                     yield from self.handle_connection_closed()
