@@ -5,6 +5,7 @@ import asyncio
 import io
 from websockets.protocol import WebSocketCommonProtocol
 from asyncio import StreamReader, StreamWriter
+import logging
 
 
 class ReaderAdapter:
@@ -140,6 +141,7 @@ class StreamWriterAdapter(WriterAdapter):
     Because API is very close, this class is trivial
     """
     def __init__(self, writer: StreamWriter):
+        self.logger = logging.getLogger(__name__)
         self._writer = writer
 
     def write(self, data):
