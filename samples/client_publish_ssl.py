@@ -25,7 +25,7 @@ C = MQTTClient()
 
 @asyncio.coroutine
 def test_coro():
-    yield from C.connect(uri='mqtts://test.mosquitto.org:8883/', username=None, password=None, cafile='mosquitto.org.crt')
+    yield from C.connect('mqtts://test.mosquitto.org:8883/', cafile='mosquitto.org.crt')
     tasks = [
         asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
         asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
