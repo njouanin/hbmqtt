@@ -211,7 +211,10 @@ class MQTTClient:
             self.session.password = uri_attributes.password
             self.session.remote_address = uri_attributes.hostname
             self.session.remote_port = uri_attributes.port
-            if scheme == 'mqtts':
+            if scheme in ('mqtt', 'mqtts') and not self.session.remote_port:
+                self.session.remote_port = 8883 if scheme == 'mqtts' else 1883
+
+            if scheme in ('mqtts', 'wss'):
                 if self.session.cafile is None or self.session.cafile == '':
                     self.logger.warn("TLS connection can't be estabilshed, no certificate file (.cert) given")
                     raise ClientException("TLS connection can't be estabilshed, no certificate file (.cert) given")
@@ -220,19 +223,19 @@ class MQTTClient:
                     cafile=self.session.cafile,
                     capath=self.session.capath,
                     cadata=self.session.cadata)
-            if scheme in ('mqtt', 'mqtts') and not self.session.remote_port:
-                self.session.remote_port = 8883 if scheme == 'mqtts' else 1883
 
+            # Open connection
             if scheme in ('mqtt', 'mqtts'):
                 conn_reader, conn_writer = \
                     yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, ssl=sc)
                 reader = StreamReaderAdapter(conn_reader)
                 writer = StreamWriterAdapter(conn_writer)
-            elif scheme == 'ws':
-                websocket = yield from websockets.connect(self.session.broker_uri)
+            elif scheme == ('ws', 'wss'):
+                websocket = yield from websockets.connect(self.session.broker_uri, ssl=sc)
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
 
+            # Handle MQTT protocol
             self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
             self._handler.attach_to_session(self.session)
             yield from self._handler.start()
