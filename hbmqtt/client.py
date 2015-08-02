@@ -42,6 +42,8 @@ class MQTTClient:
                 uri: mqtt:xxx@yyy//localhost:1883/
                 # OR a mix or both
                 cafile: somefile.cert  #Server authority file
+                capath: /some/path # certficate file path
+                cadata: certificate as string data
             keep_alive: 60
             cleansession: true
             will:
@@ -78,7 +80,17 @@ class MQTTClient:
         self._disconnect_task = None
 
     @asyncio.coroutine
-    def connect(self, scheme=None, host=None, port=None, username=None, password=None, uri=None, cleansession=None, cafile=None):
+    def connect(self,
+                scheme=None,
+                host=None,
+                port=None,
+                username=None,
+                password=None,
+                uri=None,
+                cleansession=None,
+                cafile=None,
+                capath=None,
+                cadata=None):
         """
         Connect to a remote broker
         :param scheme: schema of the protocol to use. Can be ``mqtt`` for plain TCP (default), `mqtts`` for TLS or ``ws`` for websocket
@@ -92,7 +104,8 @@ class MQTTClient:
         :return:
         """
         try:
-            self.session = self._initsession(scheme, host, port, username, password, uri, cleansession, cafile)
+            self.session = self._initsession(
+                scheme, host, port, username, password, uri, cleansession, cafile, capath, cadata)
             self.logger.debug("Connect with session parameters: %s" % self.session)
 
             return_code = yield from self._connect_coro()
@@ -209,7 +222,11 @@ class MQTTClient:
                 if self.session.cafile is None or self.session.cafile == '':
                     self.logger.warn("TLS connection can't be estabilshed, no certificate file (.cert) given")
                     raise ClientException("TLS connection can't be estabilshed, no certificate file (.cert) given")
-                sc = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self.session.cafile)
+                sc = ssl.create_default_context(
+                    ssl.Purpose.SERVER_AUTH,
+                    cafile=self.session.cafile,
+                    capath=self.session.capath,
+                    cadata=self.session.cadata)
             conn_reader, conn_writer = \
                 yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, ssl=sc)
             reader = StreamReaderAdapter(conn_reader)
@@ -240,7 +257,18 @@ class MQTTClient:
         self._handler.detach_from_session()
         self.session.machine.disconnect()
 
-    def _initsession(self, scheme=None, host=None, port=None, username=None, password=None, uri=None, cleansession=None, cafile=None) -> Session:
+    def _initsession(
+            self,
+            scheme=None,
+            host=None,
+            port=None,
+            username=None,
+            password=None,
+            uri=None,
+            cleansession=None,
+            cafile=None,
+            capath=None,
+            cadata=None) -> Session:
         # Load config
         broker_conf = self.config.get('broker', dict()).copy()
         if scheme:
@@ -249,6 +277,16 @@ class MQTTClient:
             broker_conf['scheme'] = 'mqtt'
         if cafile:
             broker_conf['cafile'] = cafile
+        else:
+            broker_conf['cafile'] = None
+        if capath:
+            broker_conf['capath'] = capath
+        else:
+            broker_conf['capath'] = None
+        if cadata:
+            broker_conf['cadata'] = cadata
+        else:
+            broker_conf['cadata'] = None
 
         if 'username' not in broker_conf:
             broker_conf['username'] = None
@@ -296,6 +334,8 @@ class MQTTClient:
         s.password = broker_conf['password']
         s.scheme = broker_conf['scheme']
         s.cafile = broker_conf['cafile']
+        s.capath = broker_conf['capath']
+        s.cadata = broker_conf['cadata']
         if cleansession is not None:
             s.cleansession = cleansession
         else:
