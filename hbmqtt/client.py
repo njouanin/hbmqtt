@@ -13,7 +13,8 @@ from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session
 from hbmqtt.mqtt.connack import CONNECTION_ACCEPTED
 from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
-from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter
+from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSocketsReader, WebSocketsWriter
+import websockets
 
 _defaults = {
     'keep_alive': 10,
@@ -218,6 +219,8 @@ class MQTTClient:
     def _connect_coro(self):
         try:
             sc = None
+            reader = None
+            writer = None
             if self.session.scheme == 'mqtts':
                 if self.session.cafile is None or self.session.cafile == '':
                     self.logger.warn("TLS connection can't be estabilshed, no certificate file (.cert) given")
@@ -227,10 +230,17 @@ class MQTTClient:
                     cafile=self.session.cafile,
                     capath=self.session.capath,
                     cadata=self.session.cadata)
-            conn_reader, conn_writer = \
-                yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, ssl=sc)
-            reader = StreamReaderAdapter(conn_reader)
-            writer = StreamWriterAdapter(conn_writer)
+            if self.session.scheme == 'mqtt' or self.session.scheme == 'mqtts':
+                conn_reader, conn_writer = \
+                    yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, ssl=sc)
+                reader = StreamReaderAdapter(conn_reader)
+                writer = StreamWriterAdapter(conn_writer)
+            elif self.session.scheme == 'ws':
+                uri = "ws://" + self.session.remote_address + ":" + str(self.session.remote_port)
+                websocket = yield from websockets.connect(uri)
+                reader = WebSocketsReader(websocket)
+                writer = WebSocketsWriter(websocket)
+
             self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
             self._handler.attach_to_session(self.session)
             yield from self._handler.start()
