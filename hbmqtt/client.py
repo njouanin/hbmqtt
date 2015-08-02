@@ -104,7 +104,7 @@ class MQTTClient:
             self.session.machine.connect_fail()
             raise ClientException(msg)
         except Exception as e:
-            self.session.machine.connect_fail()
+            self.session.machine.disconnect()
             self.logger.warn("Connection failed: %s " % e)
             raise ClientException("Connection failed: %s " % e)
 
