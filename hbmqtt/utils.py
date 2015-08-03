@@ -32,5 +32,5 @@ def gen_client_id():
     gen_id = 'hbmqtt/'
 
     for i in range(7, 23):
-        gen_id += chr((int(random.random()*1000) % 73) + 48)
+        gen_id += chr(random.randint(0, 74) + 48)
     return gen_id
