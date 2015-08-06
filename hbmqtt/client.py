@@ -224,8 +224,8 @@ class MQTTClient:
                     cafile=self.session.cafile,
                     capath=self.session.capath,
                     cadata=self.session.cadata)
-                #sc.check_hostname = False
-                #sc.verify_mode = ssl.CERT_NONE
+                if 'certfile' in self.config and 'keyfile' in self.config:
+                    sc.load_cert_chain(self.config['certfile'], self.config['keyfile'])
                 kwargs['ssl'] = sc
 
             # Open connection
