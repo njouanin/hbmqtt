@@ -11,25 +11,12 @@ config = {
         },
         'tcp-mqtt': {
             'bind': '0.0.0.0:1883',
+            'max_connections': 10
         },
         'ws-mqtt': {
             'bind': '127.0.0.1:8080',
             'type': 'ws'
         },
-        'wss-mqtt': {
-            'bind': '127.0.0.1:8081',
-            'type': 'ws',
-            'ssl': 'on',
-            'certfile': 'localhost.server.crt',
-            'keyfile': 'server.key',
-        },
-        'tcp-ssl': {
-            'bind': '127.0.0.1:8883',
-            'ssl': 'on',
-            'certfile': 'localhost.server.crt',
-            'keyfile': 'server.key',
-            'type': 'tcp'
-        }
     }
 }
 
