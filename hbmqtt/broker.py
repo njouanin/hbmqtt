@@ -2,20 +2,26 @@
 #
 # See the file license.txt for copying permission.
 import logging
-import asyncio
+import ssl
+import websockets
 
 from transitions import Machine, MachineError
 from hbmqtt.session import Session
 from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
 from hbmqtt.mqtt.connect import ConnectPacket
-from hbmqtt.mqtt.connack import ConnackPacket, ReturnCode
+from hbmqtt.mqtt.connack import *
 from hbmqtt.errors import HBMQTTException
 from hbmqtt.utils import format_client_message, gen_client_id
+from hbmqtt.adapters import (
+    StreamReaderAdapter,
+    StreamWriterAdapter,
+    ReaderAdapter,
+    WriterAdapter,
+    WebSocketsReader,
+    WebSocketsWriter)
 
 
 _defaults = {
-    'bind-address': 'localhost',
-    'bind-port': 1883,
     'timeout-disconnect-delay': 2,
     'publish-retry-delay': 5,
 }
@@ -46,21 +52,64 @@ class Broker:
     states = ['new', 'starting', 'started', 'not_started', 'stopping', 'stopped', 'not_stopped', 'stopped']
 
     def __init__(self, config=None, loop=None):
+        """
+
+        :param config: Example Yaml config
+            listeners:
+                - default:  #Mandatory
+                    max-connections: 50000
+                    type: tcp
+                - my-tcp-1:
+                    bind: 127.0.0.1:1883
+                - my-tcp-2:
+                    bind: 1.2.3.4:1883
+                    max-connections: 1000
+                - my-tcp-ssl-1:
+                    bind: 127.0.0.1:8883
+                    ssl: on
+                    cafile: /some/cafile
+                    capath: /some/folder
+                    capath: certificate data
+                    certfile: /some/certfile
+                    keyfile: /some/key
+                - my-ws-1:
+                    bind: 0.0.0.0:8080
+                    type: ws
+            timeout-disconnect-delay: 2
+            publish-retry-delay: 5
+
+        :param loop:
+        :return:
+        """
         self.logger = logging.getLogger(__name__)
         self.config = _defaults
         if config is not None:
             self.config.update(config)
+        self._build_listeners_config(self.config)
 
         if loop is not None:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
 
-        self._server = None
+        self._servers = []
         self._init_states()
         self._sessions = dict()
         self._subscriptions = dict()
         self._global_retained_messages = dict()
+
+    def _build_listeners_config(self, broker_config):
+        self.listeners_config = dict()
+        try:
+            listeners_config = broker_config['listeners']
+            defaults = listeners_config['default']
+            for listener in listeners_config:
+                if listener != 'default':
+                    config = dict(defaults)
+                    config.update(listeners_config[listener])
+                    self.listeners_config[listener] = config
+        except KeyError as ke:
+            raise BrokerException("Listener config not found invalid: %s" % ke)
 
     def _init_states(self):
         self.machine = Machine(states=Broker.states, initial='new')
@@ -82,12 +131,37 @@ class Broker:
             raise BrokerException("Broker instance can't be started: %s" % me)
 
         try:
-            self._server = yield from asyncio.start_server(self.client_connected,
-                                                           self.config['bind-address'],
-                                                           self.config['bind-port'],
-                                                           loop=self._loop)
-            self.logger.info("Broker listening on %s:%d" % (self.config['bind-address'], self.config['bind-port']))
+            for listener_name in self.listeners_config:
+                listener = self.listeners_config[listener_name]
+                self.logger.info("Binding listener '%s' to %s" % (listener_name, listener['bind']))
+
+                # SSL Context
+                sc = None
+                if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+                    try:
+                        sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                        sc.load_cert_chain(listener['certfile'], listener['keyfile'])
+                        sc.verify_mode = ssl.CERT_OPTIONAL
+                    except KeyError as ke:
+                        raise BrokerException("'certfile' or 'keyfile' configuration parameter missing: %s" % ke)
+                    except FileNotFoundError as fnfe:
+                        raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
+                                          (listener['certfile'], listener['keyfile'], fnfe))
+
+                if listener['type'] == 'tcp':
+                    address, port = listener['bind'].split(':')
+                    server = yield from asyncio.start_server(self.stream_connected,
+                                                             address,
+                                                             port,
+                                                             ssl=sc,
+                                                             loop=self._loop)
+                    self._servers.append(server)
+                elif listener['type'] == 'ws':
+                    address, port = listener['bind'].split(':')
+                    server = yield from websockets.serve(self.ws_connected, address, port, ssl=sc, loop=self._loop)
+                    self._servers.append(server)
             self.machine.starting_success()
+            self.logger.debug("Broker started")
         except Exception as e:
             self.logger.error("Broker startup failed: %s" % e)
             self.machine.starting_fail()
@@ -100,17 +174,26 @@ class Broker:
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be stopped: %s" % me)
-        self._server.close()
+        for server in self._servers:
+            server.close()
+            yield from server.wait_closed()
         self.logger.debug("Broker closing")
-        yield from self._server.wait_closed()
         self.logger.info("Broker closed")
         self.machine.stopping_success()
 
     @asyncio.coroutine
-    def client_connected(self, reader, writer):
-        extra_info = writer.get_extra_info('peername')
-        remote_address = extra_info[0]
-        remote_port = extra_info[1]
+    def ws_connected(self, websocket, uri):
+        self.logger.debug("ws_connected")
+        yield from self.client_connected(WebSocketsReader(websocket), WebSocketsWriter(websocket))
+
+    @asyncio.coroutine
+    def stream_connected(self, reader, writer):
+        self.logger.debug("stream_connected")
+        yield from self.client_connected(StreamReaderAdapter(reader), StreamWriterAdapter(writer))
+
+    @asyncio.coroutine
+    def client_connected(self, reader: ReaderAdapter, writer: WriterAdapter):
+        remote_address, remote_port = writer.get_peer_info()
         self.logger.debug("Connection from %s:%d" % (remote_address, remote_port))
 
         # Wait for first packet and expect a CONNECT
@@ -122,13 +205,13 @@ class Broker:
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))
-            writer.close()
+            yield from writer.close()
             self.logger.debug("Connection closed")
             return
         except BrokerException as be:
             self.logger.error('Invalid connection from %s : %s' %
                               (format_client_message(address=remote_address, port=remote_port), be))
-            writer.close()
+            yield from writer.close()
             self.logger.debug("Connection closed")
             return
 
@@ -138,23 +221,23 @@ class Broker:
             self.logger.error('Invalid protocol from %s: %d' %
                               (format_client_message(address=remote_address, port=remote_port),
                                connect.variable_header.protocol_level))
-            connack = ConnackPacket.build(0, ReturnCode.UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
+            connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.variable_header.username_flag and connect.payload.username is None:
             self.logger.error('Invalid username from %s' %
                               (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
+            connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.variable_header.password_flag and connect.payload.password is None:
             self.logger.error('Invalid password %s' % (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, ReturnCode.BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
+            connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.variable_header.clean_session_flag == False and connect.payload.client_id is None:
             self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' %
                               format_client_message(address=remote_address, port=remote_port))
-            connack = ConnackPacket.build(0, ReturnCode.IDENTIFIER_REJECTED)
+            connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
             self.logger.debug(" -out-> " + repr(connack))
         if connack is not None:
             self.logger.debug(" -out-> " + repr(connack))
             yield from connack.to_stream(writer)
-            writer.close()
+            yield from writer.close()
             return
 
         client_session = None
@@ -202,20 +285,20 @@ class Broker:
         client_session.writer = writer
 
         if self.authenticate(client_session):
-            connack = ConnackPacket.build(client_session.parent, ReturnCode.CONNECTION_ACCEPTED)
+            connack = ConnackPacket.build(client_session.parent, CONNECTION_ACCEPTED)
             self.logger.info('%s : connection accepted' % format_client_message(session=client_session))
             self.logger.debug(" -out-> " + repr(connack))
             yield from connack.to_stream(writer)
         else:
-            connack = ConnackPacket.build(client_session.parent, ReturnCode.NOT_AUTHORIZED)
+            connack = ConnackPacket.build(client_session.parent, NOT_AUTHORIZED)
             self.logger.info('%s : connection refused' % format_client_message(session=client_session))
             self.logger.debug(" -out-> " + repr(connack))
             yield from connack.to_stream(writer)
-            writer.close()
+            yield from writer.close()
             return
 
         client_session.machine.connect()
-        handler = BrokerProtocolHandler(self._loop)
+        handler = BrokerProtocolHandler(reader, writer, self._loop)
         handler.attach_to_session(client_session)
         self.logger.debug("%s Start messages handling" % client_session.client_id)
         yield from handler.start()
@@ -295,7 +378,7 @@ class Broker:
             handler.detach_from_session()
             handler = None
         client_session.machine.disconnect()
-        writer.close()
+        yield from writer.close()
         self.logger.debug("%s Session disconnected" % client_session.client_id)
 
     @asyncio.coroutine

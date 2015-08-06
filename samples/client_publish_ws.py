@@ -18,14 +18,15 @@ config = {
         'message': b'Dead or alive',
         'qos': 0x01,
         'retain': True
-    }
+    },
+    'capath': '.',
 }
-#C = MQTTClient(config=config)
-C = MQTTClient()
+C = MQTTClient(config=config)
+#C = MQTTClient()
 
 @asyncio.coroutine
 def test_coro():
-    yield from C.connect('mqtt://test.mosquitto.org:1883/')
+    yield from C.connect('wss://test.mosquitto.org:8081/', cafile='mosquitto.org.crt')
     tasks = [
         asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
         asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),

@@ -2,7 +2,7 @@
 #
 # See the file license.txt for copying permission.
 from hbmqtt.errors import HBMQTTException
-from hbmqtt.mqtt.packet import MQTTFixedHeader, MQTTPacket, PacketType
+from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
@@ -19,21 +19,22 @@ from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 
 packet_dict = {
-    PacketType.CONNECT: ConnectPacket,
-    PacketType.CONNACK: ConnackPacket,
-    PacketType.PUBLISH: PublishPacket,
-    PacketType.PUBACK: PubackPacket,
-    PacketType.PUBREC: PubrecPacket,
-    PacketType.PUBREL: PubrelPacket,
-    PacketType.PUBCOMP: PubcompPacket,
-    PacketType.SUBSCRIBE: SubscribePacket,
-    PacketType.SUBACK: SubackPacket,
-    PacketType.UNSUBSCRIBE: UnsubscribePacket,
-    PacketType.UNSUBACK: UnsubackPacket,
-    PacketType.PINGREQ: PingReqPacket,
-    PacketType.PINGRESP: PingRespPacket,
-    PacketType.DISCONNECT: DisconnectPacket
+    CONNECT: ConnectPacket,
+    CONNACK: ConnackPacket,
+    PUBLISH: PublishPacket,
+    PUBACK: PubackPacket,
+    PUBREC: PubrecPacket,
+    PUBREL: PubrelPacket,
+    PUBCOMP: PubcompPacket,
+    SUBSCRIBE: SubscribePacket,
+    SUBACK: SubackPacket,
+    UNSUBSCRIBE: UnsubscribePacket,
+    UNSUBACK: UnsubackPacket,
+    PINGREQ: PingReqPacket,
+    PINGRESP: PingRespPacket,
+    DISCONNECT: DisconnectPacket
 }
+
 
 def packet_class(fixed_header: MQTTFixedHeader):
     try:

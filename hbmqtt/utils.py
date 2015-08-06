@@ -25,8 +25,12 @@ def format_client_message(session=None, address=None, port=None, id=None):
 
 def gen_client_id():
     """
-    Generates unique client ID
+    Generates random client ID
     :return:
     """
-    import uuid
-    return str(uuid.uuid4())
+    import random
+    gen_id = 'hbmqtt/'
+
+    for i in range(7, 23):
+        gen_id += chr(random.randint(0, 74) + 48)
+    return gen_id

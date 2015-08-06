@@ -1,12 +1,10 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-import logging
 import asyncio
 from asyncio import futures
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
 from hbmqtt.mqtt.connect import ConnectPacket
-from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.mqtt.subscribe import SubscribePacket
@@ -14,11 +12,12 @@ from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.utils import format_client_message
+from hbmqtt.adapters import WriterAdapter, ReaderAdapter
 
 
 class BrokerProtocolHandler(ProtocolHandler):
-    def __init__(self, loop=None):
-        super().__init__(loop)
+    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, loop=None):
+        super().__init__(reader, writer, loop)
         self._disconnect_waiter = None
         self._pending_subscriptions = asyncio.Queue()
         self._pending_unsubscriptions = asyncio.Queue()

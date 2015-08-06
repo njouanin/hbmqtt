@@ -14,8 +14,6 @@ class Session:
         self.writer = None
         self.remote_address = None
         self.remote_port = None
-        self.local_address = None
-        self.local_port = None
         self.client_id = None
         self.clean_session = None
         self.will_flag = False
@@ -25,9 +23,12 @@ class Session:
         self.will_topic = None
         self.keep_alive = 0
         self.publish_retry_delay = 0
+        self.broker_uri = None
         self.username = None
         self.password = None
-        self.scheme = None
+        self.cafile = None
+        self.capath = None
+        self.cadata = None
         self._packet_id = 0
         self.parent = 0
         self.handler = None
@@ -49,6 +50,7 @@ class Session:
         self.machine.add_transition(trigger='connect', source='new', dest='connected')
         self.machine.add_transition(trigger='connect', source='disconnected', dest='connected')
         self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
+        self.machine.add_transition(trigger='disconnect', source='new', dest='disconnected')
 
     @property
     def next_packet_id(self):

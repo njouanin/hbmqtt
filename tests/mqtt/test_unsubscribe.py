@@ -5,7 +5,9 @@ import unittest
 
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket, UnubscribePayload
 from hbmqtt.mqtt.packet import PacketIdVariableHeader
+from hbmqtt.adapters import BufferReader
 from hbmqtt.codecs import *
+
 
 class UnsubscribePacketTest(unittest.TestCase):
     def setUp(self):
@@ -13,9 +15,7 @@ class UnsubscribePacketTest(unittest.TestCase):
 
     def test_from_stream(self):
         data = b'\xa2\x0c\x00\n\x00\x03a/b\x00\x03c/d'
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream.feed_data(data)
-        stream.feed_eof()
+        stream = BufferReader(data)
         message = self.loop.run_until_complete(UnsubscribePacket.from_stream(stream))
         self.assertEqual(message.payload.topics[0], 'a/b')
         self.assertEqual(message.payload.topics[1], 'c/d')
