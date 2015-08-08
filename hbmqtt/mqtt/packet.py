@@ -171,7 +171,7 @@ class MQTTPacket:
         writer.write(self.to_bytes())
         yield from writer.drain()
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         if self.variable_header:
             variable_header_bytes = self.variable_header.to_bytes()
         else:
@@ -207,6 +207,10 @@ class MQTTPacket:
             return cls(fixed_header, variable_header)
         else:
             return cls(fixed_header, variable_header, payload)
+
+    @property
+    def bytes_length(self):
+        return len(self.to_bytes())
 
     def __repr__(self):
         return type(self).__name__ + '(fixed={0!r}, variable={1!r}, payload={2!r})'.\
