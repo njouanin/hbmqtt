@@ -97,9 +97,12 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def mqtt_publish(self, topic, message, qos, retain):
-        packet_id = self.session.next_packet_id
-        if packet_id in self.session.outgoing_msg:
-            self.logger.warn("%s A message with the same packet ID is already in flight" % self.session.client_id)
+        if qos:
+            packet_id = self.session.next_packet_id
+            if packet_id in self.session.outgoing_msg:
+                self.logger.warn("%s A message with the same packet ID is already in flight" % self.session.client_id)
+        else:
+            packet_id = None
         packet = PublishPacket.build(topic, message, packet_id, False, qos, retain)
         yield from self.outgoing_queue.put(packet)
         if qos != QOS_0:
