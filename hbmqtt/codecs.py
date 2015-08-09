@@ -102,3 +102,13 @@ def decode_packet_id(reader) -> int:
     """
     packet_id_bytes = yield from read_or_raise(reader, 2)
     return bytes_to_int(packet_id_bytes)
+
+
+def int_to_bytes_str(value: int) -> bytes:
+    """
+    Converts a int value to a bytes array containing the numeric character.
+    Ex: 123 -> b'123'
+    :param value: int value to convert
+    :return: bytes array
+    """
+    return str(value).encode('utf-8')
