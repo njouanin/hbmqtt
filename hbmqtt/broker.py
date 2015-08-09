@@ -282,7 +282,7 @@ class Broker:
         elif connect.variable_header.password_flag and connect.payload.password is None:
             self.logger.error('Invalid password %s' % (format_client_message(address=remote_address, port=remote_port)))
             connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
-        elif connect.variable_header.clean_session_flag == False and connect.payload.client_id is None:
+        elif connect.variable_header.clean_session_flag is False and connect.payload.client_id is None:
             self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' %
                               format_client_message(address=remote_address, port=remote_port))
             connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
@@ -502,9 +502,9 @@ class Broker:
             # Unsubscribe topic not found in current subscribed topics
             pass
 
-    def matches(self, topic, filter):
+    def matches(self, topic, a_filter):
         import re
-        match_pattern = re.compile(filter.replace('#', '.*').replace('+', '[\s\w\d]+'))
+        match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[\$\s\w\d]+'))
         if match_pattern.match(topic):
             return True
         else:
