@@ -296,22 +296,25 @@ class Broker:
         client_session = None
         self.logger.debug("Clean session={0}".format(connect.variable_header.clean_session_flag))
         self.logger.debug("known sessions={0}".format(self._sessions))
+        client_id = connect.payload.client_id
         if connect.variable_header.clean_session_flag:
-            client_id = connect.payload.client_id
+            # Delete existing session and create a new one
             if client_id is not None:
                 self.delete_session(client_id)
             client_session = Session()
             client_session.parent = 0
+            client_session.client_id = client_id
             self._sessions[client_id] = client_session
         else:
             # Get session from cache
-            client_id = connect.payload.client_id
             if client_id in self._sessions:
                 self.logger.debug("Found old session %s" % repr(self._sessions[client_id]))
                 client_session = self._sessions[client_id]
                 client_session.parent = 1
             else:
                 client_session = Session()
+                client_session.client_id = client_id
+                self._sessions[client_id] = client_session
                 client_session.parent = 0
 
         if client_session.client_id is None:
