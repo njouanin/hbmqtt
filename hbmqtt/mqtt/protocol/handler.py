@@ -219,8 +219,8 @@ class ProtocolHandler:
                 if not isinstance(packet, MQTTPacket):
                     self.logger.debug("%s Writer interruption" % self.session.client_id)
                     break
-                self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
                 yield from packet.to_stream(self.writer)
+                self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
                 self._loop.call_soon(self.on_packet_sent.send, packet)
             except asyncio.TimeoutError as ce:
                 self.logger.debug("%s Output queue get timeout" % self.session.client_id)
