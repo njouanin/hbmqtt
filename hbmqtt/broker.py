@@ -654,9 +654,9 @@ class Broker:
 
     @asyncio.coroutine
     def broadcast_application_message(self, source_session, topic, data, force_qos=None):
-        self.logger.debug("Broadcasting message from %s on topic %s" %
-                          (format_client_message(session=source_session), topic)
-                          )
+        #self.logger.debug("Broadcasting message from %s on topic %s" %
+        #                  (format_client_message(session=source_session), topic)
+        #                  )
         publish_tasks = []
         try:
             for k_filter in self._subscriptions:
@@ -688,12 +688,9 @@ class Broker:
                 asyncio.wait(publish_tasks)
         except Exception as e:
             self.logger.warn("Message broadcasting failed: %s", e)
-        self.logger.debug("End Broadcasting message from %s on topic %s" %
-                          (format_client_message(session=source_session), topic)
-                          )
-        for client_id in self._sessions:
-            self.logger.debug("%s Retained messages queue size: %d" %
-                              (client_id, self._sessions[client_id].retained_messages.qsize()))
+        #self.logger.debug("End Broadcasting message from %s on topic %s" %
+        #                  (format_client_message(session=source_session), topic)
+        #                  )
 
     @asyncio.coroutine
     def publish_session_retained_messages(self, session):
