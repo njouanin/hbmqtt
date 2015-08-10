@@ -17,7 +17,8 @@ config = {
             'bind': '127.0.0.1:8080',
             'type': 'ws'
         },
-    }
+    },
+    'sys_interval': 10,
 }
 
 broker = Broker(config)

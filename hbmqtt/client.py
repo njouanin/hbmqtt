@@ -308,9 +308,9 @@ class MQTTClient:
         s.capath = broker_conf['capath']
         s.cadata = broker_conf['cadata']
         if cleansession is not None:
-            s.cleansession = cleansession
+            s.clean_session = cleansession
         else:
-            s.cleansession = self.config.get('cleansession', True)
+            s.clean_session = self.config.get('cleansession', True)
         s.keep_alive = self.config['keep_alive'] - self.config['ping_delay']
         if 'will' in self.config:
             s.will_flag = True

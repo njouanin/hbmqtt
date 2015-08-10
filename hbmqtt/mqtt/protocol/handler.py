@@ -2,6 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import logging
+from blinker import Signal
 from hbmqtt.mqtt import packet_class
 from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.connack import ConnackPacket
@@ -28,6 +29,9 @@ class ProtocolHandler:
     """
     Class implementing the MQTT communication protocol using asyncio features
     """
+
+    on_packet_sent = Signal()
+    on_packet_received = Signal()
 
     def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, loop=None):
         self.logger = logging.getLogger(__name__)
@@ -97,9 +101,12 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def mqtt_publish(self, topic, message, qos, retain):
-        packet_id = self.session.next_packet_id
-        if packet_id in self.session.outgoing_msg:
-            self.logger.warn("%s A message with the same packet ID is already in flight" % self.session.client_id)
+        if qos:
+            packet_id = self.session.next_packet_id
+            if packet_id in self.session.outgoing_msg:
+                self.logger.warn("%s A message with the same packet ID is already in flight" % self.session.client_id)
+        else:
+            packet_id = None
         packet = PublishPacket.build(topic, message, packet_id, False, qos, retain)
         yield from self.outgoing_queue.put(packet)
         if qos != QOS_0:
@@ -148,6 +155,7 @@ class ProtocolHandler:
                         cls = packet_class(fixed_header)
                         packet = yield from cls.from_stream(self.reader, fixed_header=fixed_header)
                         self.logger.debug("%s <-in-- %s" % (self.session.client_id, repr(packet)))
+                        self._loop.call_soon(self.on_packet_received.send, packet)
 
                         task = None
                         if packet.fixed_header.packet_type == CONNACK:
@@ -213,7 +221,7 @@ class ProtocolHandler:
                     break
                 yield from packet.to_stream(self.writer)
                 self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
-                yield from self.writer.drain()
+                self._loop.call_soon(self.on_packet_sent.send, packet)
             except asyncio.TimeoutError as ce:
                 self.logger.debug("%s Output queue get timeout" % self.session.client_id)
                 if self._running:
@@ -234,6 +242,7 @@ class ProtocolHandler:
                         break
                     yield from packet.to_stream(self.session.writer)
                     self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
+                    self._loop.call_soon(self.on_packet_sent, packet)
                 except asyncio.QueueEmpty:
                     break
                 except Exception as e:
