@@ -57,5 +57,17 @@ class Session:
         self._packet_id += 1
         return self._packet_id
 
+    @property
+    def inflight_in_count(self):
+        return len(self.incoming_msg)
+
+    @property
+    def inflight_out_count(self):
+        return len(self.outgoing_msg)
+
+    @property
+    def retained_messages_count(self):
+        return self.retained_messages.qsize()
+
     def __repr__(self):
         return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.machine.state)
