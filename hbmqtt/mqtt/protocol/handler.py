@@ -128,13 +128,13 @@ class ProtocolHandler:
     def stop(self):
         self._running = False
         yield from self.outgoing_queue.put("STOP")
+        yield from self.writer.close()
         yield from asyncio.wait([self._writer_task, self._reader_task], loop=self._loop)
         # Stop incoming messages flow waiter
         for packet_id in self.session.incoming_msg:
             self.session.incoming_msg[packet_id].cancel()
         for packet_id in self.session.outgoing_msg:
             self.session.outgoing_msg[packet_id].cancel()
-        yield from self.writer.close()
 
     @asyncio.coroutine
     def _reader_coro(self):
