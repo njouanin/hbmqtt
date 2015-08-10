@@ -51,6 +51,7 @@ class Session:
         self.machine.add_transition(trigger='connect', source='disconnected', dest='connected')
         self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
         self.machine.add_transition(trigger='disconnect', source='new', dest='disconnected')
+        self.machine.add_transition(trigger='disconnect', source='disconnected', dest='disconnected')
 
     @property
     def next_packet_id(self):

@@ -80,7 +80,6 @@ class ProtocolHandler:
         ack_packets = []
         for packet_id in self.session.outgoing_msg:
             message = self.session.outgoing_msg[packet_id]
-            self.logger.debug(message.state)
             if message.is_new() or message.is_published():
                 self.logger.debug("Retrying publish message Id=%d", packet_id)
                 message.publish_packet.dup_flag = True
