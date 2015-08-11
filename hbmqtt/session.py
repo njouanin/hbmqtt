@@ -46,12 +46,12 @@ class Session:
         self.delivered_message_queue = Queue()
 
     def _init_states(self):
-        self.machine = Machine(states=Session.states, initial='new')
-        self.machine.add_transition(trigger='connect', source='new', dest='connected')
-        self.machine.add_transition(trigger='connect', source='disconnected', dest='connected')
-        self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
-        self.machine.add_transition(trigger='disconnect', source='new', dest='disconnected')
-        self.machine.add_transition(trigger='disconnect', source='disconnected', dest='disconnected')
+        self.transitions = Machine(states=Session.states, initial='new')
+        self.transitions.add_transition(trigger='connect', source='new', dest='connected')
+        self.transitions.add_transition(trigger='connect', source='disconnected', dest='connected')
+        self.transitions.add_transition(trigger='disconnect', source='connected', dest='disconnected')
+        self.transitions.add_transition(trigger='disconnect', source='new', dest='disconnected')
+        self.transitions.add_transition(trigger='disconnect', source='disconnected', dest='disconnected')
 
     @property
     def next_packet_id(self):
@@ -71,4 +71,4 @@ class Session:
         return self.retained_messages.qsize()
 
     def __repr__(self):
-        return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.machine.state)
+        return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.transitions.state)

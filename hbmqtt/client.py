@@ -96,26 +96,26 @@ class MQTTClient:
             self._disconnect_task = asyncio.Task(self.handle_connection_close())
             return return_code
         except MachineError:
-            msg = "Connect call incompatible with client current state '%s'" % self.session.machine.state
+            msg = "Connect call incompatible with client current state '%s'" % self.session.transitions.state
             self.logger.warn(msg)
-            self.session.machine.connect_fail()
+            self.session.transitions.connect_fail()
             raise ClientException(msg)
         except Exception as e:
-            self.session.machine.disconnect()
+            self.session.transitions.disconnect()
             self.logger.warn("Connection failed: %s " % e)
             raise ClientException("Connection failed: %s " % e)
 
     @asyncio.coroutine
     def disconnect(self):
         try:
-            self.session.machine.disconnect()
+            self.session.transitions.disconnect()
             if not self._disconnect_task.done():
                 self._disconnect_task.cancel()
             yield from self._handler.mqtt_disconnect()
             yield from self._handler.stop()
             self._handler.detach_from_session()
         except MachineError as me:
-            if self.session.machine.state == "disconnected":
+            if self.session.transitions.state == "disconnected":
                 self.logger.warn("Client session is already disconnected")
             else:
                 self.logger.debug("Invalid method call at this moment: %s" % me)
@@ -126,7 +126,7 @@ class MQTTClient:
 
     @asyncio.coroutine
     def reconnect(self, cleansession=False):
-        if self.session.machine.state == 'connected':
+        if self.session.transitions.state == 'connected':
             self.logger.warn("Client already connected")
             return CONNECTION_ACCEPTED
 
@@ -138,12 +138,12 @@ class MQTTClient:
             self._disconnect_task = asyncio.Task(self.handle_connection_close())
             return return_code
         except MachineError:
-            msg = "Connect call incompatible with client current state '%s'" % self.session.machine.state
+            msg = "Connect call incompatible with client current state '%s'" % self.session.transitions.state
             self.logger.warn(msg)
-            self.session.machine.disconnect()
+            self.session.transitions.disconnect()
             raise ClientException(msg)
         except Exception as e:
-            self.session.machine.disconnect()
+            self.session.transitions.disconnect()
             self.logger.warn("Connection failed: %s " % e)
             raise ClientException("Connection failed: %s " % e)
 
@@ -153,11 +153,11 @@ class MQTTClient:
         Send a MQTT ping request and wait for response
         :return: None
         """
-        if self.session.machine.state == 'connected':
+        if self.session.transitions.state == 'connected':
             yield from self._handler.mqtt_ping()
         else:
             self.logger.warn("MQTT PING request incompatible with current session state '%s'" %
-                             self.session.machine.state)
+                             self.session.transitions.state)
 
     @asyncio.coroutine
     def publish(self, topic, message, qos=None, retain=None):
@@ -246,7 +246,7 @@ class MQTTClient:
                 writer = WebSocketsWriter(websocket)
         except Exception as e:
             self.logger.warn("connection failed: %s" % e)
-            self.session.machine.disconnect()
+            self.session.transitions.disconnect()
             raise ClientException("connection Failed: %s" % e)
 
         connect_packet = self.build_connect_packet()
@@ -259,19 +259,19 @@ class MQTTClient:
 
             if return_code is not CONNECTION_ACCEPTED:
                 yield from self._handler.stop()
-                self.session.machine.disconnect()
+                self.session.transitions.disconnect()
                 self.logger.warn("Connection rejected with code '%s'" % return_code)
             else:
                 # Handle MQTT protocol
                 self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
                 self._handler.attach_to_session(self.session)
                 yield from self._handler.start()
-                self.session.machine.connect()
+                self.session.transitions.connect()
                 self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
             return return_code
         except Exception as e:
             self.logger.warn("connection failed: %s" % e)
-            self.session.machine.disconnect()
+            self.session.transitions.disconnect()
             raise ClientException("connection Failed: %s" % e)
 
     def build_connect_packet(self):
@@ -312,8 +312,8 @@ class MQTTClient:
         yield from self._handler.wait_disconnect()
         self.logger.debug("Handle broker disconnection")
         yield from self._handler.stop()
-        self.session.machine.disconnect()
-#        while self.session.machine.state != 'connected':
+        self.session.transitions.disconnect()
+#        while self.session.transitions.state != 'connected':
 #            yield from asyncio.sleep(2)
 #            self.logger.debug("Trying reconnect")
 #            try:

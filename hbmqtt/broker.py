@@ -173,19 +173,19 @@ class Broker:
             raise BrokerException("Listener config not found invalid: %s" % ke)
 
     def _init_states(self):
-        self.machine = Machine(states=Broker.states, initial='new')
-        self.machine.add_transition(trigger='start', source='new', dest='starting')
-        self.machine.add_transition(trigger='starting_fail', source='starting', dest='not_started')
-        self.machine.add_transition(trigger='starting_success', source='starting', dest='started')
-        self.machine.add_transition(trigger='shutdown', source='started', dest='stopping')
-        self.machine.add_transition(trigger='stopping_success', source='stopping', dest='stopped')
-        self.machine.add_transition(trigger='stopping_failure', source='stopping', dest='not_stopped')
-        self.machine.add_transition(trigger='start', source='stopped', dest='starting')
+        self.transitions = Machine(states=Broker.states, initial='new')
+        self.transitions.add_transition(trigger='start', source='new', dest='starting')
+        self.transitions.add_transition(trigger='starting_fail', source='starting', dest='not_started')
+        self.transitions.add_transition(trigger='starting_success', source='starting', dest='started')
+        self.transitions.add_transition(trigger='shutdown', source='started', dest='stopping')
+        self.transitions.add_transition(trigger='stopping_success', source='stopping', dest='stopped')
+        self.transitions.add_transition(trigger='stopping_failure', source='stopping', dest='not_stopped')
+        self.transitions.add_transition(trigger='start', source='stopped', dest='starting')
 
     @asyncio.coroutine
     def start(self):
         try:
-            self.machine.start()
+            self.transitions.start()
             self.logger.debug("Broker starting")
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
@@ -244,17 +244,17 @@ class Broker:
                 pass
                 # 'sys_internal' config parameter not found
 
-            self.machine.starting_success()
+            self.transitions.starting_success()
             self.logger.debug("Broker started")
         except Exception as e:
             self.logger.error("Broker startup failed: %s" % e)
-            self.machine.starting_fail()
+            self.transitions.starting_fail()
             raise BrokerException("Broker instance can't be started: %s" % e)
 
     @asyncio.coroutine
     def shutdown(self):
         try:
-            self.machine.shutdown()
+            self.transitions.shutdown()
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be stopped: %s" % me)
@@ -268,7 +268,7 @@ class Broker:
             yield from server.close_instance()
         self.logger.debug("Broker closing")
         self.logger.info("Broker closed")
-        self.machine.stopping_success()
+        self.transitions.stopping_success()
 
     def _clear_stats(self):
         """
@@ -475,7 +475,7 @@ class Broker:
             yield from writer.close()
             return
 
-        client_session.machine.connect()
+        client_session.transitions.connect()
         handler = self._init_handler(reader, writer, client_session)
         self.logger.debug("%s Start messages handling" % client_session.client_id)
         yield from handler.start()
@@ -548,7 +548,7 @@ class Broker:
 
         self.logger.debug("%s Client disconnecting" % client_session.client_id)
         yield from self._stop_handler(handler)
-        client_session.machine.disconnect()
+        client_session.transitions.disconnect()
         yield from writer.close()
         self.logger.debug("%s Session disconnected" % client_session.client_id)
         server.release_connection()
