@@ -23,6 +23,12 @@ config = {
 #C = MQTTClient(config=config)
 C = MQTTClient()
 
+
+def disconnected(future):
+    print("DISCONNECTED")
+    asyncio.get_event_loop().stop()
+
+
 @asyncio.coroutine
 def test_coro():
     yield from C.connect('mqtt://localhost:1883/')
@@ -36,7 +42,22 @@ def test_coro():
     yield from C.disconnect()
 
 
+@asyncio.coroutine
+def test_coro2():
+    future = yield from C.connect('mqtt://localhost:1883/')
+    future.add_done_callback(disconnected)
+    yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
+    yield from asyncio.sleep(10)
+    yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
+    logger.info("messages published")
+    yield from C.disconnect()
+
+
 if __name__ == '__main__':
     formatter = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.DEBUG, format=formatter)
-    asyncio.get_event_loop().run_until_complete(test_coro())
+    asyncio.async(test_coro2())
+    try:
+        asyncio.get_event_loop().run_forever()
+    finally:
+        asyncio.get_event_loop().close()
