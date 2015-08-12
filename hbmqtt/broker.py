@@ -301,10 +301,10 @@ class Broker:
 
         # Update stats
         uptime = datetime.now() - self._stats[STAT_UPTIME]
-        client_connected = sum(1 for k, session in self._sessions.items() if session.machine.state == 'connected')
+        client_connected = sum(1 for k, session in self._sessions.items() if session.transitions.state == 'connected')
         if client_connected > self._stats[STAT_CLIENTS_MAXIMUM]:
             self._stats[STAT_CLIENTS_MAXIMUM] = client_connected
-        client_disconnected = sum(1 for k, session in self._sessions.items() if session.machine.state == 'disconnected')
+        client_disconnected = sum(1 for k, session in self._sessions.items() if session.transitions.state == 'disconnected')
         inflight_in = 0
         inflight_out = 0
         messages_stored = 0
