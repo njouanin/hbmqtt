@@ -1,8 +1,9 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, PacketIdVariableHeader, MQTTPayload, MQTTVariableHeader
-from hbmqtt.errors import HBMQTTException, MQTTException
+from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, SUBACK, PacketIdVariableHeader, MQTTPayload, MQTTVariableHeader
+from hbmqtt.errors import HBMQTTException
+from hbmqtt.adapters import ReaderAdapter
 from hbmqtt.codecs import *
 
 
@@ -11,6 +12,7 @@ class SubackPayload(MQTTPayload):
     RETURN_CODE_01 = 0x01
     RETURN_CODE_02 = 0x02
     RETURN_CODE_80 = 0x80
+
     def __init__(self, return_codes=[]):
         super().__init__()
         self.return_codes = return_codes
@@ -26,7 +28,7 @@ class SubackPayload(MQTTPayload):
 
     @classmethod
     @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
+    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
         return_codes = []
         bytes_to_read = fixed_header.remaining_length - variable_header.bytes_length
@@ -35,7 +37,7 @@ class SubackPayload(MQTTPayload):
                 return_code_byte = yield from read_or_raise(reader, 1)
                 return_code = bytes_to_int(return_code_byte)
                 return_codes.append(return_code)
-            except NoDataException as e:
+            except NoDataException:
                 break
         return cls(return_codes)
 
@@ -46,9 +48,9 @@ class SubackPacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PacketIdVariableHeader=None, payload=None):
         if fixed is None:
-            header = MQTTFixedHeader(PacketType.SUBACK, 0x00)
+            header = MQTTFixedHeader(SUBACK, 0x00)
         else:
-            if fixed.packet_type is not PacketType.SUBACK:
+            if fixed.packet_type is not SUBACK:
                 raise HBMQTTException("Invalid fixed packet type %s for SubackPacket init" % fixed.packet_type)
             header = fixed
 

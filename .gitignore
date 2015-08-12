@@ -1,2 +1,4 @@
 hbmqtt/__pycache__
 *.pyc
+
+.idea/hbmqtt.iml

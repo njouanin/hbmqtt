@@ -1,12 +1,9 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-import logging
-import asyncio
 from asyncio import futures
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
-from hbmqtt.mqtt.packet import MQTTFixedHeader
-from hbmqtt.mqtt.packet import PacketType
+from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
 from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
@@ -16,12 +13,13 @@ from hbmqtt.mqtt.subscribe import SubscribePacket
 from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
+from hbmqtt.adapters import ReaderAdapter, WriterAdapter
+
 
 class ClientProtocolHandler(ProtocolHandler):
-    def __init__(self, loop=None):
-        super().__init__(loop)
+    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, loop=None):
+        super().__init__(reader, writer, loop)
         self._ping_task = None
-        self._connack_waiter = None
         self._pingresp_queue = asyncio.Queue()
         self._subscriptions_waiter = dict()
         self._unsubscriptions_waiter = dict()
@@ -96,49 +94,6 @@ class ClientProtocolHandler(ProtocolHandler):
             waiter.set_result(None)
         except KeyError as ke:
             self.logger.warn("Received UNSUBACK for unknown pending subscription with Id: %s" % packet_id)
-
-    @asyncio.coroutine
-    def mqtt_connect(self):
-        def build_connect_packet(session):
-            vh = ConnectVariableHeader()
-            payload = ConnectPayload()
-
-            vh.keep_alive = session.keep_alive
-            vh.clean_session_flag = session.clean_session
-            vh.will_retain_flag = session.will_retain
-            payload.client_id = session.client_id
-
-            if session.username:
-                vh.username_flag = True
-                payload.username = session.username
-            else:
-                vh.username_flag = False
-
-            if session.password:
-                vh.password_flag = True
-                payload.password = session.password
-            else:
-                vh.password_flag = False
-            if session.will_flag:
-                vh.will_flag = True
-                vh.will_qos = session.will_qos
-                payload.will_message = session.will_message
-                payload.will_topic = session.will_topic
-            else:
-                vh.will_flag = False
-
-            header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
-            packet = ConnectPacket(header, vh, payload)
-            return packet
-
-        packet = build_connect_packet(self.session)
-        yield from self.outgoing_queue.put(packet)
-        self._connack_waiter = futures.Future(loop=self._loop)
-        return (yield from self._connack_waiter)
-
-    @asyncio.coroutine
-    def handle_connack(self, connack: ConnackPacket):
-        self._connack_waiter.set_result(connack.variable_header.return_code)
 
     @asyncio.coroutine
     def mqtt_disconnect(self):

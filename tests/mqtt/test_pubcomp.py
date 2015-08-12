@@ -4,7 +4,9 @@
 import unittest
 
 from hbmqtt.mqtt.pubcomp import PubcompPacket, PacketIdVariableHeader
+from hbmqtt.adapters import BufferReader
 from hbmqtt.codecs import *
+
 
 class PubcompPacketTest(unittest.TestCase):
     def setUp(self):
@@ -12,8 +14,7 @@ class PubcompPacketTest(unittest.TestCase):
 
     def test_from_stream(self):
         data = b'\x70\x02\x00\x0a'
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream.feed_data(data)
+        stream = BufferReader(data)
         message = self.loop.run_until_complete(PubcompPacket.from_stream(stream))
         self.assertEqual(message.variable_header.packet_id, 10)
 

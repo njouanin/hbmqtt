@@ -14,8 +14,6 @@ class Session:
         self.writer = None
         self.remote_address = None
         self.remote_port = None
-        self.local_address = None
-        self.local_port = None
         self.client_id = None
         self.clean_session = None
         self.will_flag = False
@@ -25,9 +23,12 @@ class Session:
         self.will_topic = None
         self.keep_alive = 0
         self.publish_retry_delay = 0
+        self.broker_uri = None
         self.username = None
         self.password = None
-        self.scheme = None
+        self.cafile = None
+        self.capath = None
+        self.cadata = None
         self._packet_id = 0
         self.parent = 0
         self.handler = None
@@ -45,15 +46,29 @@ class Session:
         self.delivered_message_queue = Queue()
 
     def _init_states(self):
-        self.machine = Machine(states=Session.states, initial='new')
-        self.machine.add_transition(trigger='connect', source='new', dest='connected')
-        self.machine.add_transition(trigger='connect', source='disconnected', dest='connected')
-        self.machine.add_transition(trigger='disconnect', source='connected', dest='disconnected')
+        self.transitions = Machine(states=Session.states, initial='new')
+        self.transitions.add_transition(trigger='connect', source='new', dest='connected')
+        self.transitions.add_transition(trigger='connect', source='disconnected', dest='connected')
+        self.transitions.add_transition(trigger='disconnect', source='connected', dest='disconnected')
+        self.transitions.add_transition(trigger='disconnect', source='new', dest='disconnected')
+        self.transitions.add_transition(trigger='disconnect', source='disconnected', dest='disconnected')
 
     @property
     def next_packet_id(self):
         self._packet_id += 1
         return self._packet_id
 
+    @property
+    def inflight_in_count(self):
+        return len(self.incoming_msg)
+
+    @property
+    def inflight_out_count(self):
+        return len(self.outgoing_msg)
+
+    @property
+    def retained_messages_count(self):
+        return self.retained_messages.qsize()
+
     def __repr__(self):
-        return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.machine.state)
+        return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.transitions.state)

@@ -2,7 +2,6 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from asyncio import IncompleteReadError
 from math import ceil
 
 from hbmqtt.errors import NoDataException
@@ -16,6 +15,7 @@ def bytes_to_hex_str(data):
     """
     return '0x' + ''.join(format(b, '02x') for b in data)
 
+
 def bytes_to_int(data):
     """
     convert a sequence of bytes to an integer using big endian byte ordering
@@ -26,6 +26,7 @@ def bytes_to_int(data):
         return data
     else:
         return int.from_bytes(data, byteorder='big')
+
 
 def int_to_bytes(int_value: int, length=-1) -> bytes:
     """
@@ -45,17 +46,15 @@ def int_to_bytes(int_value: int, length=-1) -> bytes:
 def read_or_raise(reader, n=-1):
     """
     Read a given byte number from Stream. NoDataException is raised if read gives no data
-    :param reader: Stream reader
+    :param reader: reader adapter
     :param n: number of bytes to read
     :return: bytes read
     """
-    try:
-        data = yield from reader.readexactly(n)
-    except IncompleteReadError:
-        raise NoDataException("Incomplete read")
+    data = yield from reader.read(n)
     if not data:
         raise NoDataException("No more data")
     return data
+
 
 @asyncio.coroutine
 def decode_string(reader) -> bytes:
@@ -69,6 +68,7 @@ def decode_string(reader) -> bytes:
     byte_str = yield from read_or_raise(reader, str_length)
     return byte_str.decode(encoding='utf-8')
 
+
 @asyncio.coroutine
 def decode_data_with_length(reader) -> bytes:
     """
@@ -81,14 +81,17 @@ def decode_data_with_length(reader) -> bytes:
     data = yield from read_or_raise(reader, bytes_length)
     return data
 
+
 def encode_string(string: str) -> bytes:
     data = string.encode(encoding='utf-8')
     data_length = len(data)
     return int_to_bytes(data_length, 2) + data
 
+
 def encode_data_with_length(data: bytes) -> bytes:
     data_length = len(data)
     return int_to_bytes(data_length, 2) + data
+
 
 @asyncio.coroutine
 def decode_packet_id(reader) -> int:
@@ -99,3 +102,13 @@ def decode_packet_id(reader) -> int:
     """
     packet_id_bytes = yield from read_or_raise(reader, 2)
     return bytes_to_int(packet_id_bytes)
+
+
+def int_to_bytes_str(value: int) -> bytes:
+    """
+    Converts a int value to a bytes array containing the numeric character.
+    Ex: 123 -> b'123'
+    :param value: int value to convert
+    :return: bytes array
+    """
+    return str(value).encode('utf-8')

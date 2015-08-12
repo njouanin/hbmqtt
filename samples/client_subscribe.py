@@ -17,7 +17,7 @@ C = MQTTClient()
 
 @asyncio.coroutine
 def uptime_coro():
-    yield from C.connect(uri='mqtt://test.mosquitto.org:1883/', username=None, password=None)
+    yield from C.connect('mqtt://test.mosquitto.org:1883/')
     # Subscribe to '$SYS/broker/uptime' with QOS=1
     yield from C.subscribe([
                  {'filter': '$SYS/broker/uptime', 'qos': 0x01},

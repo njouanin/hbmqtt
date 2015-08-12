@@ -1,9 +1,10 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, PacketType, MQTTVariableHeader, MQTTPayload
+from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, CONNECT, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
-from hbmqtt.errors import MQTTException, CodecException, HBMQTTException, NoDataException
+from hbmqtt.errors import MQTTException, HBMQTTException, NoDataException
+from hbmqtt.adapters import ReaderAdapter
 
 
 class ConnectVariableHeader(MQTTVariableHeader):
@@ -93,7 +94,7 @@ class ConnectVariableHeader(MQTTVariableHeader):
 
     @classmethod
     @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
+    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
         #  protocol name
         protocol_name = yield from decode_string(reader)
         if protocol_name != "MQTT":
@@ -114,16 +115,16 @@ class ConnectVariableHeader(MQTTVariableHeader):
         return cls(flags, keep_alive, protocol_name, protocol_level)
 
     def to_bytes(self):
-        out = b''
+        out = bytearray()
 
         # Protocol name
-        out += encode_string(self.proto_name)
+        out.extend(encode_string(self.proto_name))
         # Protocol level
-        out += int_to_bytes(self.proto_level)
+        out.append(self.proto_level)
         # flags
-        out += int_to_bytes(self.flags)
+        out.append(self.flags)
         # keep alive
-        out += int_to_bytes(self.keep_alive, 2)
+        out.extend(int_to_bytes(self.keep_alive, 2))
 
         return out
 
@@ -138,12 +139,12 @@ class ConnectPayload(MQTTPayload):
         self.password = password
 
     def __repr__(self):
-        return "ConnectVariableHeader(client_id={0}, will_topic={1}, will_message={2}, username={3}, password={4})".format(
-            self.client_id, self.will_topic, self.will_message, self.username, self.password)
+        return "ConnectVariableHeader(client_id={0}, will_topic={1}, will_message={2}, username={3}, password={4})".\
+            format(self.client_id, self.will_topic, self.will_message, self.username, self.password)
 
     @classmethod
     @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
+    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader,
                     variable_header: ConnectVariableHeader):
         payload = cls()
         #  Client identifier
@@ -176,19 +177,19 @@ class ConnectPayload(MQTTPayload):
         return payload
 
     def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: ConnectVariableHeader):
-        out = b''
+        out = bytearray()
         # Client identifier
-        out += encode_string(self.client_id)
+        out.extend(encode_string(self.client_id))
         # Will topic / message
         if variable_header.will_flag:
-            out += encode_string(self.will_topic)
-            out += encode_data_with_length(self.will_message)
+            out.extend(encode_string(self.will_topic))
+            out.extend(encode_data_with_length(self.will_message))
         # username
         if variable_header.username_flag:
-            out += encode_string(self.username)
+            out.extend(encode_string(self.username))
         # password
         if variable_header.password_flag:
-            out += encode_string(self.password)
+            out.extend(encode_string(self.password))
 
         return out
 
@@ -199,9 +200,9 @@ class ConnectPacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, vh: ConnectVariableHeader=None, payload: ConnectPayload=None):
         if fixed is None:
-            header = MQTTFixedHeader(PacketType.CONNECT, 0x00)
+            header = MQTTFixedHeader(CONNECT, 0x00)
         else:
-            if fixed.packet_type is not PacketType.CONNECT:
+            if fixed.packet_type is not CONNECT:
                 raise HBMQTTException("Invalid fixed packet type %s for ConnectPacket init" % fixed.packet_type)
             header = fixed
         super().__init__(header)

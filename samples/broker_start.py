@@ -4,7 +4,24 @@ from hbmqtt.broker import Broker
 
 logger = logging.getLogger(__name__)
 
-broker = Broker()
+config = {
+    'listeners': {
+        'default': {
+            'type': 'tcp'
+        },
+        'tcp-mqtt': {
+            'bind': '0.0.0.0:1883',
+            'max_connections': 10
+        },
+        'ws-mqtt': {
+            'bind': '127.0.0.1:8080',
+            'type': 'ws'
+        },
+    },
+    'sys_interval': 10,
+}
+
+broker = Broker(config)
 
 @asyncio.coroutine
 def test_coro():
