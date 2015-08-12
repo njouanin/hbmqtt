@@ -7,8 +7,6 @@ import asyncio
 import ssl
 from urllib.parse import urlparse
 
-from transitions import MachineError
-
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session
 from hbmqtt.mqtt.connack import *
@@ -30,8 +28,7 @@ class ClientException(BaseException):
 
 
 class ConnectException(ClientException):
-    def __init__(self, code):
-        self.return_code = code
+    pass
 
 
 class MQTTClient:
@@ -236,32 +233,36 @@ class MQTTClient:
         except Exception as e:
             self.logger.warn("connection failed: %s" % e)
             self.session.transitions.disconnect()
-            raise ClientException("connection Failed: %s" % e)
+            raise ConnectException("connection Failed: %s" % e)
 
-        connect_packet = self.build_connect_packet()
-        yield from connect_packet.to_stream(writer)
-        self.logger.debug(" -out-> " + repr(connect_packet))
+        return_code = None
         try :
+            connect_packet = self.build_connect_packet()
+            yield from connect_packet.to_stream(writer)
+            self.logger.debug(" -out-> " + repr(connect_packet))
+
             connack = yield from ConnackPacket.from_stream(reader)
             self.logger.debug(" <-in-- " + repr(connack))
             return_code = connack.variable_header.return_code
-
-            if return_code is not CONNECTION_ACCEPTED:
-                yield from self._handler.stop()
-                self.session.transitions.disconnect()
-                self.logger.warn("Connection rejected with code '%s'" % return_code)
-                raise ConnectException(return_code)
-            else:
-                # Handle MQTT protocol
-                self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
-                self._handler.attach_to_session(self.session)
-                yield from self._handler.start()
-                self.session.transitions.connect()
-                self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
         except Exception as e:
             self.logger.warn("connection failed: %s" % e)
             self.session.transitions.disconnect()
             raise ClientException("connection Failed: %s" % e)
+
+        if return_code is not CONNECTION_ACCEPTED:
+            yield from self._handler.stop()
+            self.session.transitions.disconnect()
+            self.logger.warn("Connection rejected with code '%s'" % return_code)
+            exc = ConnectException("Connection rejected by broker")
+            exc.return_code = return_code
+            raise exc
+        else:
+            # Handle MQTT protocol
+            self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
+            self._handler.attach_to_session(self.session)
+            yield from self._handler.start()
+            self.session.transitions.connect()
+            self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
 
     def build_connect_packet(self):
         vh = ConnectVariableHeader()

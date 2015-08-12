@@ -1,7 +1,7 @@
 import logging
 import asyncio
 
-from hbmqtt.client import MQTTClient
+from hbmqtt.client import MQTTClient, ConnectException
 
 
 
@@ -44,13 +44,15 @@ def test_coro():
 
 @asyncio.coroutine
 def test_coro2():
-    future = yield from C.connect('mqtt://localhost:1883/')
-    future.add_done_callback(disconnected)
-    yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
-    yield from asyncio.sleep(10)
-    yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
-    logger.info("messages published")
-    yield from C.disconnect()
+    try:
+        future = yield from C.connect('mqtt://localhost:1883/')
+        future.add_done_callback(disconnected)
+        yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
+        logger.info("messages published")
+        yield from C.disconnect()
+    except ConnectException as ce:
+        logger.error("Connection failed: %s" % ce)
+        asyncio.get_event_loop().stop()
 
 
 if __name__ == '__main__':
