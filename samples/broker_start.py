@@ -18,7 +18,7 @@ config = {
             'type': 'ws'
         },
     },
-    'sys_interval': 10,
+    'sys_interval': 0,
 }
 
 broker = Broker(config)

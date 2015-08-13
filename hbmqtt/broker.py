@@ -234,11 +234,11 @@ class Broker:
                     self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
 
             # Start $SYS topics management
-            self._init_dollar_sys()
             try:
-                sys_interval = int(self.config['sys_interval'])
-                if sys_interval:
+                sys_interval = int(self.config.get('sys_interval', 0))
+                if sys_interval > 0:
                     self.logger.debug("Setup $SYS broadcasting every %d secondes" % sys_interval)
+                    self._init_dollar_sys()
                     self.sys_handle = self._loop.call_later(sys_interval, self.broadcast_dollar_sys_topics)
             except KeyError:
                 pass
@@ -301,10 +301,10 @@ class Broker:
 
         # Update stats
         uptime = datetime.now() - self._stats[STAT_UPTIME]
-        client_connected = sum(1 for k, session in self._sessions.items() if session.machine.state == 'connected')
+        client_connected = sum(1 for k, session in self._sessions.items() if session.transitions.state == 'connected')
         if client_connected > self._stats[STAT_CLIENTS_MAXIMUM]:
             self._stats[STAT_CLIENTS_MAXIMUM] = client_connected
-        client_disconnected = sum(1 for k, session in self._sessions.items() if session.machine.state == 'disconnected')
+        client_disconnected = sum(1 for k, session in self._sessions.items() if session.transitions.state == 'disconnected')
         inflight_in = 0
         inflight_out = 0
         messages_stored = 0
@@ -667,7 +667,7 @@ class Broker:
                         qos = subscription.qos
                         if force_qos is not None:
                             qos = force_qos
-                        if target_session.machine.state == 'connected':
+                        if target_session.transitions.state == 'connected':
                             self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
                                               (format_client_message(session=source_session),
                                                topic, format_client_message(session=target_session)))

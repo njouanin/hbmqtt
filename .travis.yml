@@ -1,6 +1,9 @@
 language: python
 python:
   - "3.4"
-install: "pip install -r requirements.txt"
+install:
+  - pip install -r requirements.txt
+  - pip install tox
 # command to run tests
-script: nosetests
+script:
+  - tox
