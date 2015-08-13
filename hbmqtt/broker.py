@@ -234,11 +234,11 @@ class Broker:
                     self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
 
             # Start $SYS topics management
-            self._init_dollar_sys()
             try:
-                sys_interval = int(self.config['sys_interval'])
-                if sys_interval:
+                sys_interval = int(self.config.get('sys_interval', 0))
+                if sys_interval > 0:
                     self.logger.debug("Setup $SYS broadcasting every %d secondes" % sys_interval)
+                    self._init_dollar_sys()
                     self.sys_handle = self._loop.call_later(sys_interval, self.broadcast_dollar_sys_topics)
             except KeyError:
                 pass
