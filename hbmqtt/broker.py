@@ -667,7 +667,7 @@ class Broker:
                         qos = subscription.qos
                         if force_qos is not None:
                             qos = force_qos
-                        if target_session.machine.state == 'connected':
+                        if target_session.transitions.state == 'connected':
                             self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
                                               (format_client_message(session=source_session),
                                                topic, format_client_message(session=target_session)))
