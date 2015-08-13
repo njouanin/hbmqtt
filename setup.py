@@ -14,7 +14,10 @@ setup(
     url="https://github.com/beerfactory/hbmqtt",
     license='MIT',
     packages=find_packages(exclude=['tests']),
-    install_requires=['transitions', 'blinker'],
+    install_requires=[
+        'transitions==0.2.5',
+        'blinker',
+        'websockets'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
