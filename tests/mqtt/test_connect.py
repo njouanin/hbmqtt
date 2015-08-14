@@ -52,12 +52,6 @@ class ConnectPacketTest(unittest.TestCase):
         self.assertEqual(message.payload.username, 'user')
         self.assertEqual(message.payload.password, 'password')
 
-    def test_decode_fail_protocol_name(self):
-        data = b'\x10\x3e\x00\x04TTQM\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
-        stream = BufferReader(data)
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(ConnectPacket.from_stream(stream))
-
     def test_decode_fail_reserved_flag(self):
         data = b'\x10\x3e\x00\x04MQTT\x04\xcf\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
         stream = BufferReader(data)

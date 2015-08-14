@@ -97,8 +97,6 @@ class ConnectVariableHeader(MQTTVariableHeader):
     def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
         #  protocol name
         protocol_name = yield from decode_string(reader)
-        if protocol_name != "MQTT":
-            raise MQTTException('[MQTT-3.1.2-1] Incorrect protocol name: "%s"' % protocol_name)
 
         # protocol level
         protocol_level_byte = yield from read_or_raise(reader, 1)
