@@ -30,5 +30,11 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Topic :: Communications',
         'Topic :: Internet'
-    ]
+    ],
+    entry_points = {
+        'hbmqtt.test.plugins': [
+            'test_plugin = tests.plugins.test_manager:TestPlugin',
+            'event_plugin = tests.plugins.test_manager:EventTestPlugin'
+        ]
+    }
 )
