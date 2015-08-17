@@ -14,11 +14,12 @@ from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
+from hbmqtt.plugins.manager import PluginManager
 
 
 class ClientProtocolHandler(ProtocolHandler):
-    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, loop=None):
-        super().__init__(reader, writer, loop)
+    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, plugins_manager: PluginManager, loop=None):
+        super().__init__(reader, writer, plugins_manager, loop=loop)
         self._ping_task = None
         self._pingresp_queue = asyncio.Queue()
         self._subscriptions_waiter = dict()

@@ -13,6 +13,8 @@ from hbmqtt.mqtt.connack import *
 from hbmqtt.mqtt.connect import *
 from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSocketsReader, WebSocketsWriter
+from hbmqtt.plugins.manager import PluginManager, BaseContext
+from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED
 import websockets
 
 _defaults = {
@@ -29,6 +31,15 @@ class ClientException(BaseException):
 
 class ConnectException(ClientException):
     pass
+
+
+class ClientContext(BaseContext):
+    """
+    ClientContext is used as the context passed to plugins interacting with the client.
+    It act as an adapter to client services from plugins
+    """
+    def __init__(self, loop=None):
+        super().__init__(loop)
 
 
 class MQTTClient:
@@ -76,6 +87,9 @@ class MQTTClient:
         self._handler = None
         self._disconnect_task = None
         self._connection_closed_future = None
+
+        # Init plugins manager
+        self.plugins_manager = PluginManager('hbmqtt.client', ClientContext(self._loop), self._loop)
 
 
     @asyncio.coroutine
@@ -239,10 +253,10 @@ class MQTTClient:
         try :
             connect_packet = self.build_connect_packet()
             yield from connect_packet.to_stream(writer)
-            self.logger.debug(" -out-> " + repr(connect_packet))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connect_packet)
 
             connack = yield from ConnackPacket.from_stream(reader)
-            self.logger.debug(" <-in-- " + repr(connack))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connack)
             return_code = connack.variable_header.return_code
         except Exception as e:
             self.logger.warn("connection failed: %s" % e)
@@ -258,7 +272,7 @@ class MQTTClient:
             raise exc
         else:
             # Handle MQTT protocol
-            self._handler = ClientProtocolHandler(reader, writer, loop=self._loop)
+            self._handler = ClientProtocolHandler(reader, writer, self.plugins_manager, loop=self._loop)
             self._handler.attach_to_session(self.session)
             yield from self._handler.start()
             self.session.transitions.connect()

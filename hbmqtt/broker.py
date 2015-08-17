@@ -11,6 +11,7 @@ from functools import partial
 from transitions import Machine, MachineError
 from hbmqtt.session import Session
 from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
+from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_RECEIVED, EVENT_MQTT_PACKET_SENT
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import *
 from hbmqtt.errors import HBMQTTException
@@ -46,6 +47,7 @@ EVENT_BROKER_PRE_START = 'broker_pre_start'
 EVENT_BROKER_POST_START = 'broker_post_start'
 EVENT_BROKER_PRE_SHUTDOWN = 'broker_pre_shutdown'
 EVENT_BROKER_POST_SHUTDOWN = 'broker_post_shutdown'
+
 
 class BrokerException(BaseException):
     pass
@@ -399,7 +401,7 @@ class Broker:
         connect = None
         try:
             connect = yield from ConnectPacket.from_stream(reader)
-            self.logger.debug(" <-in-- " + repr(connect))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connect)
             self.check_connect(connect)
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
@@ -437,9 +439,8 @@ class Broker:
             self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' %
                               format_client_message(address=remote_address, port=remote_port))
             connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
-            self.logger.debug(" -out-> " + repr(connack))
         if connack is not None:
-            self.logger.debug(" -out-> " + repr(connack))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
             yield from connack.to_stream(writer)
             yield from writer.close()
             return
@@ -494,12 +495,12 @@ class Broker:
         if self.authenticate(client_session):
             connack = ConnackPacket.build(client_session.parent, CONNECTION_ACCEPTED)
             self.logger.info('%s : connection accepted' % format_client_message(session=client_session))
-            self.logger.debug(" -out-> " + repr(connack))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
             yield from connack.to_stream(writer)
         else:
             connack = ConnackPacket.build(client_session.parent, NOT_AUTHORIZED)
             self.logger.info('%s : connection refused' % format_client_message(session=client_session))
-            self.logger.debug(" -out-> " + repr(connack))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
             yield from connack.to_stream(writer)
             yield from writer.close()
             return
@@ -587,7 +588,7 @@ class Broker:
         Create a BrokerProtocolHandler and attach to a session
         :return:
         """
-        handler = BrokerProtocolHandler(reader, writer, self._loop)
+        handler = BrokerProtocolHandler(reader, writer, self.plugins_manager, self._loop)
         handler.attach_to_session(session)
         handler.on_packet_received.connect(self.sys_handle_packet_received)
         handler.on_packet_sent.connect(self.sys_handle_packet_sent)
