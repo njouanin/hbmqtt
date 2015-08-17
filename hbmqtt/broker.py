@@ -413,7 +413,7 @@ class Broker:
             yield from writer.close()
             self.logger.debug("Connection closed")
             return
-        if connect.variable_header.protocol_name != "MQTT":
+        if connect.variable_header.proto_name != "MQTT":
             self.logger.warn('[MQTT-3.1.2-1] Incorrect protocol name: "%s"' % connect.variable_header.protocol_name)
             yield from writer.close()
             self.logger.debug("Connection closed")
