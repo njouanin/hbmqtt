@@ -14,6 +14,7 @@ Plugin = namedtuple('Plugin', ['name', 'ep', 'object'])
 
 plugins_manager = dict()
 
+
 def get_plugin_manager(namespace):
     global plugins_manager
     return plugins_manager.get(namespace, None)
@@ -25,6 +26,7 @@ class BaseContext:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
+
 
 class PluginManager:
     """
