@@ -10,14 +10,20 @@ from collections import namedtuple
 
 Plugin = namedtuple('Plugin', ['name', 'ep', 'object'])
 
+plugins_manager = dict()
+
+def get_plugin_manager(namespace):
+    global plugins_manager
+    return plugins_manager.get(namespace, None)
 
 class PluginManager:
     """
     Wraps setuptools Entry point mechanism to provide a basic plugin system.
     Plugins are loaded for a given namespace (group).
-    This plugin manager uses coroutines to run plugin call asynchrounously in an event queue
+    This plugin manager uses coroutines to run plugin call asynchronously in an event queue
     """
     def __init__(self, namespace, context, loop=None):
+        global plugins_manager
         if loop is not None:
             self._loop = loop
         else:
@@ -27,6 +33,7 @@ class PluginManager:
         self.context = context
         self._plugins = []
         self._load_plugins(namespace)
+        plugins_manager[namespace] = self
 
     @property
     def app_context(self):
@@ -114,7 +121,7 @@ class PluginManager:
     def _get_coro(plugin, coro_name, *args, **kwargs):
         try:
             return getattr(plugin.object, coro_name, None)(*args, **kwargs)
-        except TypeError as te:
+        except TypeError:
             # Plugin doesn't implement coro_name
             return None
 
