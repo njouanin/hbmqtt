@@ -115,7 +115,7 @@ class BrokerContext(BaseContext):
     It act as an adapter to broker services from plugins developed for HBMQTT broker
     """
     def __init__(self, loop=None):
-        super().__init__(self, loop)
+        super().__init__(loop)
 
 
 class Broker:

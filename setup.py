@@ -34,7 +34,10 @@ setup(
     entry_points = {
         'hbmqtt.test.plugins': [
             'test_plugin = tests.plugins.test_manager:TestPlugin',
-            'event_plugin = tests.plugins.test_manager:EventTestPlugin'
+            'event_plugin = tests.plugins.test_manager:EventTestPlugin',
+        ],
+        'hbmqtt.broker': [
+            'event_logger_plugin = hbmqtt.plugins:EventLoggerPlugin',
         ]
     }
 )
