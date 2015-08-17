@@ -14,7 +14,7 @@ class EventLoggerPlugin:
 
     @asyncio.coroutine
     def log_event(self, event_name):
-        self.logger.info("### EVENT FIRED: '%s' ###" % event_name)
+        self.logger.info("### '%s' EVENT FIRED ###" % event_name.replace('old', ''))
 
     def __getattr__(self, name):
         if name.startswith("on_"):
