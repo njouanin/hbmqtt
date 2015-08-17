@@ -24,6 +24,7 @@ from hbmqtt.adapters import (
     WriterAdapter,
     WebSocketsReader,
     WebSocketsWriter)
+from .plugins.manager import PluginManager, BaseContext
 
 
 _defaults = {
@@ -40,6 +41,11 @@ STAT_PUBLISH_SENT = 'publish_sent'
 STAT_PUBLISH_RECEIVED = 'publish_received'
 STAT_UPTIME = 'uptime'
 STAT_CLIENTS_MAXIMUM = 'clients_maximum'
+
+EVENT_BROKER_PRE_START = 'broker_pre_start'
+EVENT_BROKER_POST_START = 'broker_post_start'
+EVENT_BROKER_PRE_SHUTDOWN = 'broker_pre_shutdown'
+EVENT_BROKER_POST_SHUTDOWN = 'broker_post_shutdown'
 
 class BrokerException(BaseException):
     pass
@@ -103,6 +109,15 @@ class Server:
             yield self.instance.wait_closed()
 
 
+class BrokerContext(BaseContext):
+    """
+    BrokerContext is used as the context passed to plugins interacting with the broker.
+    It act as an adapter to broker services from plugins developed for HBMQTT broker
+    """
+    def __init__(self, loop=None):
+        super().__init__(self, loop)
+
+
 class Broker:
     states = ['new', 'starting', 'started', 'not_started', 'stopping', 'stopped', 'not_stopped', 'stopped']
 
@@ -159,6 +174,9 @@ class Broker:
         # $SYS tree task handle
         self.sys_handle = None
 
+        # Init plugins manager
+        self.plugins_manager = PluginManager('hbmqtt.broker', BrokerContext(self._loop), self._loop)
+
     def _build_listeners_config(self, broker_config):
         self.listeners_config = dict()
         try:
@@ -191,6 +209,7 @@ class Broker:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be started: %s" % me)
 
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_START)
         # Clear broker stats
         self._clear_stats()
         try:
@@ -245,6 +264,7 @@ class Broker:
                 # 'sys_internal' config parameter not found
 
             self.transitions.starting_success()
+            yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
             self.logger.debug("Broker started")
         except Exception as e:
             self.logger.error("Broker startup failed: %s" % e)
@@ -259,6 +279,9 @@ class Broker:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be stopped: %s" % me)
 
+        # Fire broker_shutdown event to plugins
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_SHUTDOWN)
+
         # Stop $SYS topics broadcasting
         if self.sys_handle:
             self.sys_handle.cancel()
@@ -268,6 +291,7 @@ class Broker:
             yield from server.close_instance()
         self.logger.debug("Broker closing")
         self.logger.info("Broker closed")
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_SHUTDOWN)
         self.transitions.stopping_success()
 
     def _clear_stats(self):
