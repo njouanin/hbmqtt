@@ -2,6 +2,8 @@
 #
 # See the file license.txt for copying permission.
 
+__all__ = ['get_plugin_manager', 'BaseContext', 'PluginManager']
+
 import pkg_resources
 import logging
 import asyncio
@@ -15,6 +17,14 @@ plugins_manager = dict()
 def get_plugin_manager(namespace):
     global plugins_manager
     return plugins_manager.get(namespace, None)
+
+
+class BaseContext:
+    def __init__(self, loop=None):
+        if loop is not None:
+            self._loop = loop
+        else:
+            self._loop = asyncio.get_event_loop()
 
 class PluginManager:
     """
