@@ -38,8 +38,8 @@ class ClientContext(BaseContext):
     ClientContext is used as the context passed to plugins interacting with the client.
     It act as an adapter to client services from plugins
     """
-    def __init__(self, loop=None):
-        super().__init__(loop)
+    def __init__(self, client):
+        super().__init__(client.loop)
 
 
 class MQTTClient:
@@ -89,7 +89,7 @@ class MQTTClient:
         self._connection_closed_future = None
 
         # Init plugins manager
-        self.plugins_manager = PluginManager('hbmqtt.client', ClientContext(self._loop), self._loop)
+        self.plugins_manager = PluginManager('hbmqtt.client', ClientContext(self))
 
 
     @asyncio.coroutine
@@ -253,10 +253,14 @@ class MQTTClient:
         try :
             connect_packet = self.build_connect_packet()
             yield from connect_packet.to_stream(writer)
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connect_packet)
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT,
+                                                       packet=connect_packet,
+                                                       session=self.session)
 
             connack = yield from ConnackPacket.from_stream(reader)
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connack)
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED,
+                                                       packet=connack,
+                                                       session=self.session)
             return_code = connack.variable_header.return_code
         except Exception as e:
             self.logger.warn("connection failed: %s" % e)

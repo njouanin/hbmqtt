@@ -495,12 +495,12 @@ class Broker:
         if self.authenticate(client_session):
             connack = ConnackPacket.build(client_session.parent, CONNECTION_ACCEPTED)
             self.logger.info('%s : connection accepted' % format_client_message(session=client_session))
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack, session=client_session)
             yield from connack.to_stream(writer)
         else:
             connack = ConnackPacket.build(client_session.parent, NOT_AUTHORIZED)
             self.logger.info('%s : connection refused' % format_client_message(session=client_session))
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack, session=client_session)
             yield from connack.to_stream(writer)
             yield from writer.close()
             return
