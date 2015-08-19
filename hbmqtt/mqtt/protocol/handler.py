@@ -23,6 +23,11 @@ from hbmqtt.adapters import ReaderAdapter, WriterAdapter
 from hbmqtt.session import Session
 from hbmqtt.specs import *
 from hbmqtt.mqtt.protocol.inflight import *
+from hbmqtt.plugins.manager import PluginManager
+
+
+EVENT_MQTT_PACKET_SENT = 'mqtt_packet_sent'
+EVENT_MQTT_PACKET_RECEIVED = 'mqtt_packet_received'
 
 
 class ProtocolHandler:
@@ -33,11 +38,12 @@ class ProtocolHandler:
     on_packet_sent = Signal()
     on_packet_received = Signal()
 
-    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, loop=None):
+    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, plugins_manager: PluginManager, loop=None):
         self.logger = logging.getLogger(__name__)
         self.session = None
         self.reader = reader
         self.writer = writer
+        self.plugins_manager = plugins_manager
         if loop is None:
             self._loop = asyncio.get_event_loop()
         else:
@@ -153,7 +159,8 @@ class ProtocolHandler:
                     else:
                         cls = packet_class(fixed_header)
                         packet = yield from cls.from_stream(self.reader, fixed_header=fixed_header)
-                        self.logger.debug("%s <-in-- %s" % (self.session.client_id, repr(packet)))
+                        yield from self.plugins_manager.fire_event(
+                            EVENT_MQTT_PACKET_RECEIVED, packet=packet, session=self.session)
                         self._loop.call_soon(self.on_packet_received.send, packet)
 
                         task = None
@@ -219,7 +226,7 @@ class ProtocolHandler:
                     self.logger.debug("%s Writer interruption" % self.session.client_id)
                     break
                 yield from packet.to_stream(self.writer)
-                self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
+                yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
                 self._loop.call_soon(self.on_packet_sent.send, packet)
             except asyncio.TimeoutError as ce:
                 self.logger.debug("%s Output queue get timeout" % self.session.client_id)

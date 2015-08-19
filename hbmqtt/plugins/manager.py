@@ -14,6 +14,7 @@ Plugin = namedtuple('Plugin', ['name', 'ep', 'object'])
 
 plugins_manager = dict()
 
+
 def get_plugin_manager(namespace):
     global plugins_manager
     return plugins_manager.get(namespace, None)
@@ -25,6 +26,7 @@ class BaseContext:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
+
 
 class PluginManager:
     """
@@ -61,7 +63,7 @@ class PluginManager:
             self.logger.debug(" Loading plugin %s" % ep)
             plugin = ep.load(require=True)
             self.logger.debug(" Initializing plugin %s" % ep)
-            obj = plugin(self)
+            obj = plugin(self.context)
             return Plugin(ep.name, ep, obj)
         except ImportError as ie:
             self.logger.warn("Plugin %r import failed: %s" % (ep, ie))
@@ -110,7 +112,8 @@ class PluginManager:
             event_method = getattr(plugin.object, event_method_name, None)
             if event_method:
                 tasks.append(self._schedule_coro(event_method(*args, **kwargs)))
-        yield from asyncio.wait(tasks, loop=self._loop)
+        if len(tasks) > 0:
+            yield from asyncio.wait(tasks, loop=self._loop)
 
     @asyncio.coroutine
     def map(self, coro, *args, **kwargs):
