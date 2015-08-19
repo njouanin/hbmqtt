@@ -41,6 +41,19 @@ class TestPluginManager(unittest.TestCase):
         @asyncio.coroutine
         def fire_event():
             yield from manager.fire_event("test")
+            yield from asyncio.sleep(1, loop=self.loop)
+            yield from manager.close()
+
+        manager = PluginManager("hbmqtt.test.plugins", context=None, loop=self.loop)
+        self.loop.run_until_complete(fire_event())
+        plugin = manager.get_plugin("event_plugin")
+        self.assertTrue(plugin.object.test_flag)
+
+    def test_fire_event_wait(self):
+        @asyncio.coroutine
+        def fire_event():
+            yield from manager.fire_event("test", wait=True)
+            yield from manager.close()
 
         manager = PluginManager("hbmqtt.test.plugins", context=None, loop=self.loop)
         self.loop.run_until_complete(fire_event())

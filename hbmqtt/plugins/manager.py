@@ -45,6 +45,7 @@ class PluginManager:
         self.context = context
         self._plugins = []
         self._load_plugins(namespace)
+        self._fired_events = []
         plugins_manager[namespace] = self
 
     @property
@@ -81,6 +82,17 @@ class PluginManager:
                 return p
         return None
 
+    @asyncio.coroutine
+    def close(self):
+        """
+        Free PluginManager resources and cancel pending event methods
+        This method call a close() coroutine for each plugin, allowing plugins to close and free resources
+        :return:
+        """
+        yield from self.map_plugin_coro("close")
+        for task in self._fired_events:
+            task.cancel()
+
     @property
     def plugins(self):
         """
@@ -112,8 +124,12 @@ class PluginManager:
             event_method = getattr(plugin.object, event_method_name, None)
             if event_method:
                 tasks.append(self._schedule_coro(event_method(*args, **kwargs)))
-        if len(tasks) > 0:
-            yield from asyncio.wait(tasks, loop=self._loop)
+        if wait:
+            if len(tasks) > 0:
+                yield from asyncio.wait(tasks, loop=self._loop)
+        else:
+            self._fired_events.extend(tasks)
+
 
     @asyncio.coroutine
     def map(self, coro, *args, **kwargs):
