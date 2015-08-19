@@ -91,14 +91,17 @@ class PluginManager:
         return asyncio.Task(coro, loop=self._loop)
 
     @asyncio.coroutine
-    def fire_event(self, event_name, *args, **kwargs):
+    def fire_event(self, event_name, wait=False, *args, **kwargs):
         """
         Fire an event to plugins.
         PluginManager schedule async calls for each plugin on method called "on_" + event_name
         For example, on_connect will be called on event 'connect'
+        Method calls are schedule in the asyn loop. wait parameter must be set to true to wait until all
+        mehtods are completed.
         :param event_name:
         :param args:
         :param kwargs:
+        :param wait: indicates if fire_event should wait for plugin calls completion (True), or not
         :return:
         """
         tasks = []
