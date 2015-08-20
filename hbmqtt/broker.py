@@ -116,8 +116,9 @@ class BrokerContext(BaseContext):
     BrokerContext is used as the context passed to plugins interacting with the broker.
     It act as an adapter to broker services from plugins developed for HBMQTT broker
     """
-    def __init__(self, loop=None):
-        super().__init__(loop)
+    def __init__(self):
+        super().__init__()
+        self.config = None
 
 
 class Broker:
@@ -177,7 +178,9 @@ class Broker:
         self.sys_handle = None
 
         # Init plugins manager
-        self.plugins_manager = PluginManager('hbmqtt.broker.plugins', BrokerContext(self._loop), self._loop)
+        context = BrokerContext()
+        context.config = self.config
+        self.plugins_manager = PluginManager('hbmqtt.broker.plugins', context, self._loop)
 
     def _build_listeners_config(self, broker_config):
         self.listeners_config = dict()

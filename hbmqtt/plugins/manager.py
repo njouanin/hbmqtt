@@ -22,11 +22,8 @@ def get_plugin_manager(namespace):
 
 
 class BaseContext:
-    def __init__(self, loop=None):
-        if loop is not None:
-            self._loop = loop
-        else:
-            self._loop = asyncio.get_event_loop()
+    def __init__(self):
+        self.loop = None
         self.logger = None
 
 
@@ -48,6 +45,7 @@ class PluginManager:
             self.context = BaseContext()
         else:
             self.context = context
+        context.loop = loop
         self._plugins = []
         self._load_plugins(namespace)
         self._fired_events = []

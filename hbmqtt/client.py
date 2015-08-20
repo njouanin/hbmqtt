@@ -38,8 +38,9 @@ class ClientContext(BaseContext):
     ClientContext is used as the context passed to plugins interacting with the client.
     It act as an adapter to client services from plugins
     """
-    def __init__(self, client):
-        super().__init__(client._loop)
+    def __init__(self):
+        super().__init__()
+        self.config = None
 
 
 class MQTTClient:
@@ -89,7 +90,9 @@ class MQTTClient:
         self._connection_closed_future = None
 
         # Init plugins manager
-        self.plugins_manager = PluginManager('hbmqtt.client.plugins', ClientContext(self))
+        context = ClientContext()
+        context.config = self.config
+        self.plugins_manager = PluginManager('hbmqtt.client.plugins', context)
 
 
     @asyncio.coroutine
