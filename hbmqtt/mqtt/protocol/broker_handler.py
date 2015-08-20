@@ -20,8 +20,8 @@ class BrokerProtocolHandler(ProtocolHandler):
     def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, plugins_manager: PluginManager, loop=None):
         super().__init__(reader, writer, plugins_manager, loop)
         self._disconnect_waiter = None
-        self._pending_subscriptions = asyncio.Queue()
-        self._pending_unsubscriptions = asyncio.Queue()
+        self._pending_subscriptions = asyncio.Queue(loop=self._loop)
+        self._pending_unsubscriptions = asyncio.Queue(loop=self._loop)
 
     @asyncio.coroutine
     def start(self):

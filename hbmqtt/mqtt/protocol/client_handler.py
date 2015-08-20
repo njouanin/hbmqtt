@@ -4,8 +4,6 @@
 from asyncio import futures
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
 from hbmqtt.mqtt.packet import *
-from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPacket, ConnectPayload
-from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.pingresp import PingRespPacket
@@ -21,7 +19,7 @@ class ClientProtocolHandler(ProtocolHandler):
     def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, plugins_manager: PluginManager, loop=None):
         super().__init__(reader, writer, plugins_manager, loop=loop)
         self._ping_task = None
-        self._pingresp_queue = asyncio.Queue()
+        self._pingresp_queue = asyncio.Queue(loop=self._loop)
         self._subscriptions_waiter = dict()
         self._unsubscriptions_waiter = dict()
         self._disconnect_waiter = None

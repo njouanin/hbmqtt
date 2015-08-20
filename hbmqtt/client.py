@@ -114,7 +114,7 @@ class MQTTClient:
 
         return_code = yield from self._connect_coro()
         self._connection_closed_future = asyncio.Future(loop=self._loop)
-        self._disconnect_task = asyncio.Task(self.handle_connection_close())
+        self._disconnect_task = asyncio.Task(self.handle_connection_close(), loop=self._loop)
         return self._connection_closed_future
 
     @asyncio.coroutine
@@ -141,7 +141,7 @@ class MQTTClient:
 
         return_code = yield from self._connect_coro()
         self._connection_closed_future = asyncio.Future(loop=self._loop)
-        self._disconnect_task = asyncio.Task(self.handle_connection_close())
+        self._disconnect_task = asyncio.Task(self.handle_connection_close(), loop=self._loop)
         return self._connection_closed_future
 
     @asyncio.coroutine
@@ -240,11 +240,17 @@ class MQTTClient:
         try:
             if scheme in ('mqtt', 'mqtts'):
                 conn_reader, conn_writer = \
-                    yield from asyncio.open_connection(self.session.remote_address, self.session.remote_port, **kwargs)
+                    yield from asyncio.open_connection(
+                        self.session.remote_address,
+                        self.session.remote_port, loop=self._loop, **kwargs)
                 reader = StreamReaderAdapter(conn_reader)
                 writer = StreamWriterAdapter(conn_writer)
             elif scheme in ('ws', 'wss'):
-                websocket = yield from websockets.connect(self.session.broker_uri, subprotocols=['mqtt'], **kwargs)
+                websocket = yield from websockets.connect(
+                    self.session.broker_uri,
+                    subprotocols=['mqtt'],
+                    loop=self._loop,
+                    **kwargs)
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
         except Exception as e:
