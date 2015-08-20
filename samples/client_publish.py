@@ -56,7 +56,7 @@ def test_coro2():
 
 
 if __name__ == '__main__':
-    formatter = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+    formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.DEBUG, format=formatter)
     asyncio.async(test_coro2())
     try:

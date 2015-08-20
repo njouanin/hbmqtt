@@ -31,7 +31,7 @@ def test_coro():
 
 
 if __name__ == '__main__':
-    formatter = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+    formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.DEBUG, format=formatter)
     asyncio.get_event_loop().run_until_complete(test_coro())
     asyncio.get_event_loop().run_forever()
