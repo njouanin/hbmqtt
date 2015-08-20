@@ -89,7 +89,7 @@ class MQTTClient:
         self._connection_closed_future = None
 
         # Init plugins manager
-        self.plugins_manager = PluginManager('hbmqtt.client', ClientContext(self))
+        self.plugins_manager = PluginManager('hbmqtt.client.plugins', ClientContext(self))
 
 
     @asyncio.coroutine

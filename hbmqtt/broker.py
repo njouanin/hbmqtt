@@ -177,7 +177,7 @@ class Broker:
         self.sys_handle = None
 
         # Init plugins manager
-        self.plugins_manager = PluginManager('hbmqtt.broker', BrokerContext(self._loop), self._loop)
+        self.plugins_manager = PluginManager('hbmqtt.broker.plugins', BrokerContext(self._loop), self._loop)
 
     def _build_listeners_config(self, broker_config):
         self.listeners_config = dict()
