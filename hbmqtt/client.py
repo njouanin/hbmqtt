@@ -39,7 +39,7 @@ class ClientContext(BaseContext):
     It act as an adapter to client services from plugins
     """
     def __init__(self, client):
-        super().__init__(client.loop)
+        super().__init__(client._loop)
 
 
 class MQTTClient:

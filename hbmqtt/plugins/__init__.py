@@ -4,4 +4,4 @@
 
 from .event_logger import EventLoggerPlugin
 # TODO: File is missing
-# from .packet_logger import PacketLoggerPlugin
+from .packet_logger import PacketLoggerPlugin
