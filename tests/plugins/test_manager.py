@@ -4,25 +4,27 @@
 import unittest
 import logging
 import asyncio
-from hbmqtt.plugins.manager import PluginManager
+from hbmqtt.plugins.manager import PluginManager, BaseContext
 
-formatter = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=formatter)
 
 
 class TestPlugin:
-    def __init__(self, manager):
-        pass
+    def __init__(self, context):
+        self.context = context
 
 
 class EventTestPlugin:
-    def __init__(self, manager: PluginManager):
+    def __init__(self, context):
+        self.context = context
         self.test_flag = False
         self.coro_flag = False
 
     @asyncio.coroutine
     def on_test(self):
         self.test_flag = True
+        self.context.logger.info("on_test")
 
     @asyncio.coroutine
     def test_coro(self):

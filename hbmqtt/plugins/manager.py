@@ -7,6 +7,7 @@ __all__ = ['get_plugin_manager', 'BaseContext', 'PluginManager']
 import pkg_resources
 import logging
 import asyncio
+import copy
 
 from collections import namedtuple
 
@@ -26,6 +27,7 @@ class BaseContext:
             self._loop = loop
         else:
             self._loop = asyncio.get_event_loop()
+        self.logger = None
 
 
 class PluginManager:
@@ -41,8 +43,11 @@ class PluginManager:
         else:
             self._loop = asyncio.get_event_loop()
 
-        self.logger = logging.getLogger(__name__)
-        self.context = context
+        self.logger = logging.getLogger(namespace)
+        if context is None:
+            self.context = BaseContext()
+        else:
+            self.context = context
         self._plugins = []
         self._load_plugins(namespace)
         self._fired_events = []
@@ -64,7 +69,9 @@ class PluginManager:
             self.logger.debug(" Loading plugin %s" % ep)
             plugin = ep.load(require=True)
             self.logger.debug(" Initializing plugin %s" % ep)
-            obj = plugin(self.context)
+            plugin_context = copy.copy(self.app_context)
+            plugin_context.logger = self.logger.getChild(ep.name)
+            obj = plugin(plugin_context)
             return Plugin(ep.name, ep, obj)
         except ImportError as ie:
             self.logger.warn("Plugin %r import failed: %s" % (ep, ie))
