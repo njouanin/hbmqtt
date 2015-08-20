@@ -11,6 +11,7 @@ from functools import partial
 from transitions import Machine, MachineError
 from hbmqtt.session import Session
 from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
+from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_RECEIVED, EVENT_MQTT_PACKET_SENT
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import *
 from hbmqtt.errors import HBMQTTException
@@ -24,6 +25,7 @@ from hbmqtt.adapters import (
     WriterAdapter,
     WebSocketsReader,
     WebSocketsWriter)
+from .plugins.manager import PluginManager, BaseContext
 
 
 _defaults = {
@@ -40,6 +42,12 @@ STAT_PUBLISH_SENT = 'publish_sent'
 STAT_PUBLISH_RECEIVED = 'publish_received'
 STAT_UPTIME = 'uptime'
 STAT_CLIENTS_MAXIMUM = 'clients_maximum'
+
+EVENT_BROKER_PRE_START = 'broker_pre_start'
+EVENT_BROKER_POST_START = 'broker_post_start'
+EVENT_BROKER_PRE_SHUTDOWN = 'broker_pre_shutdown'
+EVENT_BROKER_POST_SHUTDOWN = 'broker_post_shutdown'
+
 
 class BrokerException(BaseException):
     pass
@@ -103,6 +111,16 @@ class Server:
             yield self.instance.wait_closed()
 
 
+class BrokerContext(BaseContext):
+    """
+    BrokerContext is used as the context passed to plugins interacting with the broker.
+    It act as an adapter to broker services from plugins developed for HBMQTT broker
+    """
+    def __init__(self):
+        super().__init__()
+        self.config = None
+
+
 class Broker:
     states = ['new', 'starting', 'started', 'not_started', 'stopping', 'stopped', 'not_stopped', 'stopped']
 
@@ -159,6 +177,11 @@ class Broker:
         # $SYS tree task handle
         self.sys_handle = None
 
+        # Init plugins manager
+        context = BrokerContext()
+        context.config = self.config
+        self.plugins_manager = PluginManager('hbmqtt.broker.plugins', context, self._loop)
+
     def _build_listeners_config(self, broker_config):
         self.listeners_config = dict()
         try:
@@ -191,6 +214,7 @@ class Broker:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be started: %s" % me)
 
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_START)
         # Clear broker stats
         self._clear_stats()
         try:
@@ -245,6 +269,7 @@ class Broker:
                 # 'sys_internal' config parameter not found
 
             self.transitions.starting_success()
+            yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
             self.logger.debug("Broker started")
         except Exception as e:
             self.logger.error("Broker startup failed: %s" % e)
@@ -259,6 +284,9 @@ class Broker:
             self.logger.debug("Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be stopped: %s" % me)
 
+        # Fire broker_shutdown event to plugins
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_SHUTDOWN)
+
         # Stop $SYS topics broadcasting
         if self.sys_handle:
             self.sys_handle.cancel()
@@ -268,6 +296,7 @@ class Broker:
             yield from server.close_instance()
         self.logger.debug("Broker closing")
         self.logger.info("Broker closed")
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_SHUTDOWN)
         self.transitions.stopping_success()
 
     def _clear_stats(self):
@@ -375,7 +404,7 @@ class Broker:
         connect = None
         try:
             connect = yield from ConnectPacket.from_stream(reader)
-            self.logger.debug(" <-in-- " + repr(connect))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connect)
             self.check_connect(connect)
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
@@ -389,7 +418,7 @@ class Broker:
             yield from writer.close()
             self.logger.debug("Connection closed")
             return
-        if connect.variable_header.protocol_name != "MQTT":
+        if connect.variable_header.proto_name != "MQTT":
             self.logger.warn('[MQTT-3.1.2-1] Incorrect protocol name: "%s"' % connect.variable_header.protocol_name)
             yield from writer.close()
             self.logger.debug("Connection closed")
@@ -413,9 +442,8 @@ class Broker:
             self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' %
                               format_client_message(address=remote_address, port=remote_port))
             connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
-            self.logger.debug(" -out-> " + repr(connack))
         if connack is not None:
-            self.logger.debug(" -out-> " + repr(connack))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
             yield from connack.to_stream(writer)
             yield from writer.close()
             return
@@ -470,12 +498,12 @@ class Broker:
         if self.authenticate(client_session):
             connack = ConnackPacket.build(client_session.parent, CONNECTION_ACCEPTED)
             self.logger.info('%s : connection accepted' % format_client_message(session=client_session))
-            self.logger.debug(" -out-> " + repr(connack))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack, session=client_session)
             yield from connack.to_stream(writer)
         else:
             connack = ConnackPacket.build(client_session.parent, NOT_AUTHORIZED)
             self.logger.info('%s : connection refused' % format_client_message(session=client_session))
-            self.logger.debug(" -out-> " + repr(connack))
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack, session=client_session)
             yield from connack.to_stream(writer)
             yield from writer.close()
             return
@@ -563,7 +591,7 @@ class Broker:
         Create a BrokerProtocolHandler and attach to a session
         :return:
         """
-        handler = BrokerProtocolHandler(reader, writer, self._loop)
+        handler = BrokerProtocolHandler(reader, writer, self.plugins_manager, self._loop)
         handler.attach_to_session(session)
         handler.on_packet_received.connect(self.sys_handle_packet_received)
         handler.on_packet_sent.connect(self.sys_handle_packet_sent)
