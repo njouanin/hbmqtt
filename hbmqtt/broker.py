@@ -495,7 +495,8 @@ class Broker:
         client_session.reader = reader
         client_session.writer = writer
 
-        if self.authenticate(client_session):
+        authenticated = yield from self.authenticate(client_session, self.listeners_config[listener_name])
+        if authenticated:
             connack = ConnackPacket.build(client_session.parent, CONNECTION_ACCEPTED)
             self.logger.info('%s : connection accepted' % format_client_message(session=client_session))
             yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack, session=client_session)
@@ -623,7 +624,27 @@ class Broker:
         if connect.variable_header.reserved_flag:
             raise BrokerException('[MQTT-3.1.2-3] CONNECT reserved flag must be set to 0')
 
-    def authenticate(self, session: Session):
+    @asyncio.coroutine
+    def authenticate(self, session: Session, listener):
+        """
+        This method call the authenticate method on registered plugins to test user authentication.
+        User is considered authenticated if at least one plugin returns True.
+        :param session:
+        :param listener:
+        :return:
+        """
+        returns = yield from self.plugins_manager.map_plugin_coro("authenticate", session)
+        if not returns:
+            self.logger.debug("Authentication plugin results: %r" % returns)
+            return True
+        else:
+            for res in returns:
+                if res:
+                    # Consider authentication succeed if at least one plugin returns True
+                    return True
+            # If all plugins returned False, authentications is failed
+            return True
+
         # TODO : Handle client authentication here
         return True
 
@@ -717,7 +738,7 @@ class Broker:
                                 asyncio.Task(target_session.retained_messages.put(retained_message), loop=self._loop)
                             )
 
-            if len(publish_tasks) > 0:
+            if publish_tasks:
                 yield from asyncio.wait(publish_tasks, loop=self._loop)
         except Exception as e:
             self.logger.warn("Message broadcasting failed: %s", e)
@@ -736,7 +757,7 @@ class Broker:
             publish_tasks.append(asyncio.Task(
                 session.handler.mqtt_publish(
                     retained.topic, retained.data, retained.qos, True), loop=self._loop))
-        if len(publish_tasks) > 0:
+        if publish_tasks:
             yield from asyncio.wait(publish_tasks, loop=self._loop)
 
     @asyncio.coroutine
@@ -752,7 +773,7 @@ class Broker:
                 publish_tasks.append(asyncio.Task(
                     session.handler.mqtt_publish(
                         retained.topic, retained.data, subscription['qos'], True), loop=self._loop))
-        if len(publish_tasks) > 0:
+        if publish_tasks:
             yield from asyncio.wait(publish_tasks, loop=self._loop)
         self.logger.debug("End broadcasting messages retained due to subscription on '%s' from %s" %
                           (subscription['filter'], format_client_message(session=session)))
