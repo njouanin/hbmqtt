@@ -130,7 +130,7 @@ class PluginManager:
             if event_method:
                 tasks.append(self._schedule_coro(event_method(*args, **kwargs)))
         if wait:
-            if len(tasks) > 0:
+            if tasks:
                 yield from asyncio.wait(tasks, loop=self._loop)
         else:
             self._fired_events.extend(tasks)
