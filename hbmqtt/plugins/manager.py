@@ -45,7 +45,7 @@ class PluginManager:
             self.context = BaseContext()
         else:
             self.context = context
-        context.loop = loop
+        self.context.loop = self._loop
         self._plugins = []
         self._load_plugins(namespace)
         self._fired_events = []
@@ -134,7 +134,6 @@ class PluginManager:
                 yield from asyncio.wait(tasks, loop=self._loop)
         else:
             self._fired_events.extend(tasks)
-
 
     @asyncio.coroutine
     def map(self, coro, *args, **kwargs):
