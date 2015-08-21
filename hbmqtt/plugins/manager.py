@@ -146,12 +146,17 @@ class PluginManager:
         :return:
         """
         tasks = []
+        plugins_list = []
         for plugin in self._plugins:
             coro_instance = coro(plugin, *args, **kwargs)
             if coro_instance:
                 tasks.append(self._schedule_coro(coro_instance))
-        ret = yield from asyncio.gather(*tasks, loop=self._loop)
-        return ret
+                plugins_list.append(plugin)
+        ret_list = yield from asyncio.gather(*tasks, loop=self._loop)
+
+        # Create result map plugin=>ret
+        ret_dict = {k: v for k, v in zip(plugins_list, ret_list)}
+        return ret_dict
 
     @staticmethod
     def _get_coro(plugin, coro_name, *args, **kwargs):

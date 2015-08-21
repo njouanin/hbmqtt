@@ -30,6 +30,10 @@ class EventTestPlugin:
     def test_coro(self):
         self.coro_flag = True
 
+    @asyncio.coroutine
+    def ret_coro(self):
+        return "TEST"
+
 
 class TestPluginManager(unittest.TestCase):
     def setUp(self):
@@ -71,3 +75,13 @@ class TestPluginManager(unittest.TestCase):
         self.loop.run_until_complete(call_coro())
         plugin = manager.get_plugin("event_plugin")
         self.assertTrue(plugin.object.test_coro)
+
+    def test_map_coro_return(self):
+        @asyncio.coroutine
+        def call_coro():
+            return (yield from manager.map_plugin_coro('ret_coro'))
+
+        manager = PluginManager("hbmqtt.test.plugins", context=None, loop=self.loop)
+        ret = self.loop.run_until_complete(call_coro())
+        plugin = manager.get_plugin("event_plugin")
+        self.assertEqual(ret[plugin], "TEST")
