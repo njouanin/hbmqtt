@@ -37,11 +37,11 @@ setup(
             'event_plugin = tests.plugins.test_manager:EventTestPlugin',
         ],
         'hbmqtt.broker.plugins': [
-#            'event_logger_plugin = hbmqtt.plugins:EventLoggerPlugin',
-            'packet_logger_plugin = hbmqtt.plugins:PacketLoggerPlugin',
+#            'event_logger_plugin = hbmqtt.plugins.logging:EventLoggerPlugin',
+            'packet_logger_plugin = hbmqtt.plugins.logging:PacketLoggerPlugin',
         ],
         'hbmqtt.client.plugins': [
-            'packet_logger_plugin = hbmqtt.plugins:PacketLoggerPlugin',
+            'packet_logger_plugin = hbmqtt.plugins.logging:PacketLoggerPlugin',
         ]
     }
 )
