@@ -22,16 +22,16 @@ class EventTestPlugin:
         self.coro_flag = False
 
     @asyncio.coroutine
-    def on_test(self):
+    def on_test(self, *args, **kwargs):
         self.test_flag = True
         self.context.logger.info("on_test")
 
     @asyncio.coroutine
-    def test_coro(self):
+    def test_coro(self, *args, **kwargs):
         self.coro_flag = True
 
     @asyncio.coroutine
-    def ret_coro(self):
+    def ret_coro(self, *args, **kwargs):
         return "TEST"
 
 
@@ -85,3 +85,16 @@ class TestPluginManager(unittest.TestCase):
         ret = self.loop.run_until_complete(call_coro())
         plugin = manager.get_plugin("event_plugin")
         self.assertEqual(ret[plugin], "TEST")
+
+    def test_map_coro_filter(self):
+        """
+        Run plugin coro but expect no return as an empty filter is given
+        :return:
+        """
+        @asyncio.coroutine
+        def call_coro():
+            return (yield from manager.map_plugin_coro('ret_coro', filter_plugins=[]))
+
+        manager = PluginManager("hbmqtt.test.plugins", context=None, loop=self.loop)
+        ret = self.loop.run_until_complete(call_coro())
+        self.assertTrue(len(ret) == 0)

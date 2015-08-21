@@ -140,22 +140,30 @@ class PluginManager:
         """
         Schedule a given coroutine call for each plugin.
         The coro called get the Plugin instance as first argument of its method call
-        :param coro:
-        :param args:
-        :param kwargs:
-        :return:
+        :param coro: coro to call on each plugin
+        :param filter_plugins: list of plugin names to filter (only plugin whose name is in filter are called).
+        None will call all plugins. [] will call None.
+        :param args: arguments to pass to coro
+        :param kwargs: arguments to pass to coro
+        :return: dict containing return from coro call for each plugin
         """
+        p_list = kwargs.pop('filter_plugins', None)
+        if p_list is None:
+            p_list = [p.name for p in self.plugins]
         tasks = []
         plugins_list = []
         for plugin in self._plugins:
-            coro_instance = coro(plugin, *args, **kwargs)
-            if coro_instance:
-                tasks.append(self._schedule_coro(coro_instance))
-                plugins_list.append(plugin)
-        ret_list = yield from asyncio.gather(*tasks, loop=self._loop)
-
-        # Create result map plugin=>ret
-        ret_dict = {k: v for k, v in zip(plugins_list, ret_list)}
+            if plugin.name in p_list:
+                coro_instance = coro(plugin, *args, **kwargs)
+                if coro_instance:
+                    tasks.append(self._schedule_coro(coro_instance))
+                    plugins_list.append(plugin)
+        if tasks:
+            ret_list = yield from asyncio.gather(*tasks, loop=self._loop)
+            # Create result map plugin=>ret
+            ret_dict = {k: v for k, v in zip(plugins_list, ret_list)}
+        else:
+            ret_dict = {}
         return ret_dict
 
     @staticmethod
