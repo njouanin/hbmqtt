@@ -31,6 +31,9 @@ from .plugins.manager import PluginManager, BaseContext
 _defaults = {
     'timeout-disconnect-delay': 2,
     'publish-retry-delay': 5,
+    'auth': {
+        'allow-anonymous': True,
+    }
 }
 
 DOLLAR_SYS_ROOT = '$SYS/broker/'
@@ -129,15 +132,15 @@ class Broker:
 
         :param config: Example Yaml config
             listeners:
-                - default:  #Mandatory
+                default:  #Mandatory
                     max-connections: 50000
                     type: tcp
-                - my-tcp-1:
+                my-tcp-1:
                     bind: 127.0.0.1:1883
-                - my-tcp-2:
+                my-tcp-2:
                     bind: 1.2.3.4:1883
                     max-connections: 1000
-                - my-tcp-ssl-1:
+                my-tcp-ssl-1:
                     bind: 127.0.0.1:8883
                     ssl: on
                     cafile: /some/cafile
@@ -145,14 +148,14 @@ class Broker:
                     capath: certificate data
                     certfile: /some/certfile
                     keyfile: /some/key
-                - my-ws-1:
+                my-ws-1:
                     bind: 0.0.0.0:8080
                     type: ws
             timeout-disconnect-delay: 2
             publish-retry-delay: 5
+            plugins-enabled: ['auth.anonymous'] #List of plugins to activate among all registered plugins
             auth:
                 allow-anonymous: true / false
-            plugins: ['auth.anonymous'] #List of plugins to activate among all registered plugins
 
         :param loop:
         :return:
@@ -636,7 +639,7 @@ class Broker:
         :param listener:
         :return:
         """
-        returns = yield from self.plugins_manager.map_plugin_coro("authenticate", session)
+        returns = yield from self.plugins_manager.map_plugin_coro("authenticate", session=session)
         if not returns:
             self.logger.debug("Authentication plugin results: %r" % returns)
             return True
