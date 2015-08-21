@@ -150,6 +150,9 @@ class Broker:
                     type: ws
             timeout-disconnect-delay: 2
             publish-retry-delay: 5
+            auth:
+                allow-anonymous: true / false
+            plugins: ['auth.anonymous'] #List of plugins to activate among all registered plugins
 
         :param loop:
         :return:
