@@ -128,7 +128,11 @@ class PluginManager:
         for plugin in self._plugins:
             event_method = getattr(plugin.object, event_method_name, None)
             if event_method:
-                tasks.append(self._schedule_coro(event_method(*args, **kwargs)))
+                try:
+                    tasks.append(self._schedule_coro(event_method(*args, **kwargs)))
+                except AssertionError:
+                    self.logger.error("Method '%s' on plugin '%s' is not a coroutine" %
+                                      (event_method_name, plugin.name))
         if wait:
             if tasks:
                 yield from asyncio.wait(tasks, loop=self._loop)
@@ -156,8 +160,12 @@ class PluginManager:
             if plugin.name in p_list:
                 coro_instance = coro(plugin, *args, **kwargs)
                 if coro_instance:
-                    tasks.append(self._schedule_coro(coro_instance))
-                    plugins_list.append(plugin)
+                    try:
+                        tasks.append(self._schedule_coro(coro_instance))
+                        plugins_list.append(plugin)
+                    except AssertionError:
+                        self.logger.error("Method '%r' on plugin '%s' is not a coroutine" %
+                                          (coro, plugin.name))
         if tasks:
             ret_list = yield from asyncio.gather(*tasks, loop=self._loop)
             # Create result map plugin=>ret
@@ -167,9 +175,11 @@ class PluginManager:
         return ret_dict
 
     @staticmethod
-    def _get_coro(plugin, coro_name, *args, **kwargs):
+    @asyncio.coroutine
+    def _call_coro(plugin, coro_name, *args, **kwargs):
         try:
-            return getattr(plugin.object, coro_name, None)(*args, **kwargs)
+            coro = getattr(plugin.object, coro_name, None)(*args, **kwargs)
+            return (yield from coro)
         except TypeError:
             # Plugin doesn't implement coro_name
             return None
@@ -183,4 +193,4 @@ class PluginManager:
         :param kwargs:
         :return:
         """
-        return (yield from self.map(self._get_coro, coro_name, *args, **kwargs))
+        return (yield from self.map(self._call_coro, coro_name, *args, **kwargs))
