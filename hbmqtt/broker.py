@@ -33,6 +33,7 @@ _defaults = {
     'publish-retry-delay': 5,
     'auth': {
         'allow-anonymous': True,
+        'password-file': None
     }
 }
 
@@ -156,6 +157,7 @@ class Broker:
             plugins-enabled: ['auth.anonymous'] #List of plugins to activate among all registered plugins
             auth:
                 allow-anonymous: true / false
+                password-file: /some/passwd_file
 
         :param loop:
         :return:
