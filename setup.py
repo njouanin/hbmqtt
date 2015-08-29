@@ -18,7 +18,8 @@ setup(
     install_requires=[
         'transitions==0.2.5',
         'blinker',
-        'websockets'
+        'websockets',
+        'passlib'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
