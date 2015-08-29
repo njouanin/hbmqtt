@@ -154,10 +154,11 @@ class Broker:
                     type: ws
             timeout-disconnect-delay: 2
             publish-retry-delay: 5
-            plugins-enabled: ['auth.anonymous'] #List of plugins to activate among all registered plugins
             auth:
+                plugins: ['auth.anonymous'] #List of plugins to activate for authentication among all registered plugins
                 allow-anonymous: true / false
                 password-file: /some/passwd_file
+            persistence:
 
         :param loop:
         :return:
@@ -645,7 +646,14 @@ class Broker:
         :param listener:
         :return:
         """
-        returns = yield from self.plugins_manager.map_plugin_coro("authenticate", session=session)
+        auth_plugins = None
+        auth_config = self.config.get('auth', None)
+        if auth_config:
+            auth_plugins = auth_config.get('plugins', None)
+        returns = yield from self.plugins_manager.map_plugin_coro(
+            "authenticate",
+            session=session,
+            filter_plugins=auth_plugins)
         auth_result = True
         for plugin in returns:
             res = returns[plugin]

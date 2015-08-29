@@ -22,7 +22,10 @@ config = {
     'sys_interval': 0,
     'auth': {
         'allow-anonymous': False,
-        'password-file': os.path.join(os.path.dirname(os.path.realpath(__file__)), "passwd")
+        'password-file': os.path.join(os.path.dirname(os.path.realpath(__file__)), "passwd"),
+        'plugins': [
+            'auth_file', 'auth_anonymous'
+        ]
 
     }
 }
