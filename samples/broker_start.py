@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import os
 from hbmqtt.broker import Broker
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,11 @@ config = {
         },
     },
     'sys_interval': 0,
+    'auth': {
+        'allow-anonymous': False,
+        'password-file': os.path.join(os.path.dirname(os.path.realpath(__file__)), "passwd")
+
+    }
 }
 
 broker = Broker(config)

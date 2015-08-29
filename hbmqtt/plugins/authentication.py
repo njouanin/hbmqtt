@@ -2,6 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import logging
+import asyncio
 from passlib.apps import custom_app_context as pwd_context
 
 
@@ -25,6 +26,7 @@ class AnonymousAuthPlugin(BaseAuthPlugin):
     def __init__(self, context):
         super().__init__(context)
 
+    @asyncio.coroutine
     def authenticate(self, *args, **kwargs):
         authenticated = super().authenticate(*args, **kwargs)
         if authenticated:
@@ -72,14 +74,18 @@ class FileAuthPlugin(BaseAuthPlugin):
         else:
             self.context.logger.debug("Configuration parameter 'password_file' not found")
 
+    @asyncio.coroutine
     def authenticate(self, *args, **kwargs):
         authenticated = super().authenticate(*args, **kwargs)
         if authenticated:
             session = kwargs.get('session', None)
-            hash = self._users.get(session.username, None)
-            if not hash:
-                authenticated = False
-                self.context.logger.debug("User '%s' unknown" % session.username)
+            if session.username:
+                hash = self._users.get(session.username, None)
+                if not hash:
+                    authenticated = False
+                    self.context.logger.debug("No hash found for user '%s'" % session.username)
+                else:
+                    authenticated = pwd_context.verify(session.password, hash)
             else:
-                authenticated = pwd_context.verify(session.password, hash)
+                return None
         return authenticated

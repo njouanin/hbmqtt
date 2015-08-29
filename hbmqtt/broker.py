@@ -636,25 +636,26 @@ class Broker:
     def authenticate(self, session: Session, listener):
         """
         This method call the authenticate method on registered plugins to test user authentication.
-        User is considered authenticated if at least one plugin returns True.
+        User is considered authenticated if all plugins called returns True.
+        Plugins authenticate() method are supposed to return :
+         - True if user is authentication succeed
+         - False if user authentication fails
+         - None if authentication can't be achieved (then plugin result is then ignored)
         :param session:
         :param listener:
         :return:
         """
         returns = yield from self.plugins_manager.map_plugin_coro("authenticate", session=session)
-        if not returns:
-            self.logger.debug("Authentication plugin results: %r" % returns)
-            return True
-        else:
-            for res in returns:
-                if res:
-                    # Consider authentication succeed if at least one plugin returns True
-                    return True
-            # If all plugins returned False, authentications is failed
-            return True
-
-        # TODO : Handle client authentication here
-        return True
+        auth_result = True
+        for plugin in returns:
+            res = returns[plugin]
+            if res is False:
+                auth_result = False
+                self.logger.debug("Authentication failed due to '%s' plugin result: %s" % (plugin.name, res))
+            else:
+                self.logger.debug("'%s' plugin result: %s" % (plugin.name, res))
+        # If all plugins returned True, authentication is success
+        return auth_result
 
     def retain_message(self, source_session, topic_name, data, qos=None):
         if data is not None and data != b'':

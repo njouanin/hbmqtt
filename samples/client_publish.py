@@ -45,7 +45,7 @@ def test_coro():
 @asyncio.coroutine
 def test_coro2():
     try:
-        future = yield from C.connect('mqtt://localhost:1883/')
+        future = yield from C.connect('mqtt://test:test@localhost:1883/')
         future.add_done_callback(disconnected)
         yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
         logger.info("messages published")
