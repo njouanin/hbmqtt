@@ -72,3 +72,16 @@ class Session:
 
     def __repr__(self):
         return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.transitions.state)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        #del state['transitions']
+        del state['retained_messages']
+        del state['delivered_message_queue']
+        return state
+
+    def __setstate(self, state):
+        self.__dict__.update(state)
+        self.retained_messages = Queue()
+        self.delivered_message_queue = Queue()
