@@ -159,6 +159,7 @@ class Broker:
                 allow-anonymous: true / false
                 password-file: /some/passwd_file
             persistence:
+                plugin: 'persistence-sqlite'
 
         :param loop:
         :return:
