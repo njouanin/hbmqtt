@@ -2,7 +2,9 @@
 #
 # See the file license.txt for copying permission.
 import logging
+
 from blinker import Signal
+
 from hbmqtt.mqtt import packet_class
 from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.connack import ConnackPacket
@@ -21,10 +23,9 @@ from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
 from hbmqtt.session import Session
-from hbmqtt.specs import *
+from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.protocol.inflight import *
 from hbmqtt.plugins.manager import PluginManager
-
 
 EVENT_MQTT_PACKET_SENT = 'mqtt_packet_sent'
 EVENT_MQTT_PACKET_RECEIVED = 'mqtt_packet_received'

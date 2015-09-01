@@ -14,8 +14,8 @@ class SubscribePayload(MQTTPayload):
     def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
         out = b''
         for topic in self.topics:
-            out += encode_string(topic['filter'])
-            out += int_to_bytes(topic['qos'], 1)
+            out += encode_string(topic[0])
+            out += int_to_bytes(topic[1], 1)
         return out
 
     @classmethod
@@ -30,7 +30,7 @@ class SubscribePayload(MQTTPayload):
                 topic = yield from decode_string(reader)
                 qos_byte = yield from read_or_raise(reader, 1)
                 qos = bytes_to_int(qos_byte)
-                topics.append({'filter': topic, 'qos': qos})
+                topics.append((topic, qos))
                 read_bytes += 2 + len(topic.encode('utf-8')) + 1
             except NoDataException as exc:
                 break

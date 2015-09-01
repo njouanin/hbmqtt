@@ -54,11 +54,16 @@ class ClientProtocolHandler(ProtocolHandler):
         :param topics: array of topics [{'filter':'/a/b', 'qos': 0x00}, ...]
         :return:
         """
+
+        # Build and send SUBSCRIBE message
         subscribe = SubscribePacket.build(topics, packet_id)
         yield from self.outgoing_queue.put(subscribe)
+
+        # Wait for SUBACK is received
         waiter = futures.Future(loop=self._loop)
         self._subscriptions_waiter[subscribe.variable_header.packet_id] = waiter
         return_codes = yield from waiter
+
         del self._subscriptions_waiter[subscribe.variable_header.packet_id]
         return return_codes
 
