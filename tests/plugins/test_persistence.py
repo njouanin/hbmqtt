@@ -38,22 +38,22 @@ class TestSQLitePlugin(unittest.TestCase):
             tables.append(row[0])
         self.assertIn("session", tables)
 
-    def test_save_session(self):
-        dbfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test.db")
-        context = BaseContext()
-        context.logger = logging.getLogger(__name__)
-        context.config = {
-            'persistence': {
-                'file': dbfile
-            }
-        }
-        sql_plugin = SQLitePlugin(context)
-        s = Session()
-        s.client_id = 'test_save_session'
-        ret = self.loop.run_until_complete(sql_plugin.save_session(session=s))
-
-        conn = sqlite3.connect(dbfile)
-        cursor = conn.cursor()
-        row = cursor.execute("SELECT client_id FROM session where client_id = 'test_save_session'").fetchone()
-        self.assertTrue(len(row) == 1)
-        self.assertEquals(row[0], s.client_id)
+    # def test_save_session(self):
+    #     dbfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test.db")
+    #     context = BaseContext()
+    #     context.logger = logging.getLogger(__name__)
+    #     context.config = {
+    #         'persistence': {
+    #             'file': dbfile
+    #         }
+    #     }
+    #     sql_plugin = SQLitePlugin(context)
+    #     s = Session()
+    #     s.client_id = 'test_save_session'
+    #     ret = self.loop.run_until_complete(sql_plugin.save_session(session=s))
+    #
+    #     conn = sqlite3.connect(dbfile)
+    #     cursor = conn.cursor()
+    #     row = cursor.execute("SELECT client_id FROM session where client_id = 'test_save_session'").fetchone()
+    #     self.assertTrue(len(row) == 1)
+    #     self.assertEquals(row[0], s.client_id)
