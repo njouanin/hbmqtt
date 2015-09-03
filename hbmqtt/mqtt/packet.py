@@ -134,6 +134,24 @@ class MQTTVariableHeader(metaclass=abc.ABCMeta):
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         return
 
+class PacketIdVariableHeader(MQTTVariableHeader):
+    def __init__(self, packet_id):
+        super().__init__()
+        self.packet_id = packet_id
+
+    def to_bytes(self):
+        out = b''
+        out += int_to_bytes(self.packet_id, 2)
+        return out
+
+    @classmethod
+    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
+        packet_id = yield from decode_packet_id(reader)
+        return cls(packet_id)
+
+    def __repr__(self):
+        return type(self).__name__ + '(packet_id={0})'.format(self.packet_id)
+
 
 class MQTTPayload(metaclass=abc.ABCMeta):
     def __init__(self):
@@ -212,25 +230,29 @@ class MQTTPacket:
     def bytes_length(self):
         return len(self.to_bytes())
 
+    def __getattr__(self, name):
+        """
+        This method is implemented in order to facilitate access to packet data structure
+        attribute is first searched in packet then in fixed_header, variable_header and payload
+        example : packet.packet_id is equivalent to packet.variable_header.packet_id
+        :param name: name of attribute the packet to get
+        :return: the value of the attribute found. Raise AttributeError otherwise.
+        """
+        try:
+            return getattr(self.fixed_header, name)
+        except AttributeError:
+            pass
+        try:
+            return getattr(self.variable_header, name)
+        except AttributeError:
+            pass
+        try:
+            return getattr(self.payload, name)
+        except AttributeError:
+            pass
+        raise AttributeError("Attribute '%s' not found in packet data structure" % name)
+
+
     def __repr__(self):
         return type(self).__name__ + '(fixed={0!r}, variable={1!r}, payload={2!r})'.\
             format(self.fixed_header, self.variable_header, self.payload)
-
-
-class PacketIdVariableHeader(MQTTVariableHeader):
-    def __init__(self, packet_id):
-        super().__init__()
-        self.packet_id = packet_id
-
-    def to_bytes(self):
-        out = b''
-        out += int_to_bytes(self.packet_id, 2)
-        return out
-
-    @classmethod
-    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
-        packet_id = yield from decode_packet_id(reader)
-        return cls(packet_id)
-
-    def __repr__(self):
-        return type(self).__name__ + '(packet_id={0})'.format(self.packet_id)
