@@ -12,13 +12,13 @@ from hbmqtt.mqtt.suback import SubackPacket
 from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.utils import format_client_message
-from hbmqtt.adapters import WriterAdapter, ReaderAdapter
+from hbmqtt.session import Session
 from hbmqtt.plugins.manager import PluginManager
 
 
 class BrokerProtocolHandler(ProtocolHandler):
-    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, plugins_manager: PluginManager, loop=None):
-        super().__init__(reader, writer, plugins_manager, loop)
+    def __init__(self, session: Session, plugins_manager: PluginManager, loop=None):
+        super().__init__(session, plugins_manager, loop)
         self._disconnect_waiter = None
         self._pending_subscriptions = asyncio.Queue(loop=self._loop)
         self._pending_unsubscriptions = asyncio.Queue(loop=self._loop)

@@ -124,7 +124,6 @@ class MQTTClient:
                 self._disconnect_task.cancel()
             yield from self._handler.mqtt_disconnect()
             yield from self._handler.stop()
-            self._handler.detach_from_session()
             self.session.transitions.disconnect()
             self._connection_closed_future.set_result(None)
         else:
@@ -284,8 +283,9 @@ class MQTTClient:
             raise exc
         else:
             # Handle MQTT protocol
-            self._handler = ClientProtocolHandler(reader, writer, self.plugins_manager, loop=self._loop)
-            self._handler.attach_to_session(self.session)
+            self.session.reader = reader
+            self.session.writer = writer
+            self._handler = ClientProtocolHandler(self.session, self.plugins_manager, loop=self._loop)
             yield from self._handler.start()
             self.session.transitions.connect()
             self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))

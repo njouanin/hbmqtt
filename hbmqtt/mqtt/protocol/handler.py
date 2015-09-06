@@ -39,11 +39,11 @@ class ProtocolHandler:
     on_packet_sent = Signal()
     on_packet_received = Signal()
 
-    def __init__(self, reader: ReaderAdapter, writer: WriterAdapter, plugins_manager: PluginManager, loop=None):
+    def __init__(self, session: Session, plugins_manager: PluginManager, loop=None):
         self.logger = logging.getLogger(__name__)
-        self.session = None
-        self.reader = reader
-        self.writer = writer
+        self.session = session
+        self.reader = session.reader
+        self.writer = session.writer
         self.plugins_manager = plugins_manager
         if loop is None:
             self._loop = asyncio.get_event_loop()
@@ -58,14 +58,6 @@ class ProtocolHandler:
 
         self.outgoing_queue = asyncio.Queue(loop=self._loop)
         self._pubrel_waiters = dict()
-
-    def attach_to_session(self, session: Session):
-        self.session = session
-        self.session.handler = self
-
-    def detach_from_session(self):
-        self.session.handler = None
-        self.session = None
 
     @asyncio.coroutine
     def start(self):
@@ -121,7 +113,7 @@ class ProtocolHandler:
             self.session.outgoing_msg[packet_id] = inflight_message
             ack = yield from inflight_message.wait_acknowledge()
             while not ack:
-                #Retry publish
+                # Retry publish
                 packet = PublishPacket.build(topic, message, packet_id, True, qos, retain)
                 self.logger.debug("Retry delivery of packet %s" % repr(packet))
                 inflight_message.publish_packet = packet
@@ -134,6 +126,7 @@ class ProtocolHandler:
     def stop(self):
         self._running = False
         yield from self.outgoing_queue.put("STOP")
+        self.reader.feed_eof()
         yield from asyncio.wait([self._writer_task, self._reader_task], loop=self._loop)
         yield from self.writer.close()
         # Stop incoming messages flow waiter

@@ -23,6 +23,11 @@ class ReaderAdapter:
         :return: packet read as bytes data
         """
 
+    def feed_eof(self):
+        """
+        Acknowleddge EOF
+        """
+
 
 class WriterAdapter:
     """
@@ -132,6 +137,9 @@ class StreamReaderAdapter(ReaderAdapter):
     @asyncio.coroutine
     def read(self, n=-1) -> bytes:
         return (yield from self._reader.read(n))
+
+    def feed_eof(self):
+        return self._reader.feed_eof()
 
 
 class StreamWriterAdapter(WriterAdapter):

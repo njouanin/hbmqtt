@@ -31,7 +31,6 @@ class Session:
         self.cadata = None
         self._packet_id = 0
         self.parent = 0
-        self.handler = None
 
         # Used to store outgoing InflightMessage while publish protocol flows
         self.outgoing_msg = dict()

@@ -483,8 +483,6 @@ class Broker:
                 client_session.client_id = client_id
                 client_session.parent = 0
 
-        self._sessions[client_id] = client_session
-
         client_session.remote_address = remote_address
         client_session.remote_port = remote_port
         client_session.clean_session = connect.clean_session_flag
@@ -518,13 +516,16 @@ class Broker:
         client_session.transitions.connect()
         client_session.reader = reader
         client_session.writer = writer
-        handler = self._init_handler(reader, writer, client_session)
+        handler = self._init_handler(client_session)
+        self._sessions[client_id] = (client_session, handler)
+
         self.logger.debug("%s Start messages handling" % client_session.client_id)
         yield from handler.start()
         self.logger.debug("Retained messages queue size: %d" % client_session.retained_messages.qsize())
         yield from self.publish_session_retained_messages(client_session)
         self.logger.debug("%s Wait for disconnect" % client_session.client_id)
 
+        # Init and start loop for handling client messages (publish, subscribe/unsubscribe, disconnect)
         connected = True
         disconnect_waiter = asyncio.Task(handler.wait_disconnect(), loop=self._loop)
         subscribe_waiter = asyncio.Task(handler.get_next_pending_subscription(), loop=self._loop)
@@ -595,13 +596,12 @@ class Broker:
         self.logger.debug("%s Session disconnected" % client_session.client_id)
         server.release_connection()
 
-    def _init_handler(self, reader, writer, session):
+    def _init_handler(self, session):
         """
         Create a BrokerProtocolHandler and attach to a session
         :return:
         """
-        handler = BrokerProtocolHandler(reader, writer, self.plugins_manager, self._loop)
-        handler.attach_to_session(session)
+        handler = BrokerProtocolHandler(session, self.plugins_manager, self._loop)
         handler.on_packet_received.connect(self.sys_handle_packet_received)
         handler.on_packet_sent.connect(self.sys_handle_packet_sent)
         return handler
@@ -617,8 +617,6 @@ class Broker:
             yield from handler.stop()
         except Exception as e:
             self.logger.error(e)
-        finally:
-            handler.detach_from_session()
 
     @asyncio.coroutine
     def check_connect(self, connect: ConnectPacket):
