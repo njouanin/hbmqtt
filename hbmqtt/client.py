@@ -5,7 +5,7 @@
 import logging
 import asyncio
 import ssl
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session
@@ -16,6 +16,8 @@ from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSockets
 from hbmqtt.plugins.manager import PluginManager, BaseContext
 from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED
 import websockets
+from websockets.uri import InvalidURI
+from websockets.handshake import InvalidHandshake
 
 _defaults = {
     'keep_alive': 10,
@@ -221,6 +223,13 @@ class MQTTClient:
         self.session.remote_port = uri_attributes.port
         if scheme in ('mqtt', 'mqtts') and not self.session.remote_port:
             self.session.remote_port = 8883 if scheme == 'mqtts' else 1883
+        if scheme in ('ws', 'wss') and not self.session.remote_port:
+            self.session.remote_port = 443 if scheme == 'mqtts' else 80
+        if scheme in ('ws', 'wss'):
+            # Rewrite URI to conform to https://tools.ietf.org/html/rfc6455#section-3
+            uri = (uri_attributes[0], uri_attributes.hostname + ":" + str(uri_attributes.port), uri_attributes[2],
+                   uri_attributes[3], uri_attributes[4], uri_attributes[5])
+            self.session.broker_uri = urlunparse(uri)
 
         if scheme in ('mqtts', 'wss'):
             if self.session.cafile is None or self.session.cafile == '':
@@ -252,10 +261,14 @@ class MQTTClient:
                     **kwargs)
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
-        except Exception as e:
-            self.logger.warn("connection failed: %s" % e)
+        except InvalidURI as iuri:
+            self.logger.warn("connection failed: invalid URI '%s'" % self.session.broker_uri)
             self.session.transitions.disconnect()
-            raise ConnectException("connection Failed: %s" % e)
+            raise ConnectException("connection failed: invalid URI '%s'" % self.session.broker_uri, iuri)
+        except InvalidHandshake as ihs:
+            self.logger.warn("connection failed: invalid websocket handshake")
+            self.session.transitions.disconnect()
+            raise ConnectException("connection failed: invalid websocket handshake", ihs)
 
         return_code = None
         try :
