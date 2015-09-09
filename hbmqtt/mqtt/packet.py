@@ -105,8 +105,8 @@ class MQTTFixedHeader:
             return None
 
     def __repr__(self):
-        return type(self).__name__ + '(type={0}, length={1}, flags={2})'.\
-            format(self.packet_type, self.remaining_length, hex(self.flags))
+        return type(self).__name__ + '(length={0}, flags={1})'.\
+            format(self.remaining_length, hex(self.flags))
 
 
 class MQTTVariableHeader(metaclass=abc.ABCMeta):
