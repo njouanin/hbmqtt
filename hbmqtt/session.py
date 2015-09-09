@@ -5,6 +5,31 @@ from transitions import Machine, MachineError
 from asyncio import Queue
 
 
+class PublishMessage:
+    states = ['new', 'published', 'acknowledged', 'received', 'released', 'completed']
+
+    def __init__(self, packet_id, topic, qos, data, retain):
+        self.packet_id = packet_id
+        self.topic = topic
+        self.qos = qos
+        self.data = data
+        self.retain = retain
+        self._init_states()
+
+    def _init_states(self):
+        self.machine = Machine(model=self, states=PublishMessage.states, initial='new')
+        self.machine.add_transition(trigger='publish', source='new', dest='published')
+        self.machine.add_transition(trigger='publish', source='published', dest='published')
+        if self.qos == 0x01:
+            self.machine.add_transition(trigger='acknowledge', source='published', dest='acknowledged')
+        if self.qos == 0x02:
+            self.machine.add_transition(trigger='publish', source='received', dest='published')
+            self.machine.add_transition(trigger='publish', source='released', dest='published')
+            self.machine.add_transition(trigger='receive', source='published', dest='received')
+            self.machine.add_transition(trigger='release', source='received', dest='released')
+            self.machine.add_transition(trigger='complete', source='released', dest='completed')
+
+
 class Session:
     states = ['new', 'connected', 'disconnected']
 
@@ -32,7 +57,7 @@ class Session:
         self._packet_id = 0
         self.parent = 0
 
-        # Used to store outgoing InflightMessage while publish protocol flows
+        # Used to store outgoing PublishMessage while publish protocol flows
         self.outgoing_msg = dict()
 
         # Used to store incoming InflightMessage while publish protocol flows

@@ -22,7 +22,7 @@ from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
-from hbmqtt.session import Session
+from hbmqtt.session import Session, PublishMessage
 from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.protocol.inflight import *
 from hbmqtt.plugins.manager import PluginManager
@@ -100,61 +100,90 @@ class ProtocolHandler:
         self.logger.debug("End messages delivery retries")
 
     @asyncio.coroutine
-    def mqtt_publish(self, topic, message, qos, retain):
+    def mqtt_publish(self, topic, data, qos, retain):
         if qos:
             packet_id = self.session.next_packet_id
             if packet_id in self.session.outgoing_msg:
                 self.logger.warn("%s A message with the same packet ID is already in flight" % self.session.client_id)
         else:
             packet_id = None
-        packet = PublishPacket.build(topic, message, packet_id, False, qos, retain)
+        packet = PublishPacket.build(topic, data, packet_id, False, qos, retain)
+        # Store message in session
+        message = PublishMessage(packet_id, topic, qos, data, retain)
+        self.session.outgoing_msg[packet_id] = message
         yield from self.outgoing_queue.put(packet)
-        if qos != QOS_0:
-            inflight_message = OutgoingInFlightMessage(packet, qos, loop=self._loop)
-            inflight_message.sent_publish()
-            self.session.outgoing_msg[packet_id] = inflight_message
-            ack = yield from inflight_message.wait_acknowledge()
-            while not ack:
-                # Retry publish
-                packet = PublishPacket.build(topic, message, packet_id, True, qos, retain)
-                self.logger.debug("Retry delivery of packet %s" % repr(packet))
-                inflight_message.publish_packet = packet
-                yield from self.outgoing_queue.put(packet)
-                inflight_message.retry_publish()
-                ack = yield from inflight_message.wait_acknowledge()
+
+        # Mark message as published
+        message.publish()
+
+        # Return message acknowledge management result
+        ack = yield from self._handle_message_acknowledge(message)
+        if ack:
             del self.session.outgoing_msg[packet_id]
+        return ack
 
     @asyncio.coroutine
-    def _handle_publish_sent_acknowledge(self, publish_packet):
+    def _handle_message_acknowledge(self, publish_message):
         """
         Handle message acknowledgment flows for a publish message sent to a recipient
-        For QOS_0 messages, this method does nothing.
+        For QOS_0 messages, this method does nothing, returns True.
         For QOS_1 messages, this methods wait for the corresponding PUBACK
         For QOS_2 messages, this method wait for the corresponding PUBREC and send a PUBREL.
         PUBCOMP is managed internally for cleaning stored state
-        :param publish_packet: returns true if the acknowledgment flows has reached the end, False otherwise.
+        :param message: PublishMessage to handle acknowledgment for
+        :return: returns true if the acknowledgment flows has reached the end, False otherwise.
         Caller can discard messages only if this methods returns True. Otherwise they should re-send.
-        :return:
         """
-        if publish_packet.qos == QOS_0:
+        if publish_message.qos == QOS_0:
             # QOS 0 packet don't need acknowledgment
             return True
-        packet_id = publish_packet.packet_id
-
-        if publish_packet.qos == QOS_1:
-            if packet_id in self._puback_waiters:
+        if publish_message.qos == QOS_1:
+            if publish_message.packet_id in self._puback_waiters:
                 # PUBACK waiter already exists for this packet ID
-                message = "Can't add PUBACK waiter, a waiter already exists for message Id '%s'" % packet_id
+                warning = "Can't add PUBACK waiter, a waiter already exists for message Id '%s'" \
+                          % publish_message.packet_id
+                self.logger.warn(warning)
+                raise HBMQTTException(warning)
+            # Wait for puback
+            waiter = asyncio.Future(loop=self._loop)
+            self._puback_waiters[publish_message.packet_id] = waiter
+            yield from waiter
+            del self._puback_waiters[publish_message.packet_id]
+
+            # Mark message as acknowledged
+            publish_message.acknowledge()
+            return True
+        elif publish_message.qos == QOS_2:
+            if publish_message.packet_id in self._pubrec_waiters:
+                # PUBREC waiter already exists for this packet ID
+                message = "Can't add PUBREC waiter, a waiter already exists for message Id '%s'" \
+                          % publish_message.packet_id
                 self.logger.warn(message)
                 raise HBMQTTException(message)
+            # Wait for PUBREC
             waiter = asyncio.Future(loop=self._loop)
-            self._puback_waiters[publish_packet.packet_id] = waiter
+            self._pubrec_waiters[publish_message.packet_id] = waiter
             yield from waiter
-            del self._puback_waiters[packet_id]
-        elif publish_packet.qos == QOS_2:
-            pass
+            del self._pubrec_waiters[publish_message.packet_id]
+
+            #Mark message as received
+            publish_message.receive()
+
+            # Send pubrel
+            yield from self.outgoing_queue.put(PubrelPacket.build(publish_message.packet_id))
+            publish_message.release()
+
+            # Wait for PUBCOMP
+            waiter = asyncio.Future(loop=self._loop)
+            self._pubcomp_waiters[publish_message.packet_id] = waiter
+            yield from waiter
+            del self._pubcomp_waiters[publish_message.packet_id]
+
+            #Mark message as completed
+            publish_message.complete()
+            return True
         else:
-            raise HBMQTTException("Unexcepted QOS value '%d" % str(publish_packet.qos))
+            raise HBMQTTException("Unexcepted QOS value '%d" % str(publish_message.qos))
 
     @asyncio.coroutine
     def stop(self):
@@ -261,7 +290,7 @@ class ProtocolHandler:
                 self.logger.debug("Task cancelled, writer loop ending")
                 break
             except asyncio.TimeoutError as ce:
-                self.logger.debug("%s Output queue get timeout" % self.session.client_id)
+                # self.logger.debug("%s Output queue get timeout" % self.session.client_id)
                 self.handle_write_timeout()
             except ConnectionResetError as cre:
                 yield from self.handle_connection_closed()
@@ -361,37 +390,27 @@ class ProtocolHandler:
             self.logger.warn("%s Received PUBACK for unknown pending message Id: '%s'" %
                              (self.session.client_id, packet_id))
 
-        packet_id = puback.variable_header.packet_id
-        try:
-            inflight_message = self.session.outgoing_msg[packet_id]
-            inflight_message.received_puback()
-        except KeyError as ke:
-            self.logger.warn("%s Received PUBACK for unknown pending subscription with Id: %s" %
-                             (self.session.client_id, packet_id))
-
     @asyncio.coroutine
     def handle_pubrec(self, pubrec: PubrecPacket):
-        packet_id = pubrec.variable_header.packet_id
+        packet_id = pubrec.packet_id
         try:
-            inflight_message = self.session.outgoing_msg[packet_id]
-            inflight_message.received_pubrec()
-            yield from self.outgoing_queue.put(PubrelPacket.build(packet_id))
-            inflight_message.sent_pubrel()
-        except KeyError as ke:
-            self.logger.warn("Received PUBREC for unknown pending subscription with Id: %s" % packet_id)
+            waiter = self._pubrec_waiters[packet_id]
+            waiter.set_result(True)
+        except KeyError:
+            self.logger.warn("Received PUBREC for unknown pending message with Id: %s" % packet_id)
 
     @asyncio.coroutine
     def handle_pubcomp(self, pubcomp: PubcompPacket):
-        packet_id = pubcomp.variable_header.packet_id
+        packet_id = pubcomp.packet_id
         try:
-            inflight_message = self.session.outgoing_msg[packet_id]
-            inflight_message.received_pubcomp()
-        except KeyError as ke:
-            self.logger.warn("Received PUBCOMP for unknown pending subscription with Id: %s" % packet_id)
+            waiter = self._pubcomp_waiters[packet_id]
+            waiter.set_result(True)
+        except KeyError:
+            self.logger.warn("Received PUBCOMP for unknown pending message with Id: %s" % packet_id)
 
     @asyncio.coroutine
     def handle_pubrel(self, pubrel: PubrecPacket):
-        packet_id = pubrel.variable_header.packet_id
+        packet_id = pubrel.packet_id
         try:
             inflight_message = self.session.incoming_msg[packet_id]
             inflight_message.received_pubrel()

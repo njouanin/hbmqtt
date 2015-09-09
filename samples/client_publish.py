@@ -47,7 +47,8 @@ def test_coro2():
     try:
         future = yield from C.connect('mqtt://test:test@localhost:1883/')
         future.add_done_callback(disconnected)
-        yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
+        #yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
+        yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02))])
         logger.info("messages published")
         yield from C.disconnect()
     except ConnectException as ce:
