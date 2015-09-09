@@ -57,7 +57,10 @@ class ProtocolHandler:
         self._writer_stopped = asyncio.Event(loop=self._loop)
 
         self.outgoing_queue = asyncio.Queue(loop=self._loop)
+        self._puback_waiters = dict()
+        self._pubrec_waiters = dict()
         self._pubrel_waiters = dict()
+        self._pubcomp_waiters = dict()
 
     @asyncio.coroutine
     def start(self):
@@ -120,6 +123,38 @@ class ProtocolHandler:
                 inflight_message.retry_publish()
                 ack = yield from inflight_message.wait_acknowledge()
             del self.session.outgoing_msg[packet_id]
+
+    @asyncio.coroutine
+    def _handle_publish_sent_acknowledge(self, publish_packet):
+        """
+        Handle message acknowledgment flows for a publish message sent to a recipient
+        For QOS_0 messages, this method does nothing.
+        For QOS_1 messages, this methods wait for the corresponding PUBACK
+        For QOS_2 messages, this method wait for the corresponding PUBREC and send a PUBREL.
+        PUBCOMP is managed internally for cleaning stored state
+        :param publish_packet: returns true if the acknowledgment flows has reached the end, False otherwise.
+        Caller can discard messages only if this methods returns True. Otherwise they should re-send.
+        :return:
+        """
+        if publish_packet.qos == QOS_0:
+            # QOS 0 packet don't need acknowledgment
+            return True
+        packet_id = publish_packet.packet_id
+
+        if publish_packet.qos == QOS_1:
+            if packet_id in self._puback_waiters:
+                # PUBACK waiter already exists for this packet ID
+                message = "Can't add PUBACK waiter, a waiter already exists for message Id '%s'" % packet_id
+                self.logger.warn(message)
+                raise HBMQTTException(message)
+            waiter = asyncio.Future(loop=self._loop)
+            self._puback_waiters[publish_packet.packet_id] = waiter
+            yield from waiter
+            del self._puback_waiters[packet_id]
+        elif publish_packet.qos == QOS_2:
+            pass
+        else:
+            raise HBMQTTException("Unexcepted QOS value '%d" % str(publish_packet.qos))
 
     @asyncio.coroutine
     def stop(self):
@@ -318,6 +353,14 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def handle_puback(self, puback: PubackPacket):
+        packet_id = puback.variable_header.packet_id
+        try:
+            waiter = self._puback_waiters[packet_id]
+            waiter.set_result(True)
+        except KeyError:
+            self.logger.warn("%s Received PUBACK for unknown pending message Id: '%s'" %
+                             (self.session.client_id, packet_id))
+
         packet_id = puback.variable_header.packet_id
         try:
             inflight_message = self.session.outgoing_msg[packet_id]
