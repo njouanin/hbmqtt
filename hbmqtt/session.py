@@ -4,6 +4,7 @@
 from transitions import Machine, MachineError
 from asyncio import Queue
 from collections import OrderedDict
+from hbmqtt.mqtt.constants import *
 
 
 class PublishMessage:
@@ -15,20 +16,19 @@ class PublishMessage:
         self.qos = qos
         self.data = data
         self.retain = retain
-        self._init_states()
+        self.publish_packet = None
+        self.puback_packet = None
+        self.pubrec_packet = None
+        self.pubrel_packet = None
+        self.pubcomp_packet = None
 
-    def _init_states(self):
-        self.machine = Machine(model=self, states=PublishMessage.states, initial='new')
-        self.machine.add_transition(trigger='publish', source='new', dest='published')
-        self.machine.add_transition(trigger='publish', source='published', dest='published')
-        if self.qos == 0x01:
-            self.machine.add_transition(trigger='acknowledge', source='published', dest='acknowledged')
-        if self.qos == 0x02:
-            self.machine.add_transition(trigger='publish', source='received', dest='published')
-            self.machine.add_transition(trigger='publish', source='released', dest='published')
-            self.machine.add_transition(trigger='receive', source='published', dest='received')
-            self.machine.add_transition(trigger='release', source='received', dest='released')
-            self.machine.add_transition(trigger='complete', source='released', dest='completed')
+    def is_acknowledged(self):
+        if self.qos == QOS_0:
+            return True
+        if self.qos == QOS_1:
+            return True if self.puback_packet is not None else False
+        if self.qos == QOS_2:
+            return True if self.pubcomp_packet is not None else False
 
 
 class Session:
