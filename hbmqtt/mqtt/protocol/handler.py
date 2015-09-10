@@ -307,7 +307,7 @@ class ProtocolHandler:
                     if not isinstance(packet, MQTTPacket):
                         break
                     yield from packet.to_stream(self.session.writer)
-                    self.logger.debug("%s -out-> %s" % (self.session.client_id, repr(packet)))
+                    yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
                     self._loop.call_soon(self.on_packet_sent, packet)
                 except asyncio.QueueEmpty:
                     break
