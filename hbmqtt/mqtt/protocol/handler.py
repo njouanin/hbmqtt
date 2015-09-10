@@ -40,7 +40,8 @@ class ProtocolHandler:
     on_packet_received = Signal()
 
     def __init__(self, session: Session, plugins_manager: PluginManager, loop=None):
-        self.logger = logging.getLogger(__name__)
+        log = logging.getLogger(__name__)
+        self.logger = logging.LoggerAdapter(log, {'client_id': session.client_id})
         self.session = session
         self.reader = session.reader
         self.writer = session.writer
