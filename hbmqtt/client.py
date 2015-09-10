@@ -15,6 +15,7 @@ from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSocketsReader, WebSocketsWriter
 from hbmqtt.plugins.manager import PluginManager, BaseContext
 from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED
+from hbmqtt.mqtt.constants import *
 import websockets
 from websockets.uri import InvalidURI
 from websockets.handshake import InvalidHandshake
@@ -177,15 +178,11 @@ class MQTTClient:
                 except KeyError:
                     pass
             return _qos, _retain
+        assert qos in (QOS_0, QOS_1, QOS_2)
         if not self.session.transitions.is_connected():
             self.logger.warn("publish MQTT message while not connected to broker, message may be lost")
         (app_qos, app_retain) = get_retain_and_qos()
-        if app_qos == 0:
-            yield from self._handler.mqtt_publish(topic, message, 0x00, app_retain)
-        if app_qos == 1:
-            yield from self._handler.mqtt_publish(topic, message, 0x01, app_retain)
-        if app_qos == 2:
-            yield from self._handler.mqtt_publish(topic, message, 0x02, app_retain)
+        return (yield from self._handler.mqtt_publish(topic, message, qos, app_retain))
 
     @asyncio.coroutine
     def subscribe(self, topics):
