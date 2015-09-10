@@ -3,6 +3,7 @@
 # See the file license.txt for copying permission.
 from transitions import Machine, MachineError
 from asyncio import Queue
+from collections import OrderedDict
 
 
 class PublishMessage:
@@ -58,7 +59,7 @@ class Session:
         self.parent = 0
 
         # Used to store outgoing PublishMessage while publish protocol flows
-        self.outgoing_msg = dict()
+        self.outgoing_msg = OrderedDict()
 
         # Used to store incoming InflightMessage while publish protocol flows
         self.incoming_msg = dict()
