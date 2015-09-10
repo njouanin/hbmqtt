@@ -4,6 +4,7 @@
 from hbmqtt.errors import CodecException, MQTTException
 from hbmqtt.codecs import *
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
+from datetime import datetime
 import abc
 
 
@@ -183,11 +184,13 @@ class MQTTPacket:
         self.fixed_header = fixed
         self.variable_header = variable_header
         self.payload = payload
+        self.protocol_ts = None
 
     @asyncio.coroutine
     def to_stream(self, writer: asyncio.StreamWriter):
         writer.write(self.to_bytes())
         yield from writer.drain()
+        self.protocol_ts = datetime.now()
 
     def to_bytes(self) -> bytes:
         if self.variable_header:
@@ -220,11 +223,13 @@ class MQTTPacket:
             payload = None
 
         if fixed_header and not variable_header and not payload:
-            return cls(fixed_header)
+            instance = cls(fixed_header)
         elif fixed_header and not payload:
-            return cls(fixed_header, variable_header)
+            instance = cls(fixed_header, variable_header)
         else:
-            return cls(fixed_header, variable_header, payload)
+            instance = cls(fixed_header, variable_header, payload)
+        instance.protocol_ts = datetime.now()
+        return instance
 
     @property
     def bytes_length(self):
@@ -254,5 +259,5 @@ class MQTTPacket:
 
 
     def __repr__(self):
-        return type(self).__name__ + '(fixed={0!r}, variable={1!r}, payload={2!r})'.\
-            format(self.fixed_header, self.variable_header, self.payload)
+        return type(self).__name__ + '(ts={0!s}, fixed={1!r}, variable={2!r}, payload={3!r})'.\
+            format(self.protocol_ts, self.fixed_header, self.variable_header, self.payload)
