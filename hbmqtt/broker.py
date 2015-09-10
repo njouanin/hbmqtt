@@ -618,7 +618,6 @@ class Broker:
         except Exception as e:
             self.logger.error(e)
 
-    @asyncio.coroutine
     def check_connect(self, connect: ConnectPacket):
         if connect.payload.client_id is None:
             raise BrokerException('[[MQTT-3.1.3-3]] : Client identifier must be present' )
