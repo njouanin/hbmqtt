@@ -143,7 +143,7 @@ class ProtocolHandler:
                 # PUBACK waiter already exists for this packet ID
                 warning = "Can't add PUBACK waiter, a waiter already exists for message Id '%s'" \
                           % publish_message.packet_id
-                self.logger.warn(warning)
+                self.logger.warning(warning)
                 raise HBMQTTException(warning)
             # Wait for puback
             waiter = asyncio.Future(loop=self._loop)
@@ -159,7 +159,7 @@ class ProtocolHandler:
                 # PUBREC waiter already exists for this packet ID
                 message = "Can't add PUBREC waiter, a waiter already exists for message Id '%s'" \
                           % publish_message.packet_id
-                self.logger.warn(message)
+                self.logger.warning(message)
                 raise HBMQTTException(message)
             # Wait for PUBREC
             waiter = asyncio.Future(loop=self._loop)
