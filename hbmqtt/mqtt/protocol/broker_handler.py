@@ -66,7 +66,7 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def handle_pingreq(self, pingreq: PingReqPacket):
-        yield from self.outgoing_queue.put(PingRespPacket.build())
+        yield from self._send_packet(PingRespPacket.build())
 
     @asyncio.coroutine
     def handle_subscribe(self, subscribe: SubscribePacket):
@@ -91,9 +91,9 @@ class BrokerProtocolHandler(ProtocolHandler):
     @asyncio.coroutine
     def mqtt_acknowledge_subscription(self, packet_id, return_codes):
         suback = SubackPacket.build(packet_id, return_codes)
-        yield from self.outgoing_queue.put(suback)
+        yield from self._send_packet(suback)
 
     @asyncio.coroutine
     def mqtt_acknowledge_unsubscription(self, packet_id):
         unsuback = UnsubackPacket.build(packet_id)
-        yield from self.outgoing_queue.put(unsuback)
+        yield from self._send_packet(unsuback)

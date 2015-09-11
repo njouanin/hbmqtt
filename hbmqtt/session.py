@@ -6,6 +6,7 @@ from asyncio import Queue
 from collections import OrderedDict
 from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.publish import PublishPacket
+from hbmqtt.mqtt.puback import PubackPacket
 
 
 class ApplicationMessage:
@@ -32,13 +33,19 @@ class ApplicationMessage:
             return True if self.pubcomp_packet is not None else False
 
     def build_publish_packet(self, dup=False):
-        self.publish_packet = PublishPacket.build(self.topic, self.data, self.packet_id, dup, self.qos, self.retain)
+        return PublishPacket.build(self.topic, self.data, self.packet_id, dup, self.qos, self.retain)
+
+    def build_puback_packet(self):
+        return PubackPacket.build(self.packet_id)
+
 
 class IncomingApplicationMessage(ApplicationMessage):
     pass
 
+
 class OutgoingApplicationMessage(ApplicationMessage):
     pass
+
 
 class Session:
     states = ['new', 'connected', 'disconnected']
@@ -67,11 +74,11 @@ class Session:
         self._packet_id = 0
         self.parent = 0
 
-        # Used to store outgoing PublishMessage while publish protocol flows
-        self.outgoing_msg = OrderedDict()
+        # Used to store outgoing ApplicationMessage while publish protocol flows
+        self.inflight_out = OrderedDict()
 
-        # Used to store incoming InflightMessage while publish protocol flows
-        self.incoming_msg = dict()
+        # Used to store incoming ApplicationMessage while publish protocol flows
+        self.inflight_in = OrderedDict()
 
         # Stores messages retained for this session
         self.retained_messages = Queue()
@@ -94,11 +101,11 @@ class Session:
 
     @property
     def inflight_in_count(self):
-        return len(self.incoming_msg)
+        return len(self.inflight_in)
 
     @property
     def inflight_out_count(self):
-        return len(self.outgoing_msg)
+        return len(self.inflight_out)
 
     @property
     def retained_messages_count(self):
@@ -110,7 +117,7 @@ class Session:
     def __getstate__(self):
         state = self.__dict__.copy()
         # Remove the unpicklable entries.
-        #del state['transitions']
+        # del state['transitions']
         del state['retained_messages']
         del state['delivered_message_queue']
         return state

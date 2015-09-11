@@ -57,7 +57,7 @@ class ClientProtocolHandler(ProtocolHandler):
 
         # Build and send SUBSCRIBE message
         subscribe = SubscribePacket.build(topics, packet_id)
-        yield from self.outgoing_queue.put(subscribe)
+        yield from self._send_packet(subscribe)
 
         # Wait for SUBACK is received
         waiter = futures.Future(loop=self._loop)
@@ -84,7 +84,7 @@ class ClientProtocolHandler(ProtocolHandler):
         :return:
         """
         unsubscribe = UnsubscribePacket.build(topics, packet_id)
-        yield from self.outgoing_queue.put(unsubscribe)
+        yield from self._send_packet(unsubscribe)
         waiter = futures.Future(loop=self._loop)
         self._unsubscriptions_waiter[unsubscribe.variable_header.packet_id] = waiter
         yield from waiter
@@ -101,15 +101,14 @@ class ClientProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def mqtt_disconnect(self):
-        # yield from self.outgoing_queue.join() To be used in Python 3.5
         disconnect_packet = DisconnectPacket()
-        yield from self.outgoing_queue.put(disconnect_packet)
+        yield from self._send_packet(disconnect_packet)
         self._connack_waiter = None
 
     @asyncio.coroutine
     def mqtt_ping(self):
         ping_packet = PingReqPacket()
-        yield from self.outgoing_queue.put(ping_packet)
+        yield from self._send_packet(ping_packet)
         self._pingresp_waiter = futures.Future(loop=self._loop)
         resp = yield from self._pingresp_queue.get()
         self._pingresp_waiter = None
