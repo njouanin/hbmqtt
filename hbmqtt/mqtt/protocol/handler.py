@@ -22,7 +22,7 @@ from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
-from hbmqtt.session import Session, PublishMessage
+from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage
 from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.protocol.inflight import *
 from hbmqtt.plugins.manager import PluginManager
@@ -95,7 +95,7 @@ class ProtocolHandler:
                         message.qos,
                         message.retain)
                     yield from self.outgoing_queue.put(message.publish_packet)
-                yield from self._handle_message_acknowledge(message)
+                yield from self._handle_message_flow(message)
         for packet_id in ack_packets:
             del self.session.outgoing_msg[packet_id]
         self.logger.debug("%d messages redelivered" % len(ack_packets))
@@ -110,79 +110,93 @@ class ProtocolHandler:
         else:
             packet_id = None
 
-        message = PublishMessage(packet_id, topic, qos, data, retain)
-        message.publish_packet = PublishPacket.build(topic, data, packet_id, False, qos, retain)
-        if qos in (QOS_1, QOS_2):
-            # Store QOS_1 and QOS_2 messages in session
-            self.session.outgoing_msg[packet_id] = message
-        yield from self.outgoing_queue.put(message.publish_packet)
-
+        message = OutgoingApplicationMessage(packet_id, topic, qos, data, retain)
         if qos in (QOS_1, QOS_2):
             # wait for message acknowledge management to complete
-            yield from self._handle_message_acknowledge(message)
+            yield from asyncio.wait_for(self._handle_message_flow(message), 10, loop=self._loop)
         return message
 
     @asyncio.coroutine
-    def _handle_message_acknowledge(self, publish_message):
+    def _handle_message_flow(self, app_message):
         """
-        Handle message acknowledgment flows for a publish message sent to a recipient
-        For QOS_0 messages, this method does nothing, returns True.
-        For QOS_1 messages, this methods wait for the corresponding PUBACK
-        For QOS_2 messages, this method wait for the corresponding PUBREC and send a PUBREL.
-        PUBCOMP is managed internally for cleaning stored state
-        :param publish_message: PublishMessage to handle acknowledgment for
-        :return: returns true if the acknowledgment flows has reached the end, False otherwise.
-        Caller can discard messages only if this methods returns True. Otherwise they should re-send.
+        Handle protocol flow for incoming and outgoing messages, depending on service level and according to MQTT
+        spec. paragraph 4.3-Quality of Service levels and protocol flows
+        :param app_message: PublishMessage to handle
+        :return: nothing.
         """
-        if publish_message.qos == QOS_0:
+        if app_message.qos == QOS_0:
             # QOS 0 packet don't need acknowledgment
             return
-        if publish_message.qos == QOS_1:
-            if publish_message.packet_id in self._puback_waiters:
-                # PUBACK waiter already exists for this packet ID
-                warning = "Can't add PUBACK waiter, a waiter already exists for message Id '%s'" \
-                          % publish_message.packet_id
-                self.logger.warning(warning)
-                raise HBMQTTException(warning)
-            # Wait for puback
-            waiter = asyncio.Future(loop=self._loop)
-            self._puback_waiters[publish_message.packet_id] = waiter
-            yield from waiter
-            del self._puback_waiters[publish_message.packet_id]
-            publish_message.puback_packet = waiter.result()
-
-        elif publish_message.qos == QOS_2:
-            if not publish_message.pubrec_packet:
-                if publish_message.packet_id in self._pubrec_waiters:
+        if app_message.qos == QOS_1:
+            yield from self._handle_qos1_message_flow(app_message)
+        elif app_message.qos == QOS_2:
+            if not app_message.pubrec_packet:
+                if app_message.packet_id in self._pubrec_waiters:
                     # PUBREC waiter already exists for this packet ID
                     message = "Can't add PUBREC waiter, a waiter already exists for message Id '%s'" \
-                              % publish_message.packet_id
+                              % app_message.packet_id
                     self.logger.warning(message)
                     raise HBMQTTException(message)
                 # Wait for PUBREC
                 waiter = asyncio.Future(loop=self._loop)
-                self._pubrec_waiters[publish_message.packet_id] = waiter
+                self._pubrec_waiters[app_message.packet_id] = waiter
                 yield from waiter
-                del self._pubrec_waiters[publish_message.packet_id]
-                publish_message.pubrec_packet = waiter.result()
+                del self._pubrec_waiters[app_message.packet_id]
+                app_message.pubrec_packet = waiter.result()
 
-            if not publish_message.pubrel_packet:
+            if not app_message.pubrel_packet:
                 # Send pubrel
-                publish_message.pubrel_packet = PubrelPacket.build(publish_message.packet_id)
-                yield from self.outgoing_queue.put(publish_message.pubrel_packet)
+                app_message.pubrel_packet = PubrelPacket.build(app_message.packet_id)
+                yield from self.outgoing_queue.put(app_message.pubrel_packet)
 
-            if not publish_message.pubcomp_packet:
+            if not app_message.pubcomp_packet:
                 # Wait for PUBCOMP
                 waiter = asyncio.Future(loop=self._loop)
-                self._pubcomp_waiters[publish_message.packet_id] = waiter
+                self._pubcomp_waiters[app_message.packet_id] = waiter
                 yield from waiter
-                del self._pubcomp_waiters[publish_message.packet_id]
-                publish_message.pubcomp_packet = waiter.result()
+                del self._pubcomp_waiters[app_message.packet_id]
+                app_message.pubcomp_packet = waiter.result()
         else:
-            raise HBMQTTException("Unexcepted QOS value '%d" % str(publish_message.qos))
+            raise HBMQTTException("Unexcepted QOS value '%d" % str(app_message.qos))
         # Discard acknowledged message
-        if publish_message.is_acknowledged():
-            del self.session.outgoing_msg[publish_message.packet_id]
+        if app_message.is_acknowledged():
+            del self.session.outgoing_msg[app_message.packet_id]
+
+    @asyncio.coroutine
+    def _handle_qos1_message_flow(self, app_message):
+        """
+        Handle QOS_1 application message acknowledgment
+        For incoming messages, this method stores the messages and reply with PUBACK
+        For outgoing messages, this methods sends PUBLISH and waits for the corresponding PUBACK
+        :param app_message:
+        :return:
+        """
+        assert app_message.qos == QOS_1
+        if isinstance(app_message, OutgoingApplicationMessage):
+            if app_message.is_acknowledged():
+                raise HBMQTTException("Message '%d' already sent and acknowledged" % app_message.packet_id)
+            # Store message
+            if app_message.publish_packet is not None:
+                # This is a retry flow, no need to store just check the message exists in session
+                if app_message.packet_id not in self.session.outgoing_msg:
+                    raise HBMQTTException("Unknown inflight message '%d' in session" % app_message.packet_id)
+                app_message.build_publish_packet(dup=True)
+            else:
+                # Store QOS_1 and QOS_2 messages in session
+                self.session.outgoing_msg[app_message.packet_id] = app_message
+                app_message.build_publish_packet(dup=False)
+
+            # Send PUBLISH packet
+            yield from self.outgoing_queue.put(message.publish_packet)
+
+            # Wait for puback
+            waiter = asyncio.Future(loop=self._loop)
+            self._puback_waiters[app_message.packet_id] = waiter
+            yield from waiter
+            del self._puback_waiters[app_message.packet_id]
+            app_message.puback_packet = waiter.result()
+        elif isinstance(app_message, IncomingApplicationMessage);
+            pass
 
     @asyncio.coroutine
     def stop(self):
