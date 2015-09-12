@@ -24,19 +24,8 @@ class ApplicationMessage:
         self.pubrel_packet = None
         self.pubcomp_packet = None
 
-    def is_acknowledged(self):
-        if self.qos == QOS_0:
-            return True
-        if self.qos == QOS_1:
-            return True if self.puback_packet is not None else False
-        if self.qos == QOS_2:
-            return True if self.pubcomp_packet is not None else False
-
     def build_publish_packet(self, dup=False):
         return PublishPacket.build(self.topic, self.data, self.packet_id, dup, self.qos, self.retain)
-
-    def build_puback_packet(self):
-        return PubackPacket.build(self.packet_id)
 
 
 class IncomingApplicationMessage(ApplicationMessage):
