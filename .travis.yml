@@ -4,6 +4,8 @@ python:
 install:
   - pip install -r requirements.txt
   - pip install tox
+  - pip install coveralls
 # command to run tests
 script:
   - tox
+after_success: coveralls
