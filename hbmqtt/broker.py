@@ -676,7 +676,7 @@ class Broker:
         import re
         wildcard_pattern = re.compile('.*?/?\+/?.*?')
         try:
-            a_filter = subscription['filter']
+            a_filter = subscription[0]
             if '#' in a_filter and not a_filter.endswith('#'):
                 # [MQTT-4.7.1-2] Wildcard character '#' is only allowed as last character in filter
                 return 0x80
@@ -684,7 +684,7 @@ class Broker:
                 # [MQTT-4.7.1-3] + wildcard character must occupy entire level
                 return 0x80
 
-            qos = subscription['qos']
+            qos = subscription[1]
             if 'max-qos' in self.config and qos > self.config['max-qos']:
                 qos = self.config['max-qos']
             if a_filter not in self._subscriptions:
@@ -776,20 +776,20 @@ class Broker:
     @asyncio.coroutine
     def publish_retained_messages_for_subscription(self, subscription, session):
         self.logger.debug("Begin broadcasting messages retained due to subscription on '%s' from %s" %
-                          (subscription['filter'], format_client_message(session=session)))
+                          (subscription[0], format_client_message(session=session)))
         publish_tasks = []
         for d_topic in self._global_retained_messages:
-            self.logger.debug("matching : %s %s" % (d_topic, subscription['filter']))
-            if self.matches(d_topic, subscription['filter']):
-                self.logger.debug("%s and %s match" % (d_topic, subscription['filter']))
+            self.logger.debug("matching : %s %s" % (d_topic, subscription[0]))
+            if self.matches(d_topic, subscription[0]):
+                self.logger.debug("%s and %s match" % (d_topic, subscription[0]))
                 retained = self._global_retained_messages[d_topic]
                 publish_tasks.append(asyncio.Task(
                     session.handler.mqtt_publish(
-                        retained.topic, retained.data, subscription['qos'], True), loop=self._loop))
+                        retained.topic, retained.data, subscription[1], True), loop=self._loop))
         if publish_tasks:
             yield from asyncio.wait(publish_tasks, loop=self._loop)
         self.logger.debug("End broadcasting messages retained due to subscription on '%s' from %s" %
-                          (subscription['filter'], format_client_message(session=session)))
+                          (subscription[0], format_client_message(session=session)))
 
     def delete_session(self, client_id):
         """
@@ -798,7 +798,7 @@ class Broker:
         :return:
         """
         try:
-            session = self._sessions[client_id]
+            session = self._sessions[client_id][0]
         except KeyError:
             session = None
         if session is None:
