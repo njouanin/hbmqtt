@@ -76,6 +76,20 @@ class ProtocolHandler:
         yield from self.retry_deliveries()
 
     @asyncio.coroutine
+    def stop(self):
+        # Stop incoming messages flow waiter
+        for packet_id in self.session.inflight_in:
+            self.session.inflight_in[packet_id].cancel()
+        self._reader_task.cancel()
+        if self._keepalive_task:
+            self._keepalive_task.cancel()
+        self.logger.debug("waiting for tasks to be stopped")
+        yield from asyncio.wait(
+            [self._reader_stopped.wait()], loop=self._loop)
+        self.logger.debug("closing writer")
+        yield from self.writer.close()
+
+    @asyncio.coroutine
     def retry_deliveries(self):
         """
         Handle [MQTT-4.4.0-1] by resending PUBLISH and PUBREL messages for pending out messages
@@ -277,20 +291,6 @@ class ProtocolHandler:
             # Send pubcomp
             pubcomp_packet = PubcompPacket.build(app_message.packet_id)
             yield from self._send_packet(pubcomp_packet)
-
-    @asyncio.coroutine
-    def stop(self):
-        # Stop incoming messages flow waiter
-        for packet_id in self.session.inflight_in:
-            self.session.inflight_in[packet_id].cancel()
-        self._reader_task.cancel()
-        if self._keepalive_task:
-            self._keepalive_task.cancel()
-        self.logger.debug("waiting for tasks to be stopped")
-        yield from asyncio.wait(
-            [self._reader_stopped.wait()], loop=self._loop)
-        self.logger.debug("closing writer")
-        yield from self.writer.close()
 
     @asyncio.coroutine
     def _reader_loop(self):
