@@ -57,7 +57,7 @@ class ProtocolHandler:
             self._loop = loop
         self._reader_task = None
         self._keepalive_task = None
-        self._reader_ready = asyncio.Event(loop=self._loop)
+        self._reader_ready = None
         self._reader_stopped = asyncio.Event(loop=self._loop)
 
         self._puback_waiters = dict()
@@ -67,19 +67,22 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def start(self):
+        self._reader_ready = asyncio.Event(loop=self._loop)
         self._reader_task = asyncio.Task(self._reader_loop(), loop=self._loop)
         yield from asyncio.wait([self._reader_ready.wait()], loop=self._loop)
         if self.keepalive_timeout:
             self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
-        self.logger.debug("%s Handler tasks started" % self.session.client_id)
+        self.logger.debug("Handler tasks started")
         yield from self.retry_deliveries()
+        self.logger.debug("Handler ready")
 
     @asyncio.coroutine
     def stop(self):
         # Stop incoming messages flow waiter
         for packet_id in self.session.inflight_in:
             self.session.inflight_in[packet_id].cancel()
+#        self._reader_stopped = asyncio.Event(loop=self._loop)
         self._reader_task.cancel()
         if self._keepalive_task:
             self._keepalive_task.cancel()
