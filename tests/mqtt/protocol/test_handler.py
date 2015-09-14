@@ -46,13 +46,18 @@ class ProtocolHandlerTest(unittest.TestCase):
             reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
             s.reader, s.writer = adapt(reader, writer)
             handler = ProtocolHandler(s, self.plugin_manager, loop=self.loop)
-            yield from self.start_handler(handler, s)
-            yield from self.stop_handler(handler, s)
+            yield from self.start_handler(handler, s, future)
+            yield from self.stop_handler(handler, s, future)
+            future.set_result(True)
 
+        future = asyncio.Future(loop=self.loop)
         coro = asyncio.start_server(server_mock, '127.0.0.1', 8888, loop=self.loop)
         server = self.loop.run_until_complete(coro)
         self.loop.run_until_complete(test_coro())
         server.close()
+        self.loop.run_until_complete(server.wait_closed())
+        if future.exception():
+            raise future.exception()
 
     def test_publish_qos0(self):
         @asyncio.coroutine
@@ -62,7 +67,6 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.assertEquals(packet.topic_name, '/topic')
                 self.assertEquals(packet.qos, QOS_0)
                 self.assertIsNone(packet.packet_id)
-                future.set_result(True)
             except AssertionError as ae:
                 future.set_exception(ae)
 
@@ -72,9 +76,10 @@ class ProtocolHandlerTest(unittest.TestCase):
             reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
             s.reader, s.writer = adapt(reader, writer)
             handler = ProtocolHandler(s, self.plugin_manager, loop=self.loop)
-            yield from self.start_handler(handler, s)
-            yield from handler.mqtt_publish('/topic', b'test_data', QOS_0, False)
-            yield from self.stop_handler(handler, s)
+            yield from self.start_handler(handler, s, future)
+            message = yield from handler.mqtt_publish('/topic', b'test_data', QOS_0, False)
+            yield from self.stop_handler(handler, s, future)
+            future.set_result(True)
 
         future = asyncio.Future(loop=self.loop)
         coro = asyncio.start_server(server_mock, '127.0.0.1', 8888, loop=self.loop)
@@ -87,26 +92,50 @@ class ProtocolHandlerTest(unittest.TestCase):
 
 
     @asyncio.coroutine
-    def start_handler(self, handler, session):
+    def start_handler(self, handler, session, future):
         yield from handler.start()
-        self.assertTrue(handler._reader_ready)
-        self.check_empty_waiters(handler)
-        self.check_no_message(session)
+        try:
+            self.assertTrue(handler._reader_ready)
+            self.check_empty_waiters(handler)
+            self.check_no_message(session, future)
+        except AssertionError as ae:
+            if future and not future.cancelled():
+                future.set_exception(ae)
+            else:
+                raise ae
 
     @asyncio.coroutine
-    def stop_handler(self, handler, session):
+    def stop_handler(self, handler, session, future):
         yield from handler.stop()
-        self.assertTrue(handler._reader_stopped)
-        self.check_empty_waiters(handler)
-        self.check_no_message(session)
+        try:
+            self.assertTrue(handler._reader_stopped)
+            self.check_empty_waiters(handler)
+            self.check_no_message(session, future)
+        except AssertionError as ae:
+            if future and not future.cancelled():
+                future.set_exception(ae)
+            else:
+                raise ae
 
-    def check_empty_waiters(self, handler):
-        self.assertFalse(handler._puback_waiters)
-        self.assertFalse(handler._pubrec_waiters)
-        self.assertFalse(handler._pubrel_waiters)
-        self.assertFalse(handler._pubcomp_waiters)
+    def check_empty_waiters(self, handler, future=None):
+        try:
+            self.assertFalse(handler._puback_waiters)
+            self.assertFalse(handler._pubrec_waiters)
+            self.assertFalse(handler._pubrel_waiters)
+            self.assertFalse(handler._pubcomp_waiters)
+        except AssertionError as ae:
+            if future and not future.cancelled():
+                future.set_exception(ae)
+            else:
+                raise ae
 
-    def check_no_message(self, session):
-        self.assertFalse(session.inflight_out)
-        self.assertFalse(session.inflight_in)
-        self.assertEquals(session.delivered_message_queue.qsize(), 0)
+    def check_no_message(self, session, future):
+        try:
+            self.assertFalse(session.inflight_out)
+            self.assertFalse(session.inflight_in)
+            self.assertEquals(session.delivered_message_queue.qsize(), 0)
+        except AssertionError as ae:
+            if future and not future.cancelled():
+                future.set_exception(ae)
+            else:
+                raise ae
