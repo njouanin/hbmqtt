@@ -12,7 +12,7 @@ from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.publish import PublishPacket
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
-logging.basicConfig(level=logging.DEBUG, format=formatter)
+logging.basicConfig(level=logging.INFO, format=formatter)
 log = logging.getLogger(__name__)
 
 
@@ -58,9 +58,13 @@ class ProtocolHandlerTest(unittest.TestCase):
         @asyncio.coroutine
         def server_mock(reader, writer):
             packet = yield from PublishPacket.from_stream(reader)
-            self.assertEquals(packet.topic_name, '/topic')
-            self.assertEquals(packet.qos, QOS_0)
-            self.assertIsNotNone(packet.packet_id)
+            try:
+                self.assertEquals(packet.topic_name, '/topic')
+                self.assertEquals(packet.qos, QOS_0)
+                self.assertIsNone(packet.packet_id)
+                future.set_result(True)
+            except AssertionError as ae:
+                future.set_exception(ae)
 
         @asyncio.coroutine
         def test_coro():
@@ -72,12 +76,14 @@ class ProtocolHandlerTest(unittest.TestCase):
             yield from handler.mqtt_publish('/topic', b'test_data', QOS_0, False)
             yield from self.stop_handler(handler, s)
 
+        future = asyncio.Future(loop=self.loop)
         coro = asyncio.start_server(server_mock, '127.0.0.1', 8888, loop=self.loop)
         server = self.loop.run_until_complete(coro)
         self.loop.run_until_complete(test_coro())
-        log.debug("TEST")
         server.close()
         self.loop.run_until_complete(server.wait_closed())
+        if future.exception():
+            raise future.exception()
 
 
     @asyncio.coroutine
