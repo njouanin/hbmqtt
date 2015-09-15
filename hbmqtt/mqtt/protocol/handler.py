@@ -212,6 +212,7 @@ class ProtocolHandler:
             del self.session.inflight_out[app_message.packet_id]
         elif isinstance(app_message, IncomingApplicationMessage):
             # Initiate delivery
+            self.logger.debug("Add message to delivery")
             yield from self.session.delivered_message_queue.put(app_message)
             # Send PUBACK
             puback = PubackPacket.build(app_message.packet_id)
@@ -388,6 +389,7 @@ class ProtocolHandler:
     @asyncio.coroutine
     def mqtt_deliver_next_message(self):
         message = yield from self.session.delivered_message_queue.get()
+        self.logger.debug("Delivering message %r" % message)
         return message
 
     @asyncio.coroutine
@@ -474,13 +476,13 @@ class ProtocolHandler:
             self.logger.warning("Received PUBCOMP for unknown pending message with Id: %s" % packet_id)
 
     @asyncio.coroutine
-    def handle_pubrel(self, pubrel: PubrecPacket):
+    def handle_pubrel(self, pubrel: PubrelPacket):
         packet_id = pubrel.packet_id
         try:
-            inflight_message = self.session.inflight_in[packet_id]
-            inflight_message.received_pubrel()
+            waiter = self._pubrel_waiters[packet_id]
+            waiter.set_result(pubrel)
         except KeyError as ke:
-            self.logger.warning("Received PUBREL for unknown pending subscription with Id: %s" % packet_id)
+            self.logger.warning("Received PUBREL for unknown pending message with Id: %s" % packet_id)
 
     @asyncio.coroutine
     def handle_publish(self, publish_packet: PublishPacket):
