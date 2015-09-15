@@ -205,12 +205,44 @@ class ProtocolHandlerTest(unittest.TestCase):
         if future.exception():
             raise future.exception()
 
+    def test_receive_qos0(self):
+        @asyncio.coroutine
+        def server_mock(reader, writer):
+            packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_0, False)
+            yield from packet.to_stream(writer)
+            writer.close()
+
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                s = Session()
+                reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
+                s.reader, s.writer = adapt(reader, writer)
+                handler = ProtocolHandler(s, self.plugin_manager, loop=self.loop)
+                yield from self.start_handler(handler, s)
+                message = yield from handler.mqtt_deliver_next_message()
+                self.assertIsInstance(message, IncomingApplicationMessage)
+                self.assertIsNotNone(message.publish_packet)
+                yield from self.stop_handler(handler, s)
+                future.set_result(True)
+            except AssertionError as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        coro = asyncio.start_server(server_mock, '127.0.0.1', 8888, loop=self.loop)
+        server = self.loop.run_until_complete(coro)
+        self.loop.run_until_complete(test_coro())
+        server.close()
+        self.loop.run_until_complete(server.wait_closed())
+        if future.exception():
+            raise future.exception()
+
     @asyncio.coroutine
     def start_handler(self, handler, session):
-        yield from handler.start()
-        self.assertTrue(handler._reader_ready)
         self.check_empty_waiters(handler)
         self.check_no_message(session)
+        yield from handler.start()
+        self.assertTrue(handler._reader_ready)
 
     @asyncio.coroutine
     def stop_handler(self, handler, session):
