@@ -214,7 +214,7 @@ class ProtocolHandler:
             # Initiate delivery
             yield from self.session.delivered_message_queue.put(app_message)
             # Send PUBACK
-            puback = PubackPacket.build(self.packet_id)
+            puback = PubackPacket.build(app_message.packet_id)
             yield from self._send_packet(puback)
             app_message.puback_packet = puback
 
@@ -400,50 +400,50 @@ class ProtocolHandler:
             pass
 
     def handle_write_timeout(self):
-        self.logger.warning('%s write timeout unhandled' % self.session.client_id)
+        self.logger.debug('%s write timeout unhandled' % self.session.client_id)
 
     def handle_read_timeout(self):
-        self.logger.warning('%s read timeout unhandled' % self.session.client_id)
+        self.logger.debug('%s read timeout unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_connack(self, connack: ConnackPacket):
-        self.logger.warning('%s CONNACK unhandled' % self.session.client_id)
+        self.logger.debug('%s CONNACK unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_connect(self, connect: ConnectPacket):
-        self.logger.warning('%s CONNECT unhandled' % self.session.client_id)
+        self.logger.debug('%s CONNECT unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_subscribe(self, subscribe: SubscribePacket):
-        self.logger.warning('%s SUBSCRIBE unhandled' % self.session.client_id)
+        self.logger.debug('%s SUBSCRIBE unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_unsubscribe(self, subscribe: UnsubscribePacket):
-        self.logger.warning('%s UNSUBSCRIBE unhandled' % self.session.client_id)
+        self.logger.debug('%s UNSUBSCRIBE unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_suback(self, suback: SubackPacket):
-        self.logger.warning('%s SUBACK unhandled' % self.session.client_id)
+        self.logger.debug('%s SUBACK unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_unsuback(self, unsuback: UnsubackPacket):
-        self.logger.warning('%s UNSUBACK unhandled' % self.session.client_id)
+        self.logger.debug('%s UNSUBACK unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_pingresp(self, pingresp: PingRespPacket):
-        self.logger.warning('%s PINGRESP unhandled' % self.session.client_id)
+        self.logger.debug('%s PINGRESP unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_pingreq(self, pingreq: PingReqPacket):
-        self.logger.warning('%s PINGREQ unhandled' % self.session.client_id)
+        self.logger.debug('%s PINGREQ unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_disconnect(self, disconnect: DisconnectPacket):
-        self.logger.warning('%s DISCONNECT unhandled' % self.session.client_id)
+        self.logger.debug('%s DISCONNECT unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_connection_closed(self):
-        self.logger.warning('%s Connection closed unhandled' % self.session.client_id)
+        self.logger.debug('%s Connection closed unhandled' % self.session.client_id)
 
     @asyncio.coroutine
     def handle_puback(self, puback: PubackPacket):
