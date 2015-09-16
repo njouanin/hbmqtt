@@ -290,7 +290,8 @@ class ProtocolHandler:
             yield from waiter
             del self._pubrel_waiters[app_message.packet_id]
             app_message.pubrel_packet = waiter.result()
-            #Discard message
+            # Initiate delivery and discard message
+            yield from self.session.delivered_message_queue.put(app_message)
             del self.session.inflight_in[app_message.packet_id]
             # Send pubcomp
             pubcomp_packet = PubcompPacket.build(app_message.packet_id)
