@@ -210,7 +210,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_0, False)
             yield from packet.to_stream(writer)
-            writer.close()
+            #writer.close()
 
         @asyncio.coroutine
         def test_coro():
@@ -242,7 +242,6 @@ class ProtocolHandlerTest(unittest.TestCase):
         @asyncio.coroutine
         def server_mock(reader, writer):
             try:
-                #yield from self.event.wait()
                 packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_1, False)
                 yield from packet.to_stream(writer)
                 puback = yield from PubackPacket.from_stream(reader)
@@ -261,7 +260,6 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.session.reader, self.session.writer = adapt(reader, writer)
                 self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
                 yield from self.start_handler(self.handler, self.session)
-#                self.event.set()
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
                 self.assertIsNotNone(message.publish_packet)
@@ -292,14 +290,12 @@ class ProtocolHandlerTest(unittest.TestCase):
                 pubrec = yield from PubrecPacket.from_stream(reader)
                 self.assertIsNotNone(pubrec)
                 self.assertEqual(packet.packet_id, pubrec.packet_id)
-                self.assertIn(packet.packet_id, self.handler._pubrel_waiters)
                 pubrel = PubrelPacket.build(packet.packet_id)
                 yield from pubrel.to_stream(writer)
-                self.assertNotIn(packet.packet_id, self.handler._pubrel_waiters)
                 pubcomp = yield from PubcompPacket.from_stream(reader)
                 self.assertIsNotNone(pubcomp)
                 self.assertEqual(packet.packet_id, pubcomp.packet_id)
-                writer.close()
+                #writer.close()
             except Exception as ae:
                 future.set_exception(ae)
 
