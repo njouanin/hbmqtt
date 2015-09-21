@@ -2,6 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import logging
+import collections
 
 from blinker import Signal
 
@@ -172,7 +173,6 @@ class ProtocolHandler:
                 self.logger.warning("[MQTT-3.3.1-2] DUP flag must set to 0 for QOS 0 message. Message ignored: %s" %
                                     repr(app_message.publish_packet))
             else:
-                # Assign packet_id as it's needed internally
                 yield from self.session.delivered_message_queue.put(app_message)
 
     @asyncio.coroutine
@@ -300,10 +300,12 @@ class ProtocolHandler:
     @asyncio.coroutine
     def _reader_loop(self):
         self.logger.debug("%s Starting reader coro" % self.session.client_id)
-        running_tasks = []
+        running_tasks = collections.deque()
         while True:
             try:
                 self._reader_ready.set()
+                while running_tasks and running_tasks[0].done():
+                    running_tasks.popleft()
                 keepalive_timeout = self.session.keep_alive
                 if keepalive_timeout <= 0:
                     keepalive_timeout = None
@@ -355,21 +357,13 @@ class ProtocolHandler:
                                              (self.session.client_id, packet.fixed_header.packet_type))
                         if task:
                             running_tasks.append(task)
-                        tmp_tasks = []
-                        for t in running_tasks:
-                            if not t.done():
-                                tmp_tasks.append(t)
-                        running_tasks = tmp_tasks
                 else:
                     self.logger.debug("%s No more data (EOF received), stopping reader coro" % self.session.client_id)
                     break
             except asyncio.CancelledError:
                 self.logger.debug("Task cancelled, reader loop ending")
-                for task in running_tasks:
-                    try:
-                        task.cancel()
-                    except asyncio.CancelledError:
-                        pass
+                while running_tasks:
+                    running_tasks.popleft().cancel()
                 break
             except asyncio.TimeoutError:
                 self.logger.debug("%s Input stream read timeout" % self.session.client_id)
@@ -403,7 +397,7 @@ class ProtocolHandler:
     @asyncio.coroutine
     def mqtt_deliver_next_message(self):
         message = yield from self.session.delivered_message_queue.get()
-        self.logger.debug("Delivering message %r" % message)
+        self.logger.debug("Delivering message %s" % message)
         return message
 
     @asyncio.coroutine
