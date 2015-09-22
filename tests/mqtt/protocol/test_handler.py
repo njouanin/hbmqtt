@@ -27,6 +27,7 @@ def adapt(reader, writer):
 class ProtocolHandlerTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
         self.plugin_manager = PluginManager("hbmqtt.test.plugins", context=None, loop=self.loop)
 
     def tearDown(self):
@@ -48,9 +49,9 @@ class ProtocolHandlerTest(unittest.TestCase):
         def test_coro():
             try:
                 s = Session()
-                reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
+                reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888)
                 s.reader, s.writer = adapt(reader, writer)
-                handler = ProtocolHandler(s, self.plugin_manager, loop=self.loop)
+                handler = ProtocolHandler(s, self.plugin_manager)
                 yield from self.start_handler(handler, s)
                 yield from self.stop_handler(handler, s)
                 future.set_result(True)
@@ -58,7 +59,7 @@ class ProtocolHandlerTest(unittest.TestCase):
                 future.set_exception(ae)
 
         future = asyncio.Future(loop=self.loop)
-        coro = asyncio.start_server(server_mock, '127.0.0.1', 8888, loop=self.loop)
+        coro = asyncio.start_server(server_mock, '127.0.0.1', 8888)
         server = self.loop.run_until_complete(coro)
         self.loop.run_until_complete(test_coro())
         server.close()
@@ -206,7 +207,6 @@ class ProtocolHandlerTest(unittest.TestCase):
         if future.exception():
             raise future.exception()
 
-    # @unittest.skip
     def test_receive_qos0(self):
         @asyncio.coroutine
         def server_mock(reader, writer):
@@ -220,10 +220,10 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.session.reader, self.session.writer = adapt(reader, writer)
                 self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
                 yield from self.start_handler(self.handler, self.session)
-                yield from self.stop_handler(self.handler, self.session)
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
                 self.assertIsNotNone(message.publish_packet)
+                yield from self.stop_handler(self.handler, self.session)
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -261,11 +261,11 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.session.reader, self.session.writer = adapt(reader, writer)
                 self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
                 yield from self.start_handler(self.handler, self.session)
-                yield from self.stop_handler(self.handler, self.session)
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
                 self.assertIsNotNone(message.publish_packet)
                 self.assertIsNotNone(message.puback_packet)
+                yield from self.stop_handler(self.handler, self.session)
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -307,10 +307,10 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.session.reader, self.session.writer = adapt(reader, writer)
                 self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
                 yield from self.start_handler(self.handler, self.session)
-                yield from self.stop_handler(self.handler, self.session)
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
                 self.assertIsNotNone(message.publish_packet)
+                yield from self.stop_handler(self.handler, self.session)
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
