@@ -396,6 +396,7 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def mqtt_deliver_next_message(self):
+        self.logger.debug("%d message(s) available for delivery" % self.session.delivered_message_queue.qsize())
         message = yield from self.session.delivered_message_queue.get()
         self.logger.debug("Delivering message %s" % message)
         return message
