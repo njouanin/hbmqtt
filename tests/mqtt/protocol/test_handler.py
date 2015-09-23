@@ -118,10 +118,10 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.assertIsNotNone(packet.packet_id)
                 self.assertIn(packet.packet_id, self.session.inflight_out)
                 self.assertIn(packet.packet_id, self.handler._puback_waiters)
+                puback = PubackPacket.build(packet.packet_id)
+                yield from puback.to_stream(writer)
             except Exception as ae:
                 future.set_exception(ae)
-            puback = PubackPacket.build(packet.packet_id)
-            yield from puback.to_stream(writer)
 
         @asyncio.coroutine
         def test_coro():
@@ -163,13 +163,11 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.assertEquals(packet.qos, QOS_2)
                 self.assertIsNotNone(packet.packet_id)
                 self.assertIn(packet.packet_id, self.session.inflight_out)
-
                 self.assertIn(packet.packet_id, self.handler._pubrec_waiters)
                 pubrec = PubrecPacket.build(packet.packet_id)
                 yield from pubrec.to_stream(writer)
 
                 pubrel = yield from PubrelPacket.from_stream(reader)
-
                 self.assertIn(packet.packet_id, self.handler._pubcomp_waiters)
                 pubcomp = PubcompPacket.build(packet.packet_id)
                 yield from pubcomp.to_stream(writer)
@@ -223,6 +221,10 @@ class ProtocolHandlerTest(unittest.TestCase):
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
                 self.assertIsNotNone(message.publish_packet)
+                self.assertIsNone(message.puback_packet)
+                self.assertIsNone(message.pubrec_packet)
+                self.assertIsNone(message.pubrel_packet)
+                self.assertIsNone(message.pubcomp_packet)
                 yield from self.stop_handler(self.handler, self.session)
                 future.set_result(True)
             except Exception as ae:
@@ -248,8 +250,6 @@ class ProtocolHandlerTest(unittest.TestCase):
                 puback = yield from PubackPacket.from_stream(reader)
                 self.assertIsNotNone(puback)
                 self.assertEqual(packet.packet_id, puback.packet_id)
-                #self.assertEquals(self.session.delivered_message_queue.qsize(), 1)
-                #writer.close()
             except Exception as ae:
                 print(ae)
                 future.set_exception(ae)
@@ -265,6 +265,9 @@ class ProtocolHandlerTest(unittest.TestCase):
                 self.assertIsInstance(message, IncomingApplicationMessage)
                 self.assertIsNotNone(message.publish_packet)
                 self.assertIsNotNone(message.puback_packet)
+                self.assertIsNone(message.pubrec_packet)
+                self.assertIsNone(message.pubrel_packet)
+                self.assertIsNone(message.pubcomp_packet)
                 yield from self.stop_handler(self.handler, self.session)
                 future.set_result(True)
             except Exception as ae:
@@ -292,6 +295,7 @@ class ProtocolHandlerTest(unittest.TestCase):
                 pubrec = yield from PubrecPacket.from_stream(reader)
                 self.assertIsNotNone(pubrec)
                 self.assertEqual(packet.packet_id, pubrec.packet_id)
+                self.assertIn(packet.packet_id, self.handler._pubrel_waiters)
                 pubrel = PubrelPacket.build(packet.packet_id)
                 yield from pubrel.to_stream(writer)
                 pubcomp = yield from PubcompPacket.from_stream(reader)
@@ -310,6 +314,10 @@ class ProtocolHandlerTest(unittest.TestCase):
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
                 self.assertIsNotNone(message.publish_packet)
+                self.assertIsNone(message.puback_packet)
+                self.assertIsNotNone(message.pubrec_packet)
+                self.assertIsNotNone(message.pubrel_packet)
+                self.assertIsNotNone(message.pubcomp_packet)
                 yield from self.stop_handler(self.handler, self.session)
                 future.set_result(True)
             except Exception as ae:
