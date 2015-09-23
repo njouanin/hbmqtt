@@ -87,7 +87,6 @@ class ProtocolHandler:
         # Stop incoming messages flow waiter
         #for packet_id in self.session.inflight_in:
         #    self.session.inflight_in[packet_id].cancel()
-#        self._reader_stopped = asyncio.Event(loop=self._loop)
         self._reader_task.cancel()
         if self._keepalive_task:
             self._keepalive_task.cancel()
@@ -195,7 +194,6 @@ class ProtocolHandler:
             if app_message.packet_id not in self.session.inflight_out:
                 # Store message in session
                 self.session.inflight_out[app_message.packet_id] = app_message
-            publish_packet = None
             if app_message.publish_packet is not None:
                 # A Publish packet has already been sent, this is a retry
                 publish_packet = app_message.build_publish_packet(dup=True)
@@ -239,7 +237,6 @@ class ProtocolHandler:
                 raise HBMQTTException("Message '%d' has already been acknowledged" % app_message.packet_id)
             if not app_message.pubrel_packet:
                 # Store message
-                publish_packet = None
                 if app_message.publish_packet is not None:
                     # This is a retry flow, no need to store just check the message exists in session
                     if app_message.packet_id not in self.session.inflight_out:
@@ -372,7 +369,7 @@ class ProtocolHandler:
             except asyncio.TimeoutError:
                 self.logger.debug("%s Input stream read timeout" % self.session.client_id)
                 self.handle_read_timeout()
-            except NoDataException as nde:
+            except NoDataException:
                 self.logger.debug("%s No data available" % self.session.client_id)
             except Exception as e:
                 self.logger.warning("%s Unhandled exception in reader coro: %s" % (self.session.client_id, e))
@@ -494,12 +491,11 @@ class ProtocolHandler:
         try:
             waiter = self._pubrel_waiters[packet_id]
             waiter.set_result(pubrel)
-        except KeyError as ke:
+        except KeyError:
             self.logger.warning("Received PUBREL for unknown pending message with Id: %s" % packet_id)
 
     @asyncio.coroutine
     def handle_publish(self, publish_packet: PublishPacket):
-        incoming_message = None
         packet_id = publish_packet.variable_header.packet_id
         qos = publish_packet.qos
 
