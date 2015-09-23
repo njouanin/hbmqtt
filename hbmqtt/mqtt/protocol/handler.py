@@ -28,6 +28,10 @@ from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.protocol.inflight import *
 from hbmqtt.plugins.manager import PluginManager
 
+import sys
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+
 EVENT_MQTT_PACKET_SENT = 'mqtt_packet_sent'
 EVENT_MQTT_PACKET_RECEIVED = 'mqtt_packet_received'
 
