@@ -7,6 +7,7 @@ import os
 import logging
 from hbmqtt.plugins.manager import PluginManager
 from hbmqtt.client import MQTTClient
+from hbmqtt.mqtt.constants import *
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)
@@ -116,6 +117,53 @@ class MQTTClientTest(unittest.TestCase):
                 ret = yield from client.connect('mqtt://test.mosquitto.org/')
                 self.assertIsNotNone(client.session)
                 yield from client.ping()
+                yield from client.disconnect()
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    def test_subscribe(self):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                client = MQTTClient()
+                yield from client.connect('mqtt://test.mosquitto.org/')
+                self.assertIsNotNone(client.session)
+                ret = yield from client.subscribe([
+                    ('$SYS/broker/uptime', QOS_0),
+                    ('$SYS/broker/uptime', QOS_1),
+                    ('$SYS/broker/uptime', QOS_2),
+                ])
+                self.assertEquals(ret[0], QOS_0)
+                self.assertEquals(ret[1], QOS_1)
+                self.assertEquals(ret[2], QOS_2)
+                yield from client.disconnect()
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    def test_unsubscribe(self):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                client = MQTTClient()
+                yield from client.connect('mqtt://test.mosquitto.org/')
+                self.assertIsNotNone(client.session)
+                ret = yield from client.subscribe([
+                    ('$SYS/broker/uptime', QOS_0),
+                ])
+                self.assertEquals(ret[0], QOS_0)
+                yield from client.unsubscribe(['$SYS/broker/uptime'])
                 yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
