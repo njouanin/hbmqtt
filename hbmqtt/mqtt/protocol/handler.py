@@ -95,7 +95,10 @@ class ProtocolHandler:
         yield from asyncio.wait(
             [self._reader_stopped.wait()], loop=self._loop)
         self.logger.debug("closing writer")
-        yield from self.writer.close()
+        try:
+            yield from self.writer.close()
+        except Exception as e:
+            self.logger.debug("Handler writer close failed: %s" % e)
 
     @asyncio.coroutine
     def retry_deliveries(self):
