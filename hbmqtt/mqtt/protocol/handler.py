@@ -403,15 +403,6 @@ class ProtocolHandler:
         self.logger.debug("Delivering message %s" % message)
         return message
 
-    @asyncio.coroutine
-    def mqtt_acknowledge_delivery(self, packet_id):
-        try:
-            message = self.session.inflight_in[packet_id]
-            message.acknowledge_delivery()
-            self.logger.debug('Message delivery acknowledged, packed_id=%d' % packet_id)
-        except KeyError:
-            pass
-
     def handle_write_timeout(self):
         self.logger.debug('%s write timeout unhandled' % self.session.client_id)
 

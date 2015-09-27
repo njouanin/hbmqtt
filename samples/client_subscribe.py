@@ -27,7 +27,6 @@ def uptime_coro():
     for i in range(1, 100):
         packet = yield from C.deliver_message()
         print("%d %s : %s" % (i, packet.variable_header.topic_name, str(packet.payload.data)))
-        yield from C.acknowledge_delivery(packet.variable_header.packet_id)
     yield from C.unsubscribe(['$SYS/broker/uptime'])
     logger.info("UnSubscribed")
     yield from C.disconnect()
