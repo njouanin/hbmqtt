@@ -214,6 +214,7 @@ class MQTTClient:
         # Decode URI attributes
         uri_attributes = urlparse(self.session.broker_uri)
         scheme = uri_attributes.scheme
+        secure = True if scheme in ('mqtts', 'wss') else False        
         self.session.username = uri_attributes.username
         self.session.password = uri_attributes.password
         self.session.remote_address = uri_attributes.hostname
@@ -221,14 +222,14 @@ class MQTTClient:
         if scheme in ('mqtt', 'mqtts') and not self.session.remote_port:
             self.session.remote_port = 8883 if scheme == 'mqtts' else 1883
         if scheme in ('ws', 'wss') and not self.session.remote_port:
-            self.session.remote_port = 443 if scheme == 'mqtts' else 80
+            self.session.remote_port = 443 if scheme == 'wss' else 80
         if scheme in ('ws', 'wss'):
             # Rewrite URI to conform to https://tools.ietf.org/html/rfc6455#section-3
-            uri = (uri_attributes[0], uri_attributes.hostname + ":" + str(uri_attributes.port), uri_attributes[2],
+            uri = (scheme, self.session.remote_address + ":" + str(self.session.remote_port), uri_attributes[2],
                    uri_attributes[3], uri_attributes[4], uri_attributes[5])
             self.session.broker_uri = urlunparse(uri)
 
-        if scheme in ('mqtts', 'wss'):
+        if secure:
             if self.session.cafile is None or self.session.cafile == '':
                 self.logger.warn("TLS connection can't be estabilshed, no certificate file (.cert) given")
                 raise ClientException("TLS connection can't be estabilshed, no certificate file (.cert) given")
