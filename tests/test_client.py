@@ -3,6 +3,7 @@
 # See the file license.txt for copying permission.
 import unittest
 import asyncio
+import os
 import logging
 from hbmqtt.plugins.manager import PluginManager
 from hbmqtt.client import MQTTClient
@@ -43,7 +44,9 @@ class MQTTClientTest(unittest.TestCase):
         def test_coro():
             try:
                 client = MQTTClient()
-                ret = yield from client.connect('mqtts://test.mosquitto.org/', cafile='mosquitto.org.crt')
+                print(os.path.dirname(os.path.realpath(__file__)))
+                ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
+                ret = yield from client.connect('mqtts://test.mosquitto.org/', cafile=ca)
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 future.set_result(True)
@@ -92,7 +95,8 @@ class MQTTClientTest(unittest.TestCase):
         def test_coro():
             try:
                 client = MQTTClient()
-                yield from client.connect('wss://test.mosquitto.org:8081/', cafile='mosquitto.org.crt')
+                ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
+                yield from client.connect('wss://test.mosquitto.org:8081/', cafile=ca)
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 future.set_result(True)
