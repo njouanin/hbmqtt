@@ -26,8 +26,8 @@ from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
 from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage
 from hbmqtt.mqtt.constants import *
-from hbmqtt.mqtt.protocol.inflight import *
 from hbmqtt.plugins.manager import PluginManager
+from hbmqtt.errors import HBMQTTException
 
 import sys
 if sys.version_info < (3, 5):
