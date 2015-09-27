@@ -74,7 +74,7 @@ class ClientProtocolHandler(ProtocolHandler):
             waiter = self._subscriptions_waiter.get(packet_id)
             waiter.set_result(suback.payload.return_codes)
         except KeyError as ke:
-            self.logger.warn("Received SUBACK for unknown pending subscription with Id: %s" % packet_id)
+            self.logger.warning("Received SUBACK for unknown pending subscription with Id: %s" % packet_id)
 
     @asyncio.coroutine
     def mqtt_unsubscribe(self, topics, packet_id):
@@ -97,7 +97,7 @@ class ClientProtocolHandler(ProtocolHandler):
             waiter = self._unsubscriptions_waiter.get(packet_id)
             waiter.set_result(None)
         except KeyError as ke:
-            self.logger.warn("Received UNSUBACK for unknown pending subscription with Id: %s" % packet_id)
+            self.logger.warning("Received UNSUBACK for unknown pending subscription with Id: %s" % packet_id)
 
     @asyncio.coroutine
     def mqtt_disconnect(self):
