@@ -37,6 +37,10 @@ EVENT_MQTT_PACKET_SENT = 'mqtt_packet_sent'
 EVENT_MQTT_PACKET_RECEIVED = 'mqtt_packet_received'
 
 
+class ProtocolHandlerException(BaseException):
+    pass
+
+
 class ProtocolHandler:
     """
     Class implementing the MQTT communication protocol using asyncio features
@@ -70,6 +74,21 @@ class ProtocolHandler:
         self._pubrec_waiters = dict()
         self._pubrel_waiters = dict()
         self._pubcomp_waiters = dict()
+
+    def attach_session(self, session: Session, reader:ReaderAdapter, writer:WriterAdapter):
+        if self.session:
+            raise ProtocolHandlerException("Handler already attached to session '%s'" % self.session.client_id)
+        self.session = session
+        self.reader = reader
+        self.writer = writer
+
+    def detach_session(self):
+        if not self.session:
+            self.logger.warning("detach_session() called while no session attached to handler")
+        else:
+            self.session = None
+            self.reader = None
+            self.writer = None
 
     @asyncio.coroutine
     def start(self):
