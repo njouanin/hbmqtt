@@ -14,7 +14,7 @@ from hbmqtt.mqtt.connect import *
 from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSocketsReader, WebSocketsWriter
 from hbmqtt.plugins.manager import PluginManager, BaseContext
-from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED
+from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED, ProtocolHandlerException
 from hbmqtt.mqtt.constants import *
 import websockets
 from websockets.uri import InvalidURI
@@ -25,6 +25,7 @@ _defaults = {
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False,
+    'auto_reconnect': True
 }
 
 
@@ -90,7 +91,6 @@ class MQTTClient:
         self.session = None
         self._handler = None
         self._disconnect_task = None
-        self._connection_closed_future = None
 
         # Init plugins manager
         context = ClientContext()
@@ -115,10 +115,7 @@ class MQTTClient:
         self.session = self._initsession(uri, cleansession, cafile, capath, cadata)
         self.logger.debug("Connect to: %s" % uri)
 
-        return_code = yield from self._connect_coro()
-        self._connection_closed_future = asyncio.Future(loop=self._loop)
-        self._disconnect_task = asyncio.Task(self.handle_connection_close(), loop=self._loop)
-        return self._connection_closed_future
+        return (yield from self._do_connect())
 
     @asyncio.coroutine
     def disconnect(self):
@@ -128,23 +125,25 @@ class MQTTClient:
             yield from self._handler.mqtt_disconnect()
             yield from self._handler.stop()
             self.session.transitions.disconnect()
-            self._connection_closed_future.set_result(None)
         else:
             self.logger.warn("Client session is not currently connected, ignoring call")
 
     @asyncio.coroutine
-    def reconnect(self, cleansession=False):
+    def reconnect(self, cleansession=None):
         if self.session.transitions.is_connected():
             self.logger.warn("Client already connected")
             return CONNECTION_ACCEPTED
 
-        self.session.clean_session = cleansession
+        if cleansession:
+            self.session.clean_session = cleansession
         self.logger.debug("Reconnecting with session parameters: %s" % self.session)
+        return (yield from self._do_connect())
 
+    @asyncio.coroutine
+    def _do_connect(self):
         return_code = yield from self._connect_coro()
-        self._connection_closed_future = asyncio.Future(loop=self._loop)
         self._disconnect_task = asyncio.Task(self.handle_connection_close(), loop=self._loop)
-        return self._connection_closed_future
+        return return_code
 
     @asyncio.coroutine
     def ping(self):
@@ -198,9 +197,6 @@ class MQTTClient:
 
     @asyncio.coroutine
     def _connect_coro(self):
-        sc = None
-        reader = None
-        writer = None
         kwargs = dict()
 
         # Decode URI attributes
@@ -220,6 +216,9 @@ class MQTTClient:
             uri = (scheme, self.session.remote_address + ":" + str(self.session.remote_port), uri_attributes[2],
                    uri_attributes[3], uri_attributes[4], uri_attributes[5])
             self.session.broker_uri = urlunparse(uri)
+        # Init protocol handler
+        if not self._handler:
+            self._handler = ClientProtocolHandler(self.session, self.plugins_manager, loop=self._loop)
 
         if secure:
             if self.session.cafile is None or self.session.cafile == '':
@@ -234,8 +233,8 @@ class MQTTClient:
                 sc.load_cert_chain(self.config['certfile'], self.config['keyfile'])
             kwargs['ssl'] = sc
 
-        # Open connection
         try:
+            # Open connection
             if scheme in ('mqtt', 'mqtts'):
                 conn_reader, conn_writer = \
                     yield from asyncio.open_connection(
@@ -251,6 +250,20 @@ class MQTTClient:
                     **kwargs)
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
+            # Start MQTT protocol
+            self._handler.attach_stream(reader, writer)
+            return_code = yield from self._handler.mqtt_connect()
+            if return_code is not CONNECTION_ACCEPTED:
+                self.session.transitions.disconnect()
+                self.logger.warning("Connection rejected with code '%s'" % return_code)
+                exc = ConnectException("Connection rejected by broker")
+                exc.return_code = return_code
+                raise exc
+            else:
+                # Handle MQTT protocol
+                yield from self._handler.start()
+                self.session.transitions.connect()
+                self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
         except InvalidURI as iuri:
             self.logger.warn("connection failed: invalid URI '%s'" % self.session.broker_uri)
             self.session.transitions.disconnect()
@@ -259,80 +272,23 @@ class MQTTClient:
             self.logger.warn("connection failed: invalid websocket handshake")
             self.session.transitions.disconnect()
             raise ConnectException("connection failed: invalid websocket handshake", ihs)
-
-        return_code = None
-        try :
-            connect_packet = self.build_connect_packet()
-            yield from connect_packet.to_stream(writer)
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT,
-                                                       packet=connect_packet,
-                                                       session=self.session)
-
-            connack = yield from ConnackPacket.from_stream(reader)
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED,
-                                                       packet=connack,
-                                                       session=self.session)
-            return_code = connack.variable_header.return_code
-        except Exception as e:
-            self.logger.warn("connection failed: %s" % e)
+        except ProtocolHandlerException as e:
+            self.logger.warn("MQTT connection failed: %s" % e)
             self.session.transitions.disconnect()
             raise ClientException("connection Failed: %s" % e)
 
-        if return_code is not CONNECTION_ACCEPTED:
-            self.session.transitions.disconnect()
-            self.logger.warn("Connection rejected with code '%s'" % return_code)
-            exc = ConnectException("Connection rejected by broker")
-            exc.return_code = return_code
-            raise exc
-        else:
-            # Handle MQTT protocol
-            self.session.reader = reader
-            self.session.writer = writer
-            self._handler = ClientProtocolHandler(self.session, self.plugins_manager, loop=self._loop)
-            yield from self._handler.start()
-            self.session.transitions.connect()
-            self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
-
-    def build_connect_packet(self):
-        vh = ConnectVariableHeader()
-        payload = ConnectPayload()
-
-        vh.keep_alive = self.session.keep_alive
-        vh.clean_session_flag = self.session.clean_session
-        vh.will_retain_flag = self.session.will_retain
-        payload.client_id = self.session.client_id
-
-        if self.session.username:
-            vh.username_flag = True
-            payload.username = self.session.username
-        else:
-            vh.username_flag = False
-
-        if self.session.password:
-            vh.password_flag = True
-            payload.password = self.session.password
-        else:
-            vh.password_flag = False
-        if self.session.will_flag:
-            vh.will_flag = True
-            vh.will_qos = self.session.will_qos
-            payload.will_message = self.session.will_message
-            payload.will_topic = self.session.will_topic
-        else:
-            vh.will_flag = False
-
-        header = MQTTFixedHeader(CONNECT, 0x00)
-        packet = ConnectPacket(header, vh, payload)
-        return packet
-
     @asyncio.coroutine
     def handle_connection_close(self):
+        self.logger.warning("Disconnectd from broker")
         self.logger.debug("Watch broker disconnection")
         yield from self._handler.wait_disconnect()
         self.logger.debug("Handle broker disconnection")
         yield from self._handler.stop()
+        self._handler.detach_stream()
         self.session.transitions.disconnect()
-        self._connection_closed_future.set_result(None)
+        if self.config.get('auto_reconnect', False):
+            self.logger.debug("Auto-reconnecting")
+            yield from self.reconnect()
 
     def _initsession(
             self,

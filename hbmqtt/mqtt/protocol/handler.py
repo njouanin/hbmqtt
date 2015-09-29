@@ -53,8 +53,8 @@ class ProtocolHandler:
         log = logging.getLogger(__name__)
         self.logger = logging.LoggerAdapter(log, {'client_id': session.client_id})
         self.session = session
-        self.reader = session.reader
-        self.writer = session.writer
+        self.reader = None
+        self.writer = None
         self.plugins_manager = plugins_manager
 
         self.keepalive_timeout = self.session.keep_alive
@@ -75,23 +75,26 @@ class ProtocolHandler:
         self._pubrel_waiters = dict()
         self._pubcomp_waiters = dict()
 
-    def attach_session(self, session: Session, reader:ReaderAdapter, writer:WriterAdapter):
-        if self.session:
-            raise ProtocolHandlerException("Handler already attached to session '%s'" % self.session.client_id)
-        self.session = session
+    def attach_stream(self, reader: ReaderAdapter, writer: WriterAdapter):
+        if self.reader or self.writer:
+            raise ProtocolHandlerException("Handler is already attached to an opened stream")
         self.reader = reader
         self.writer = writer
 
-    def detach_session(self):
-        if not self.session:
-            self.logger.warning("detach_session() called while no session attached to handler")
+    def detach_stream(self):
+        self.reader = None
+        self.writer = None
+
+    def _is_attached(self):
+        if self.reader and self.writer:
+            return True
         else:
-            self.session = None
-            self.reader = None
-            self.writer = None
+            return False
 
     @asyncio.coroutine
     def start(self):
+        if not self._is_attached():
+            raise ProtocolHandlerException("Handler is not attached to a stream")
         self._reader_ready = asyncio.Event(loop=self._loop)
         self._reader_task = asyncio.Task(self._reader_loop(), loop=self._loop)
         yield from asyncio.wait([self._reader_ready.wait()], loop=self._loop)

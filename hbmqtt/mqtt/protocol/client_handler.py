@@ -26,7 +26,6 @@ class ClientProtocolHandler(ProtocolHandler):
         self._unsubscriptions_waiter = dict()
         self._disconnect_waiter = None
         self._pingresp_waiter = None
-        self._connack_waiter = None
 
     @asyncio.coroutine
     def start(self):
@@ -78,21 +77,10 @@ class ClientProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def mqtt_connect(self):
-        if self._connack_waiter and not self._connack_waiter.done():
-            raise ProtocolHandlerException("A CONNECT request is already pending")
         connect_packet = self._build_connect_packet()
         yield from self._send_packet(connect_packet)
-        self._connack_waiter = futures.Future(loop=self._loop)
-        yield from self._connack_waiter
-        connack = self._connack_waiter.result()
+        connack = yield from ConnackPacket.from_stream(self.reader)
         return connack.return_code
-
-    @asyncio.coroutine
-    def handle_connack(self, connack: ConnackPacket):
-        if not self._connack_waiter or self._connack_waiter.done():
-            self.logger.warning("Unexpected CONNACK received")
-        else:
-            self._connack_waiter.set_result(connack)
 
     def handle_write_timeout(self):
         self._ping_task = self._loop.call_soon(asyncio.async, self.mqtt_ping())

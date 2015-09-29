@@ -41,8 +41,6 @@ class Session:
 
     def __init__(self):
         self._init_states()
-        self.reader = None
-        self.writer = None
         self.remote_address = None
         self.remote_port = None
         self.client_id = None
