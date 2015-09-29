@@ -46,6 +46,23 @@ class ClientContext(BaseContext):
         super().__init__()
         self.config = None
 
+base_logger = logging.getLogger(__name__)
+
+
+def mqtt_connected(func):
+    """
+    MQTTClient coroutines decorator which will wait until connection before calling the decorated method.
+    :param func: coroutine to be called once connected
+    :return: coroutine result
+    """
+    @asyncio.coroutine
+    def wrapper(self, *args, **kwargs):
+        if not self._connected_state.is_set():
+            base_logger.warning("Client not connected, waiting for it")
+            yield from self._connected_state.wait()
+        return (yield from func(self, *args, **kwargs))
+    return wrapper
+
 
 class MQTTClient:
     def __init__(self, client_id=None, config=None, loop=None):
@@ -91,6 +108,7 @@ class MQTTClient:
         self.session = None
         self._handler = None
         self._disconnect_task = None
+        self._connected_state = asyncio.Event()
 
         # Init plugins manager
         context = ClientContext()
@@ -118,11 +136,13 @@ class MQTTClient:
         return (yield from self._do_connect())
 
     @asyncio.coroutine
+    @mqtt_connected
     def disconnect(self):
         if self.session.transitions.is_connected():
             if not self._disconnect_task.done():
                 self._disconnect_task.cancel()
             yield from self._handler.mqtt_disconnect()
+            self._connected_state.clear()
             yield from self._handler.stop()
             self.session.transitions.disconnect()
         else:
@@ -146,6 +166,7 @@ class MQTTClient:
         return return_code
 
     @asyncio.coroutine
+    @mqtt_connected
     def ping(self):
         """
         Send a MQTT ping request and wait for response
@@ -158,6 +179,7 @@ class MQTTClient:
                              self.session.transitions.state)
 
     @asyncio.coroutine
+    @mqtt_connected
     def publish(self, topic, message, qos=None, retain=None):
         def get_retain_and_qos():
             if qos:
@@ -178,21 +200,17 @@ class MQTTClient:
                     pass
             return _qos, _retain
         assert qos in (QOS_0, QOS_1, QOS_2)
-        if not self.session.transitions.is_connected():
-            self.logger.warn("publish MQTT message while not connected to broker, message may be lost")
         (app_qos, app_retain) = get_retain_and_qos()
         return (yield from self._handler.mqtt_publish(topic, message, qos, app_retain))
 
     @asyncio.coroutine
+    @mqtt_connected
     def subscribe(self, topics):
-        if not self.session.transitions.is_connected():
-            self.logger.warn("subscribe while not connected to broker, message may be lost")
         return (yield from self._handler.mqtt_subscribe(topics, self.session.next_packet_id))
 
     @asyncio.coroutine
+    @mqtt_connected
     def unsubscribe(self, topics):
-        if not self.session.transitions.is_connected():
-            self.logger.warn("unsubscribe while not connected to broker, message may be lost")
         yield from self._handler.mqtt_unsubscribe(topics, self.session.next_packet_id)
 
     @asyncio.coroutine
@@ -234,6 +252,7 @@ class MQTTClient:
             kwargs['ssl'] = sc
 
         try:
+            self._connected_state.clear()
             # Open connection
             if scheme in ('mqtt', 'mqtts'):
                 conn_reader, conn_writer = \
@@ -263,6 +282,7 @@ class MQTTClient:
                 # Handle MQTT protocol
                 yield from self._handler.start()
                 self.session.transitions.connect()
+                self._connected_state.set()
                 self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
         except InvalidURI as iuri:
             self.logger.warn("connection failed: invalid URI '%s'" % self.session.broker_uri)
@@ -279,10 +299,10 @@ class MQTTClient:
 
     @asyncio.coroutine
     def handle_connection_close(self):
-        self.logger.warning("Disconnectd from broker")
         self.logger.debug("Watch broker disconnection")
         yield from self._handler.wait_disconnect()
-        self.logger.debug("Handle broker disconnection")
+        self._connected_state.clear()
+        self.logger.warning("Disconnected from broker")
         yield from self._handler.stop()
         self._handler.detach_stream()
         self.session.transitions.disconnect()
