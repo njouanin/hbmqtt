@@ -45,7 +45,6 @@ class MQTTClientTest(unittest.TestCase):
         def test_coro():
             try:
                 client = MQTTClient()
-                print(os.path.dirname(os.path.realpath(__file__)))
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
                 ret = yield from client.connect('mqtts://test.mosquitto.org/', cafile=ca)
                 self.assertIsNotNone(client.session)
@@ -65,7 +64,6 @@ class MQTTClientTest(unittest.TestCase):
             try:
                 client = MQTTClient()
                 ret = yield from client.connect('mqtt://localhost/')
-                print(ret)
             except Exception as e:
                 future.set_result(True)
 
