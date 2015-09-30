@@ -364,3 +364,94 @@ class ProtocolHandlerTest(unittest.TestCase):
         self.assertFalse(session.inflight_out)
         self.assertFalse(session.inflight_in)
         # self.assertEquals(session.delivered_message_queue.qsize(), 0)
+
+    def test_publish_qos1_retry(self):
+        @asyncio.coroutine
+        def server_mock(reader, writer):
+            packet = yield from PublishPacket.from_stream(reader)
+            try:
+                self.assertEquals(packet.topic_name, '/topic')
+                self.assertEquals(packet.qos, QOS_1)
+                self.assertIsNotNone(packet.packet_id)
+                self.assertIn(packet.packet_id, self.session.inflight_out)
+                self.assertIn(packet.packet_id, self.handler._puback_waiters)
+                puback = PubackPacket.build(packet.packet_id)
+                yield from puback.to_stream(writer)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
+                reader_adapted, writer_adapted = adapt(reader, writer)
+                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
+                self.handler.attach_stream(reader_adapted, writer_adapted)
+                yield from self.handler.start()
+                yield from self.stop_handler(self.handler, self.session)
+                if not future.done():
+                    future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+        self.handler = None
+        self.session = Session()
+        message = OutgoingApplicationMessage(1, '/topic', QOS_1, b'test_data', False)
+        message.publish_packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_1, False)
+        self.session.inflight_out[1] = message
+        future = asyncio.Future(loop=self.loop)
+
+        coro = asyncio.start_server(server_mock, '127.0.0.1', 8888, loop=self.loop)
+        server = self.loop.run_until_complete(coro)
+        self.loop.run_until_complete(test_coro())
+        server.close()
+        self.loop.run_until_complete(server.wait_closed())
+        if future.exception():
+            raise future.exception()
+
+    def test_publish_qos2_retry(self):
+        @asyncio.coroutine
+        def server_mock(reader, writer):
+            try:
+                packet = yield from PublishPacket.from_stream(reader)
+                self.assertEquals(packet.topic_name, '/topic')
+                self.assertEquals(packet.qos, QOS_2)
+                self.assertIsNotNone(packet.packet_id)
+                self.assertIn(packet.packet_id, self.session.inflight_out)
+                self.assertIn(packet.packet_id, self.handler._pubrec_waiters)
+                pubrec = PubrecPacket.build(packet.packet_id)
+                yield from pubrec.to_stream(writer)
+
+                pubrel = yield from PubrelPacket.from_stream(reader)
+                self.assertIn(packet.packet_id, self.handler._pubcomp_waiters)
+                pubcomp = PubcompPacket.build(packet.packet_id)
+                yield from pubcomp.to_stream(writer)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
+                reader_adapted, writer_adapted = adapt(reader, writer)
+                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
+                self.handler.attach_stream(reader_adapted, writer_adapted)
+                yield from self.handler.start()
+                yield from self.stop_handler(self.handler, self.session)
+                if not future.done():
+                    future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+        self.handler = None
+        self.session = Session()
+        message = OutgoingApplicationMessage(1, '/topic', QOS_2, b'test_data', False)
+        message.publish_packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_2, False)
+        self.session.inflight_out[1] = message
+        future = asyncio.Future(loop=self.loop)
+
+        coro = asyncio.start_server(server_mock, '127.0.0.1', 8888, loop=self.loop)
+        server = self.loop.run_until_complete(coro)
+        self.loop.run_until_complete(test_coro())
+        server.close()
+        self.loop.run_until_complete(server.wait_closed())
+        if future.exception():
+            raise future.exception()

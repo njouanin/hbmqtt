@@ -3,6 +3,7 @@
 # See the file license.txt for copying permission.
 import logging
 import collections
+import itertools
 
 from asyncio import InvalidStateError
 from blinker import Signal
@@ -102,15 +103,14 @@ class ProtocolHandler:
             self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
         self.logger.debug("Handler tasks started")
-        yield from self.retry_deliveries()
+        yield from self._retry_deliveries()
         self.logger.debug("Handler ready")
 
     @asyncio.coroutine
     def stop(self):
-        # Stop incoming messages flow waiter
-        #for packet_id in self.session.inflight_in:
-        #    self.session.inflight_in[packet_id].cancel()
+        # Stop messages flow waiter
         self._reader_task.cancel()
+        self._stop_waiters()
         if self._keepalive_task:
             self._keepalive_task.cancel()
         self.logger.debug("waiting for tasks to be stopped")
@@ -122,33 +122,28 @@ class ProtocolHandler:
         except Exception as e:
             self.logger.debug("Handler writer close failed: %s" % e)
 
+    def _stop_waiters(self):
+        for waiter in itertools.chain(
+                self._puback_waiters.values(),
+                self._pubcomp_waiters.values(),
+                self._pubrec_waiters.values(),
+                self._pubrel_waiters.values()):
+            waiter.cancel()
+
     @asyncio.coroutine
-    def retry_deliveries(self):
+    def _retry_deliveries(self):
         """
         Handle [MQTT-4.4.0-1] by resending PUBLISH and PUBREL messages for pending out messages
         :return:
         """
         self.logger.debug("Begin messages delivery retries")
-        ack_packets = []
-        for packet_id in self.session.inflight_out:
-            message = self.session.inflight_out[packet_id]
-            if message.is_acknowledged():
-                ack_packets.append(packet_id)
-            else:
-                if not message.pubrec_packet:
-                    self.logger.debug("Retrying publish message Id=%d acknowledgment", packet_id)
-                    message.publish_packet = PublishPacket.build(
-                        message.topic,
-                        message.data,
-                        message.packet_id,
-                        True,
-                        message.qos,
-                        message.retain)
-                    yield from self._send_packet(message.publish_packet)
-                yield from self._handle_message_flow(message)
-        for packet_id in ack_packets:
-            del self.session.inflight_out[packet_id]
-        self.logger.debug("%d messages redelivered" % len(ack_packets))
+        tasks = []
+        for message in itertools.chain(self.session.inflight_in.values(), self.session.inflight_out.values()):
+            tasks.append(asyncio.wait_for(self._handle_message_flow(message), 10, loop=self._loop))
+        if tasks:
+            done, pending = yield from asyncio.wait(tasks)
+            self.logger.debug("%d messages redelivered" % len(done))
+            self.logger.debug("%d messages not redelivered due to timeout" % len(pending))
         self.logger.debug("End messages delivery retries")
 
     @asyncio.coroutine
