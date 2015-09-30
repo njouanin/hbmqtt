@@ -5,7 +5,6 @@ import unittest
 import asyncio
 import os
 import logging
-from hbmqtt.plugins.manager import PluginManager
 from hbmqtt.client import MQTTClient
 from hbmqtt.mqtt.constants import *
 
@@ -18,7 +17,6 @@ class MQTTClientTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.plugin_manager = PluginManager("hbmqtt.test.plugins", context=None, loop=self.loop)
 
     def tearDown(self):
         self.loop.close()
