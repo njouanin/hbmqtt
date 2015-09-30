@@ -128,7 +128,7 @@ class BrokerContext(BaseContext):
 class Broker:
     states = ['new', 'starting', 'started', 'not_started', 'stopping', 'stopped', 'not_stopped', 'stopped']
 
-    def __init__(self, config=None, loop=None):
+    def __init__(self, config=None, loop=None, plugin_namespace=None):
         """
 
         :param config: Example Yaml config
@@ -190,7 +190,11 @@ class Broker:
         # Init plugins manager
         context = BrokerContext()
         context.config = self.config
-        self.plugins_manager = PluginManager('hbmqtt.broker.plugins', context, self._loop)
+        if plugin_namespace:
+            namespace = plugin_namespace
+        else:
+            namespace = 'hbmqtt.broker.plugins'
+        self.plugins_manager = PluginManager(plugin_namespace, context, self._loop)
 
     def _build_listeners_config(self, broker_config):
         self.listeners_config = dict()
@@ -198,10 +202,9 @@ class Broker:
             listeners_config = broker_config['listeners']
             defaults = listeners_config['default']
             for listener in listeners_config:
-                if listener != 'default':
-                    config = dict(defaults)
-                    config.update(listeners_config[listener])
-                    self.listeners_config[listener] = config
+                config = dict(defaults)
+                config.update(listeners_config[listener])
+                self.listeners_config[listener] = config
         except KeyError as ke:
             raise BrokerException("Listener config not found invalid: %s" % ke)
 
