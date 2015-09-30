@@ -194,7 +194,7 @@ class Broker:
             namespace = plugin_namespace
         else:
             namespace = 'hbmqtt.broker.plugins'
-        self.plugins_manager = PluginManager(plugin_namespace, context, self._loop)
+        self.plugins_manager = PluginManager(namespace, context, self._loop)
 
     def _build_listeners_config(self, broker_config):
         self.listeners_config = dict()
