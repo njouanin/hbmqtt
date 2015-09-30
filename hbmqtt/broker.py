@@ -112,7 +112,7 @@ class Server:
     def close_instance(self):
         if self.instance:
             self.instance.close()
-            yield self.instance.wait_closed()
+            yield from self.instance.wait_closed()
 
 
 class BrokerContext(BaseContext):
