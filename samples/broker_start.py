@@ -8,15 +8,13 @@ logger = logging.getLogger(__name__)
 config = {
     'listeners': {
         'default': {
-            'type': 'tcp'
-        },
-        'tcp-mqtt': {
+            'type': 'tcp',
             'bind': '0.0.0.0:1883',
-            'max_connections': 10
         },
         'ws-mqtt': {
             'bind': '127.0.0.1:8080',
-            'type': 'ws'
+            'type': 'ws',
+            'max_connections': 10,
         },
     },
     'sys_interval': 0,
