@@ -2,10 +2,10 @@
 #
 # See the file license.txt for copying permission.
 import unittest
+from unittest.mock import patch, call
 import asyncio
 import logging
-from hbmqtt.plugins.manager import PluginManager
-from hbmqtt.broker import Broker
+from hbmqtt.broker import *
 from hbmqtt.mqtt.constants import *
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
@@ -17,18 +17,16 @@ class BrokerTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.plugin_manager = PluginManager("hbmqtt.test.plugins", context=None, loop=self.loop)
 
     def tearDown(self):
         self.loop.close()
 
-    def test_start_stop(self):
+    @patch('hbmqtt.broker.PluginManager')
+    def test_start_stop(self, MockPluginManager):
         config = {
             'listeners': {
                 'default': {
-                    'type': 'tcp'
-                },
-                'tcp-mqtt': {
+                    'type': 'tcp',
                     'bind': '0.0.0.0:1883',
                     'max_connections': 10
                 },
@@ -40,8 +38,25 @@ class BrokerTest(unittest.TestCase):
         }
 
         def test_coro():
-            broker = Broker(config)
-            yield from broker.start()
-            yield from broker.shutdown()
+            try:
+                broker = Broker(config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+                self.assertIn('default', broker._servers)
+                MockPluginManager.assert_has_calls(
+                    [call().fire_event(EVENT_BROKER_PRE_START),
+                     call().fire_event(EVENT_BROKER_POST_START)], any_order=True)
+                MockPluginManager.reset_mock()
+                yield from broker.shutdown()
+                MockPluginManager.assert_has_calls(
+                    [call().fire_event(EVENT_BROKER_PRE_SHUTDOWN),
+                     call().fire_event(EVENT_BROKER_POST_SHUTDOWN)], any_order=True)
+                self.assertTrue(broker.transitions.is_stopped())
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
 
+        future = asyncio.Future(loop=self.loop)
         self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
