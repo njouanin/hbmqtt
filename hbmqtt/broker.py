@@ -517,9 +517,7 @@ class Broker:
             return
 
         client_session.transitions.connect()
-        client_session.reader = reader
-        client_session.writer = writer
-        handler = self._init_handler(client_session)
+        handler = self._init_handler(client_session, reader, writer)
         self._sessions[client_id] = (client_session, handler)
 
         self.logger.debug("%s Start messages handling" % client_session.client_id)
@@ -599,12 +597,13 @@ class Broker:
         self.logger.debug("%s Session disconnected" % client_session.client_id)
         server.release_connection()
 
-    def _init_handler(self, session):
+    def _init_handler(self, session, reader, writer):
         """
         Create a BrokerProtocolHandler and attach to a session
         :return:
         """
         handler = BrokerProtocolHandler(session, self.plugins_manager, self._loop)
+        handler.attach_stream(reader, writer)
         handler.on_packet_received.connect(self.sys_handle_packet_received)
         handler.on_packet_sent.connect(self.sys_handle_packet_sent)
         return handler
