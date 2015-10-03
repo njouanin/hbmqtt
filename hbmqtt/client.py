@@ -284,6 +284,7 @@ class MQTTClient:
                 self.session.transitions.connect()
                 self._connected_state.set()
                 self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
+            return return_code
         except InvalidURI as iuri:
             self.logger.warn("connection failed: invalid URI '%s'" % self.session.broker_uri)
             self.session.transitions.disconnect()
