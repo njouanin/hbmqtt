@@ -50,17 +50,15 @@ class ProtocolHandler:
     on_packet_sent = Signal()
     on_packet_received = Signal()
 
-    def __init__(self, session: Session, plugins_manager: PluginManager, loop=None):
-        log = logging.getLogger(__name__)
-        self.logger = logging.LoggerAdapter(log, {'client_id': session.client_id})
-        self.session = session
+    def __init__(self, plugins_manager: PluginManager, session: Session=None, loop=None):
+        self.logger = logging.getLogger(__name__)
+        if session:
+            self._init_session(session)
+        else:
+            self.session = None
         self.reader = None
         self.writer = None
         self.plugins_manager = plugins_manager
-
-        self.keepalive_timeout = self.session.keep_alive
-        if self.keepalive_timeout <= 0:
-            self.keepalive_timeout = None
 
         if loop is None:
             self._loop = asyncio.get_event_loop()
@@ -76,18 +74,29 @@ class ProtocolHandler:
         self._pubrel_waiters = dict()
         self._pubcomp_waiters = dict()
 
-    def attach_stream(self, reader: ReaderAdapter, writer: WriterAdapter):
-        if self.reader or self.writer:
-            raise ProtocolHandlerException("Handler is already attached to an opened stream")
+    def _init_session(self, session: Session):
+        assert session
+        log = logging.getLogger(__name__)
+        self.session = session
+        self.logger = logging.LoggerAdapter(log, {'client_id': self.session.client_id})
+        self.keepalive_timeout = self.session.keep_alive
+        if self.keepalive_timeout <= 0:
+            self.keepalive_timeout = None
+
+    def attach(self, session, reader: ReaderAdapter, writer: WriterAdapter):
+        if self.session:
+            raise ProtocolHandlerException("Handler is already attached to a session")
+        self._init_session(session)
         self.reader = reader
         self.writer = writer
 
-    def detach_stream(self):
+    def detach(self):
+        self.session = None
         self.reader = None
         self.writer = None
 
     def _is_attached(self):
-        if self.reader and self.writer:
+        if self.session:
             return True
         else:
             return False
@@ -109,13 +118,14 @@ class ProtocolHandler:
     @asyncio.coroutine
     def stop(self):
         # Stop messages flow waiter
-        self._reader_task.cancel()
         self._stop_waiters()
         if self._keepalive_task:
             self._keepalive_task.cancel()
         self.logger.debug("waiting for tasks to be stopped")
-        yield from asyncio.wait(
-            [self._reader_stopped.wait()], loop=self._loop)
+        if not self._reader_task.done():
+            self._reader_task.cancel()
+            yield from asyncio.wait(
+                [self._reader_stopped.wait()], loop=self._loop)
         self.logger.debug("closing writer")
         try:
             yield from self.writer.close()
@@ -392,8 +402,8 @@ class ProtocolHandler:
                 self.handle_read_timeout()
             except NoDataException:
                 self.logger.debug("%s No data available" % self.session.client_id)
-            except Exception as e:
-                self.logger.warning("%s Unhandled exception in reader coro: %s" % (self.session.client_id, e))
+            except BaseException as e:
+                self.logger.warning("%s Unhandled exception in reader coro: %s" % (type(self).__name__, e))
                 break
         yield from self.handle_connection_closed()
         self._reader_stopped.set()
@@ -412,7 +422,7 @@ class ProtocolHandler:
         except ConnectionResetError as cre:
             yield from self.handle_connection_closed()
             raise
-        except Exception as e:
+        except BaseException as e:
             self.logger.warning("Unhandled exception: %s" % e)
             raise
 

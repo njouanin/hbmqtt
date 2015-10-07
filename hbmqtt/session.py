@@ -113,3 +113,6 @@ class Session:
         self.__dict__.update(state)
         self.retained_messages = Queue()
         self.delivered_message_queue = Queue()
+
+    def __eq__(self, other):
+        return self.client_id == other.client_id

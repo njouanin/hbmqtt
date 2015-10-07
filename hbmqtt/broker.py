@@ -14,7 +14,7 @@ from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
 from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_RECEIVED, EVENT_MQTT_PACKET_SENT
 from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import *
-from hbmqtt.errors import HBMQTTException
+from hbmqtt.errors import HBMQTTException, MQTTException
 from hbmqtt.utils import format_client_message, gen_client_id
 from hbmqtt.mqtt.packet import PUBLISH
 from hbmqtt.codecs import int_to_bytes_str
@@ -26,6 +26,10 @@ from hbmqtt.adapters import (
     WebSocketsReader,
     WebSocketsWriter)
 from .plugins.manager import PluginManager, BaseContext
+
+import sys
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
 
 
 _defaults = {
@@ -51,6 +55,8 @@ EVENT_BROKER_PRE_START = 'broker_pre_start'
 EVENT_BROKER_POST_START = 'broker_post_start'
 EVENT_BROKER_PRE_SHUTDOWN = 'broker_pre_shutdown'
 EVENT_BROKER_POST_SHUTDOWN = 'broker_post_shutdown'
+EVENT_BROKER_CLIENT_CONNECTED = 'broker_client_connected'
+EVENT_BROKER_CLIENT_DISCONNECTED = 'broker_client_disconnected'
 
 
 class BrokerException(BaseException):
@@ -407,131 +413,74 @@ class Broker:
 
     @asyncio.coroutine
     def client_connected(self, listener_name, reader: ReaderAdapter, writer: WriterAdapter):
-        # Wait for connection available
-        server = self._servers[listener_name]
+        # Wait for connection available on listener
+        server = self._servers.get(listener_name, None)
+        if not server:
+            raise BrokerException("Invalid listener name '%s'" % listener_name)
         yield from server.acquire_connection()
 
         remote_address, remote_port = writer.get_peer_info()
         self.logger.debug("Connection from %s:%d on listener '%s'" % (remote_address, remote_port, listener_name))
 
         # Wait for first packet and expect a CONNECT
-        connect = None
         try:
-            connect = yield from ConnectPacket.from_stream(reader)
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connect)
-            self.check_connect(connect)
+            handler, client_session = yield from BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager)
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))
             yield from writer.close()
             self.logger.debug("Connection closed")
             return
-        except BrokerException as be:
+        except MQTTException as me:
             self.logger.error('Invalid connection from %s : %s' %
-                              (format_client_message(address=remote_address, port=remote_port), be))
-            yield from writer.close()
-            self.logger.debug("Connection closed")
-            return
-        if connect.proto_name != "MQTT":
-            self.logger.warn('[MQTT-3.1.2-1] Incorrect protocol name: "%s"' % connect.variable_header.protocol_name)
+                              (format_client_message(address=remote_address, port=remote_port), me))
             yield from writer.close()
             self.logger.debug("Connection closed")
             return
 
-        connack = None
-        if connect.proto_level != 4:
-            # only MQTT 3.1.1 supported
-            self.logger.error('Invalid protocol from %s: %d' %
-                              (format_client_message(address=remote_address, port=remote_port),
-                               connect.variable_header.protocol_level))
-            connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
-        elif connect.username_flag and connect.username is None:
-            self.logger.error('Invalid username from %s' %
-                              (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
-        elif connect.password_flag and connect.password is None:
-            self.logger.error('Invalid password %s' % (format_client_message(address=remote_address, port=remote_port)))
-            connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
-        elif connect.clean_session_flag is False and connect.payload.client_id is None:
-            self.logger.error('[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' %
-                              format_client_message(address=remote_address, port=remote_port))
-            connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
-        if connack is not None:
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
-            yield from connack.to_stream(writer)
-            yield from writer.close()
-            return
-
-        client_session = None
-        self.logger.debug("Clean session={0}".format(connect.clean_session_flag))
-        self.logger.debug("known sessions={0}".format(self._sessions))
-        client_id = connect.client_id
-        if connect.clean_session_flag:
+        if client_session.clean_session:
             # Delete existing session and create a new one
-            if client_id is not None:
-                self.delete_session(client_id)
+            if client_session.client_id is not None:
+                self.delete_session(client_session.client_id)
             else:
-                client_id = gen_client_id()
-            client_session = Session()
+                client_session.client_id = gen_client_id()
             client_session.parent = 0
-            client_session.client_id = client_id
         else:
             # Get session from cache
-            if client_id in self._sessions:
-                self.logger.debug("Found old session %s" % repr(self._sessions[client_id]))
-                client_session = self._sessions[client_id]
+            if client_session.client_id in self._sessions:
+                self.logger.debug("Found old session %s" % repr(self._sessions[client_session.client_id]))
+                (client_session,) = self._sessions[client_session.client_id]
                 client_session.parent = 1
             else:
-                client_session = Session()
-                client_session.client_id = client_id
                 client_session.parent = 0
-
-        client_session.remote_address = remote_address
-        client_session.remote_port = remote_port
-        client_session.clean_session = connect.clean_session_flag
-        client_session.will_flag = connect.will_flag
-        client_session.will_retain = connect.will_retain_flag
-        client_session.will_qos = connect.will_qos
-        client_session.will_topic = connect.will_topic
-        client_session.will_message = connect.will_message
-        client_session.username = connect.username
-        client_session.password = connect.password
-        if connect.keep_alive > 0:
-            client_session.keep_alive = connect.keep_alive + self.config['timeout-disconnect-delay']
-        else:
-            client_session.keep_alive = 0
+        if client_session.keep_alive > 0:
+            client_session.keep_alive += self.config['timeout-disconnect-delay']
+        self.logger.debug("Keep-alive timeout=%d" % client_session.keep_alive)
         client_session.publish_retry_delay = self.config['publish-retry-delay']
 
+        handler.attach(client_session, reader, writer)
+        self._sessions[client_session.client_id] = (client_session, handler)
+
         authenticated = yield from self.authenticate(client_session, self.listeners_config[listener_name])
-        if authenticated:
-            connack = ConnackPacket.build(client_session.parent, CONNECTION_ACCEPTED)
-            self.logger.info('%s : connection accepted' % format_client_message(session=client_session))
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack, session=client_session)
-            yield from connack.to_stream(writer)
-        else:
-            connack = ConnackPacket.build(client_session.parent, NOT_AUTHORIZED)
-            self.logger.info('%s : connection refused' % format_client_message(session=client_session))
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack, session=client_session)
-            yield from connack.to_stream(writer)
+        yield from handler.mqtt_connack_authorize(authenticated)
+        if not authenticated:
             yield from writer.close()
             return
 
         client_session.transitions.connect()
-        handler = self._init_handler(client_session, reader, writer)
-        self._sessions[client_id] = (client_session, handler)
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_CONNECTED, session=client_session)
 
         self.logger.debug("%s Start messages handling" % client_session.client_id)
         yield from handler.start()
         self.logger.debug("Retained messages queue size: %d" % client_session.retained_messages.qsize())
         yield from self.publish_session_retained_messages(client_session)
-        self.logger.debug("%s Wait for disconnect" % client_session.client_id)
 
         # Init and start loop for handling client messages (publish, subscribe/unsubscribe, disconnect)
         connected = True
-        disconnect_waiter = asyncio.Task(handler.wait_disconnect(), loop=self._loop)
-        subscribe_waiter = asyncio.Task(handler.get_next_pending_subscription(), loop=self._loop)
-        unsubscribe_waiter = asyncio.Task(handler.get_next_pending_unsubscription(), loop=self._loop)
-        wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message(), loop=self._loop)
+        disconnect_waiter = asyncio.ensure_future(handler.wait_disconnect(), loop=self._loop)
+        subscribe_waiter = asyncio.ensure_future(handler.get_next_pending_subscription(), loop=self._loop)
+        unsubscribe_waiter = asyncio.ensure_future(handler.get_next_pending_unsubscription(), loop=self._loop)
+        wait_deliver = asyncio.ensure_future(handler.mqtt_deliver_next_message(), loop=self._loop)
         while connected:
             done, pending = yield from asyncio.wait(
                 [disconnect_waiter, subscribe_waiter, unsubscribe_waiter, wait_deliver],
@@ -586,6 +535,7 @@ class Broker:
                 # Acknowledge message delivery
                 yield from handler.mqtt_acknowledge_delivery(packet_id)
                 wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message(), loop=self._loop)
+        disconnect_waiter.cancel()
         subscribe_waiter.cancel()
         unsubscribe_waiter.cancel()
         wait_deliver.cancel()
@@ -593,6 +543,7 @@ class Broker:
         self.logger.debug("%s Client disconnecting" % client_session.client_id)
         yield from self._stop_handler(handler)
         client_session.transitions.disconnect()
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, session=client_session)
         yield from writer.close()
         self.logger.debug("%s Session disconnected" % client_session.client_id)
         server.release_connection()
@@ -602,8 +553,8 @@ class Broker:
         Create a BrokerProtocolHandler and attach to a session
         :return:
         """
-        handler = BrokerProtocolHandler(session, self.plugins_manager, self._loop)
-        handler.attach_stream(reader, writer)
+        handler = BrokerProtocolHandler(self.plugins_manager, self._loop)
+        handler.attach(session, reader, writer)
         handler.on_packet_received.connect(self.sys_handle_packet_received)
         handler.on_packet_sent.connect(self.sys_handle_packet_sent)
         return handler
@@ -619,17 +570,6 @@ class Broker:
             yield from handler.stop()
         except Exception as e:
             self.logger.error(e)
-
-    def check_connect(self, connect: ConnectPacket):
-        if connect.payload.client_id is None:
-            raise BrokerException('[[MQTT-3.1.3-3]] : Client identifier must be present' )
-
-        if connect.variable_header.will_flag:
-            if connect.payload.will_topic is None or connect.payload.will_message is None:
-                raise BrokerException('will flag set, but will topic/message not present in payload')
-
-        if connect.variable_header.reserved_flag:
-            raise BrokerException('[MQTT-3.1.2-3] CONNECT reserved flag must be set to 0')
 
     @asyncio.coroutine
     def authenticate(self, session: Session, listener):
@@ -653,13 +593,14 @@ class Broker:
             session=session,
             filter_plugins=auth_plugins)
         auth_result = True
-        for plugin in returns:
-            res = returns[plugin]
-            if res is False:
-                auth_result = False
-                self.logger.debug("Authentication failed due to '%s' plugin result: %s" % (plugin.name, res))
-            else:
-                self.logger.debug("'%s' plugin result: %s" % (plugin.name, res))
+        if returns:
+            for plugin in returns:
+                res = returns[plugin]
+                if res is False:
+                    auth_result = False
+                    self.logger.debug("Authentication failed due to '%s' plugin result: %s" % (plugin.name, res))
+                else:
+                    self.logger.debug("'%s' plugin result: %s" % (plugin.name, res))
         # If all plugins returned True, authentication is success
         return auth_result
 

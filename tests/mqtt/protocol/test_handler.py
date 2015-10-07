@@ -35,8 +35,8 @@ class ProtocolHandlerTest(unittest.TestCase):
 
     def test_init_handler(self):
         s = Session()
-        handler = ProtocolHandler(s, self.plugin_manager, loop=self.loop)
-        self.assertIs(handler.session, s)
+        handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+        self.assertIsNone(handler.session)
         self.assertIs(handler._loop, self.loop)
         self.check_empty_waiters(handler)
 
@@ -51,8 +51,8 @@ class ProtocolHandlerTest(unittest.TestCase):
                 s = Session()
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                handler = ProtocolHandler(s, self.plugin_manager)
-                handler.attach_stream(reader_adapted, writer_adapted)
+                handler = ProtocolHandler(self.plugin_manager)
+                handler.attach(s, reader_adapted, writer_adapted)
                 yield from self.start_handler(handler, s)
                 yield from self.stop_handler(handler, s)
                 future.set_result(True)
@@ -79,15 +79,14 @@ class ProtocolHandlerTest(unittest.TestCase):
             except Exception as ae:
                 future.set_exception(ae)
 
-
         @asyncio.coroutine
         def test_coro():
             try:
                 s = Session()
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                handler = ProtocolHandler(s, self.plugin_manager, loop=self.loop)
-                handler.attach_stream(reader_adapted, writer_adapted)
+                handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+                handler.attach(s, reader_adapted, writer_adapted)
                 yield from self.start_handler(handler, s)
                 message = yield from handler.mqtt_publish('/topic', b'test_data', QOS_0, False)
                 self.assertIsInstance(message, OutgoingApplicationMessage)
@@ -130,8 +129,8 @@ class ProtocolHandlerTest(unittest.TestCase):
             try:
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
-                self.handler.attach_stream(reader_adapted, writer_adapted)
+                self.handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+                self.handler.attach(self.session, reader_adapted, writer_adapted)
                 yield from self.start_handler(self.handler, self.session)
                 message = yield from self.handler.mqtt_publish('/topic', b'test_data', QOS_1, False)
                 self.assertIsInstance(message, OutgoingApplicationMessage)
@@ -182,8 +181,8 @@ class ProtocolHandlerTest(unittest.TestCase):
             try:
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
-                self.handler.attach_stream(reader_adapted, writer_adapted)
+                self.handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+                self.handler.attach(self.session, reader_adapted, writer_adapted)
                 yield from self.start_handler(self.handler, self.session)
                 message = yield from self.handler.mqtt_publish('/topic', b'test_data', QOS_2, False)
                 self.assertIsInstance(message, OutgoingApplicationMessage)
@@ -220,8 +219,8 @@ class ProtocolHandlerTest(unittest.TestCase):
             try:
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
-                self.handler.attach_stream(reader_adapted, writer_adapted)
+                self.handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+                self.handler.attach(self.session, reader_adapted, writer_adapted)
                 yield from self.start_handler(self.handler, self.session)
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
@@ -264,8 +263,8 @@ class ProtocolHandlerTest(unittest.TestCase):
             try:
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
-                self.handler.attach_stream(reader_adapted, writer_adapted)
+                self.handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+                self.handler.attach(self.session, reader_adapted, writer_adapted)
                 yield from self.start_handler(self.handler, self.session)
                 message = yield from self.handler.mqtt_deliver_next_message()
                 self.assertIsInstance(message, IncomingApplicationMessage)
@@ -385,8 +384,8 @@ class ProtocolHandlerTest(unittest.TestCase):
             try:
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
-                self.handler.attach_stream(reader_adapted, writer_adapted)
+                self.handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+                self.handler.attach(self.session, reader_adapted, writer_adapted)
                 yield from self.handler.start()
                 yield from self.stop_handler(self.handler, self.session)
                 if not future.done():
@@ -433,8 +432,8 @@ class ProtocolHandlerTest(unittest.TestCase):
             try:
                 reader, writer = yield from asyncio.open_connection('127.0.0.1', 8888, loop=self.loop)
                 reader_adapted, writer_adapted = adapt(reader, writer)
-                self.handler = ProtocolHandler(self.session, self.plugin_manager, loop=self.loop)
-                self.handler.attach_stream(reader_adapted, writer_adapted)
+                self.handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
+                self.handler.attach(self.session, reader_adapted, writer_adapted)
                 yield from self.handler.start()
                 yield from self.stop_handler(self.handler, self.session)
                 if not future.done():

@@ -19,13 +19,16 @@ from hbmqtt.mqtt.constants import *
 import websockets
 from websockets.uri import InvalidURI
 from websockets.handshake import InvalidHandshake
+from collections import deque
 
 _defaults = {
     'keep_alive': 10,
     'ping_delay': 1,
     'default_qos': 0,
     'default_retain': False,
-    'auto_reconnect': True
+    'auto_reconnect': True,
+    'reconnect_max_interval': 10,
+    'reconnect_retries': 2,
 }
 
 
@@ -114,6 +117,7 @@ class MQTTClient:
         context = ClientContext()
         context.config = self.config
         self.plugins_manager = PluginManager('hbmqtt.client.plugins', context)
+        self.client_tasks = deque()
 
 
     @asyncio.coroutine
@@ -133,7 +137,15 @@ class MQTTClient:
         self.session = self._initsession(uri, cleansession, cafile, capath, cadata)
         self.logger.debug("Connect to: %s" % uri)
 
-        return (yield from self._do_connect())
+        try:
+            return (yield from self._do_connect())
+        except BaseException as be:
+            self.logger.warning("Connection failed: %r" % be)
+            auto_reconnect = self.config.get('auto_reconnect', False)
+            if not auto_reconnect:
+                raise
+            else:
+                return (yield from self.reconnect())
 
     @asyncio.coroutine
     @mqtt_connected
@@ -157,12 +169,30 @@ class MQTTClient:
         if cleansession:
             self.session.clean_session = cleansession
         self.logger.debug("Reconnecting with session parameters: %s" % self.session)
-        return (yield from self._do_connect())
+        reconnect_max_interval = self.config.get('reconnect_max_interval', 10)
+        reconnect_retries = self.config.get('reconnect_retries', 5)
+        nb_attempt = 1
+        yield from asyncio.sleep(1, loop=self._loop)
+        while True:
+            try:
+                self.logger.debug("Reconnect attempt %d ..." % nb_attempt)
+                return (yield from self._do_connect())
+            except BaseException as e:
+                self.logger.warning("Reconnection attempt failed: %r" % e)
+                if nb_attempt > reconnect_retries:
+                    self.logger.error("Maximum number of connection attempts reached. Reconnection aborted")
+                    raise ConnectException("Too many connection attempts failed")
+                exp = 2 ** nb_attempt
+                delay = exp if exp < reconnect_max_interval else reconnect_max_interval
+                self.logger.debug("Waiting %d second before next attempt" % delay)
+                yield from asyncio.sleep(delay, loop=self._loop)
+                nb_attempt += 1
+
 
     @asyncio.coroutine
     def _do_connect(self):
         return_code = yield from self._connect_coro()
-        self._disconnect_task = asyncio.Task(self.handle_connection_close(), loop=self._loop)
+        self._disconnect_task = asyncio.ensure_future(self.handle_connection_close(), loop=self._loop)
         return return_code
 
     @asyncio.coroutine
@@ -214,6 +244,17 @@ class MQTTClient:
         yield from self._handler.mqtt_unsubscribe(topics, self.session.next_packet_id)
 
     @asyncio.coroutine
+    def deliver_message(self, timeout=None):
+        deliver_task = asyncio.ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
+        self.client_tasks.append(deliver_task)
+        self.logger.debug("Waiting message delivery")
+        message = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
+        if deliver_task.exception():
+            raise deliver_task.exception()
+        self.client_tasks.pop()
+        return message
+
+    @asyncio.coroutine
     def _connect_coro(self):
         kwargs = dict()
 
@@ -235,8 +276,8 @@ class MQTTClient:
                    uri_attributes[3], uri_attributes[4], uri_attributes[5])
             self.session.broker_uri = urlunparse(uri)
         # Init protocol handler
-        if not self._handler:
-            self._handler = ClientProtocolHandler(self.session, self.plugins_manager, loop=self._loop)
+        #if not self._handler:
+        self._handler = ClientProtocolHandler(self.plugins_manager, loop=self._loop)
 
         if secure:
             if self.session.cafile is None or self.session.cafile == '':
@@ -252,6 +293,8 @@ class MQTTClient:
             kwargs['ssl'] = sc
 
         try:
+            reader = None
+            writer = None
             self._connected_state.clear()
             # Open connection
             if scheme in ('mqtt', 'mqtts'):
@@ -270,7 +313,7 @@ class MQTTClient:
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
             # Start MQTT protocol
-            self._handler.attach_stream(reader, writer)
+            self._handler.attach(self.session, reader, writer)
             return_code = yield from self._handler.mqtt_connect()
             if return_code is not CONNECTION_ACCEPTED:
                 self.session.transitions.disconnect()
@@ -293,23 +336,39 @@ class MQTTClient:
             self.logger.warn("connection failed: invalid websocket handshake")
             self.session.transitions.disconnect()
             raise ConnectException("connection failed: invalid websocket handshake", ihs)
-        except ProtocolHandlerException as e:
-            self.logger.warn("MQTT connection failed: %s" % e)
+        except (ProtocolHandlerException, ConnectionError, OSError) as e:
+            self.logger.warn("MQTT connection failed: %r" % e)
             self.session.transitions.disconnect()
-            raise ClientException("connection Failed: %s" % e)
+            raise ConnectException(e)
 
     @asyncio.coroutine
     def handle_connection_close(self):
         self.logger.debug("Watch broker disconnection")
+        # Wait for disconnection from broker (like connection lost)
         yield from self._handler.wait_disconnect()
-        self._connected_state.clear()
         self.logger.warning("Disconnected from broker")
+
+        # Block client API
+        self._connected_state.clear()
+
+        # stop an clean handler
         yield from self._handler.stop()
-        self._handler.detach_stream()
+        self._handler.detach()
         self.session.transitions.disconnect()
+
         if self.config.get('auto_reconnect', False):
+            # Try reconnection
             self.logger.debug("Auto-reconnecting")
-            yield from self.reconnect()
+            try:
+                yield from self.reconnect()
+            except ConnectException:
+                # Cancel client pending tasks
+                while self.client_tasks:
+                    self.client_tasks.popleft().set_exception(ClientException("Connection lost"))
+        else:
+            # Cancel client pending tasks
+            while self.client_tasks:
+                self.client_tasks.popleft().set_exception(ClientException("Connection lost"))
 
     def _initsession(
             self,

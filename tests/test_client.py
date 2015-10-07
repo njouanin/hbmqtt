@@ -5,7 +5,7 @@ import unittest
 import asyncio
 import os
 import logging
-from hbmqtt.client import MQTTClient
+from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.mqtt.constants import *
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
@@ -60,9 +60,10 @@ class MQTTClientTest(unittest.TestCase):
         @asyncio.coroutine
         def test_coro():
             try:
-                client = MQTTClient()
+                config = {'auto_reconnect': False}
+                client = MQTTClient(config=config)
                 ret = yield from client.connect('mqtt://localhost/')
-            except Exception as e:
+            except ConnectException as e:
                 future.set_result(True)
 
         future = asyncio.Future(loop=self.loop)
