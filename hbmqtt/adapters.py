@@ -165,6 +165,9 @@ class StreamWriterAdapter(WriterAdapter):
 
     @asyncio.coroutine
     def close(self):
+        yield from self._writer.drain()
+        if self._writer.can_write_eof():
+            self._writer.write_eof()
         self._writer.close()
 
 
