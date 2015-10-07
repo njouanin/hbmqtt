@@ -18,7 +18,7 @@ def not_in_dict_or_none(dict, key):
 
 def format_client_message(session=None, address=None, port=None):
     if session:
-        return "(client @=%s:%d id=%s)" % (session.remote_address, session.remote_port, session.client_id)
+        return "(client id=%s)" % session.client_id
     elif address is not None and port is not None:
         return "(client @=%s:%d)" % (address, port)
     else:
