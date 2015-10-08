@@ -56,6 +56,7 @@ EVENT_BROKER_POST_SHUTDOWN = 'broker_post_shutdown'
 EVENT_BROKER_CLIENT_CONNECTED = 'broker_client_connected'
 EVENT_BROKER_CLIENT_DISCONNECTED = 'broker_client_disconnected'
 EVENT_BROKER_CLIENT_SUBSCRIBED = 'broker_client_subscribed'
+EVENT_BROKER_CLIENT_UNSUBSCRIBED = 'broker_client_unsubscribed'
 
 
 class BrokerException(BaseException):
@@ -505,6 +506,10 @@ class Broker:
                 unsubscription = unsubscribe_waiter.result()
                 for topic in unsubscription['topics']:
                     self.del_subscription(topic, client_session)
+                    yield from self.plugins_manager.fire_event(
+                        EVENT_BROKER_CLIENT_UNSUBSCRIBED,
+                        client_id=client_session.client_id,
+                        topic=topic)
                 yield from handler.mqtt_acknowledge_unsubscription(unsubscription['packet_id'])
                 unsubscribe_waiter = asyncio.Task(handler.get_next_pending_unsubscription(), loop=self._loop)
             if subscribe_waiter in done:
@@ -634,7 +639,7 @@ class Broker:
             if a_filter not in self._subscriptions:
                 self._subscriptions[a_filter] = []
             already_subscribed = next(
-                (s for s in self._subscriptions[a_filter] if s.session.client_id == session.client_id), None)
+                (s for (s,qos) in self._subscriptions[a_filter] if s.client_id == session.client_id), None)
             if not already_subscribed:
                 self._subscriptions[a_filter].append((session, qos))
             else:
@@ -651,6 +656,9 @@ class Broker:
                     self.logger.debug("Removing subscription on topic '%s' for client %s" %
                                       (a_filter, format_client_message(session=session)))
                     subscriptions.pop(index)
+            # Remove filter for subsriptions list if there are no more subscribers
+            if not self._subscriptions[a_filter]:
+                del self._subscriptions[a_filter]
         except KeyError:
             # Unsubscribe topic not found in current subscribed topics
             pass
