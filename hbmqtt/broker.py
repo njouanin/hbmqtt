@@ -55,19 +55,11 @@ EVENT_BROKER_PRE_SHUTDOWN = 'broker_pre_shutdown'
 EVENT_BROKER_POST_SHUTDOWN = 'broker_post_shutdown'
 EVENT_BROKER_CLIENT_CONNECTED = 'broker_client_connected'
 EVENT_BROKER_CLIENT_DISCONNECTED = 'broker_client_disconnected'
+EVENT_BROKER_CLIENT_SUBSCRIBED = 'broker_client_subscribed'
 
 
 class BrokerException(BaseException):
     pass
-
-
-class Subscription:
-    def __init__(self, session, qos):
-        self.session = session
-        self.qos = qos
-
-    def __repr__(self):
-        return type(self).__name__ + '(client_id={0}, qos={1!r})'.format(self.session.client_id, self.qos)
 
 
 class RetainedApplicationMessage:
@@ -472,7 +464,7 @@ class Broker:
             return
 
         client_session.transitions.connect()
-        yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_CONNECTED, session=client_session)
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_CONNECTED, client_id=client_session.client_id)
 
         self.logger.debug("%s Start messages handling" % client_session.client_id)
         yield from handler.start()
@@ -524,6 +516,11 @@ class Broker:
                 yield from handler.mqtt_acknowledge_subscription(subscriptions['packet_id'], return_codes)
                 for index, subscription in enumerate(subscriptions['topics']):
                     if return_codes[index] != 0x80:
+                        yield from self.plugins_manager.fire_event(
+                            EVENT_BROKER_CLIENT_SUBSCRIBED,
+                            client_id=client_session.client_id,
+                            topic=subscription[0],
+                            qos=subscription[1])
                         yield from self.publish_retained_messages_for_subscription(subscription, client_session)
                 subscribe_waiter = asyncio.Task(handler.get_next_pending_subscription(), loop=self._loop)
                 self.logger.debug(repr(self._subscriptions))
@@ -547,7 +544,7 @@ class Broker:
         self.logger.debug("%s Client disconnecting" % client_session.client_id)
         yield from self._stop_handler(handler)
         client_session.transitions.disconnect()
-        yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, session=client_session)
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, client_id=client_session.client_id)
         yield from writer.close()
         self.logger.debug("%s Session disconnected" % client_session.client_id)
         server.release_connection()
@@ -639,7 +636,7 @@ class Broker:
             already_subscribed = next(
                 (s for s in self._subscriptions[a_filter] if s.session.client_id == session.client_id), None)
             if not already_subscribed:
-                self._subscriptions[a_filter].append(Subscription(session, qos))
+                self._subscriptions[a_filter].append((session, qos))
             else:
                 self.logger.debug("Client %s has already subscribed to %s" % (format_client_message(session=session), a_filter))
             return qos
@@ -649,8 +646,8 @@ class Broker:
     def del_subscription(self, a_filter, session):
         try:
             subscriptions = self._subscriptions[a_filter]
-            for index, subscription in enumerate(subscriptions):
-                if subscription.session.client_id == session.client_id:
+            for index, (sub_session, qos) in enumerate(subscriptions):
+                if sub_session.client_id == session.client_id:
                     self.logger.debug("Removing subscription on topic '%s' for client %s" %
                                       (a_filter, format_client_message(session=session)))
                     subscriptions.pop(index)
@@ -676,16 +673,14 @@ class Broker:
             for k_filter in self._subscriptions:
                 if self.matches(topic, k_filter):
                     subscriptions = self._subscriptions[k_filter]
-                    for subscription in subscriptions:
-                        target_session = subscription.session
-                        qos = subscription.qos
+                    for (target_session, qos) in subscriptions:
                         if force_qos is not None:
                             qos = force_qos
                         if target_session.transitions.state == 'connected':
                             self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
                                               (format_client_message(session=source_session),
                                                topic, format_client_message(session=target_session)))
-                            handler = subscription.session.handler
+                            handler = _get_handler(target_session)
                             publish_tasks.append(
                                 asyncio.Task(handler.mqtt_publish(topic, data, qos, retain=False), loop=self._loop)
                             )
@@ -778,3 +773,12 @@ class Broker:
             self._stats[STAT_MSG_SENT] += 1
             if packet.fixed_header.packet_type == PUBLISH:
                 self._stats[STAT_PUBLISH_SENT] += 1
+
+    def _get_handler(self, session):
+        """
+        Return the handler attached to a given session
+        :param session:
+        :return:
+        """
+        (s, h) = self._sessions[session.client_id]
+        return h
