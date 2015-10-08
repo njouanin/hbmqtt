@@ -11,8 +11,6 @@ from functools import partial
 from transitions import Machine, MachineError
 from hbmqtt.session import Session
 from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
-from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_RECEIVED, EVENT_MQTT_PACKET_SENT
-from hbmqtt.mqtt.connect import ConnectPacket
 from hbmqtt.mqtt.connack import *
 from hbmqtt.errors import HBMQTTException, MQTTException
 from hbmqtt.utils import format_client_message, gen_client_id
@@ -227,6 +225,9 @@ class Broker:
     @asyncio.coroutine
     def start(self):
         try:
+            self._sessions = dict()
+            self._subscriptions = dict()
+            self._global_retained_messages = dict()
             self.transitions.start()
             self.logger.debug("Broker starting")
         except MachineError as me:
@@ -299,6 +300,9 @@ class Broker:
     @asyncio.coroutine
     def shutdown(self):
         try:
+            self._sessions = dict()
+            self._subscriptions = dict()
+            self._global_retained_messages = dict()
             self.transitions.shutdown()
         except MachineError as me:
             self.logger.debug("Invalid method call at this moment: %s" % me)

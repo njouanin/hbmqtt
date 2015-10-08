@@ -75,8 +75,10 @@ class BrokerTest(unittest.TestCase):
                 self.assertEqual(ret, 0)
                 yield from client.disconnect()
                 yield from asyncio.sleep(0.1)
+                self.assertIn(client.session.client_id, broker._sessions)
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
+                self.assertDictEqual(broker._sessions, {})
                 MockPluginManager.assert_has_calls(
                     [call().fire_event(EVENT_BROKER_CLIENT_CONNECTED, session=client.session),
                      call().fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, session=client.session)], any_order=True)
