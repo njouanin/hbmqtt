@@ -254,10 +254,10 @@ class BrokerTest(unittest.TestCase):
                 broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
+
                 pub_client = MQTTClient()
                 ret = yield from pub_client.connect('mqtt://localhost/')
                 self.assertEqual(ret, 0)
-
                 ret_message = yield from pub_client.publish('/topic', b'data', QOS_0, retain=True)
                 yield from pub_client.disconnect()
                 yield from asyncio.sleep(0.1)
@@ -269,11 +269,6 @@ class BrokerTest(unittest.TestCase):
                 self.assertEquals(retained_message.qos, QOS_0)
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
-                MockPluginManager.assert_has_calls(
-                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
-                                       client_id=pub_client.session.client_id,
-                                       message=ret_message),
-                    ], any_order=True)
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -282,3 +277,86 @@ class BrokerTest(unittest.TestCase):
         self.loop.run_until_complete(test_coro())
         if future.exception():
             raise future.exception()
+
+    @patch('hbmqtt.broker.PluginManager')
+    def test_client_subscribe_publish(self, MockPluginManager):
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+                sub_client = MQTTClient()
+                yield from sub_client.connect('mqtt://localhost')
+                ret = yield from sub_client.subscribe([('/qos0', QOS_0), ('/qos1', QOS_1), ('/qos2', QOS_2)])
+                self.assertEquals(ret, [QOS_0, QOS_1, QOS_2])
+
+                yield from self._client_publish('/qos0', b'data', QOS_0)
+                yield from self._client_publish('/qos1', b'data', QOS_1)
+                yield from self._client_publish('/qos2', b'data', QOS_2)
+                yield from asyncio.sleep(0.1)
+                for qos in [QOS_0, QOS_1, QOS_2]:
+                    message = yield from sub_client.deliver_message()
+                    self.assertIsNotNone(message)
+                    self.assertEquals(message.topic, '/qos%s' % qos)
+                    self.assertEquals(message.data, b'data')
+                    self.assertEquals(message.qos, qos)
+                yield from sub_client.disconnect()
+                yield from asyncio.sleep(0.1)
+                yield from broker.shutdown()
+                self.assertTrue(broker.transitions.is_stopped())
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    @patch('hbmqtt.broker.PluginManager')
+    def test_client_publish_retain_subscribe(self, MockPluginManager):
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+                sub_client = MQTTClient()
+                yield from sub_client.connect('mqtt://localhost', cleansession=False)
+                ret = yield from sub_client.subscribe([('/qos0', QOS_0), ('/qos1', QOS_1), ('/qos2', QOS_2)])
+                self.assertEquals(ret, [QOS_0, QOS_1, QOS_2])
+                yield from sub_client.disconnect()
+                yield from asyncio.sleep(0.1)
+
+                yield from self._client_publish('/qos0', b'data', QOS_0, retain=True)
+                yield from self._client_publish('/qos1', b'data', QOS_1, retain=True)
+                yield from self._client_publish('/qos2', b'data', QOS_2, retain=True)
+                yield from sub_client.reconnect()
+                for qos in [QOS_0, QOS_1, QOS_2]:
+                    log.debug("TEST QOS: %d" % qos)
+                    message = yield from sub_client.deliver_message()
+                    log.debug("Message: " + repr(message.publish_packet))
+                    self.assertIsNotNone(message)
+                    self.assertEquals(message.topic, '/qos%s' % qos)
+                    self.assertEquals(message.data, b'data')
+                    self.assertEquals(message.qos, qos)
+                yield from sub_client.disconnect()
+                yield from asyncio.sleep(0.1)
+                yield from broker.shutdown()
+                self.assertTrue(broker.transitions.is_stopped())
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    @asyncio.coroutine
+    def _client_publish(self, topic, data, qos, retain=False):
+        pub_client = MQTTClient()
+        ret = yield from pub_client.connect('mqtt://localhost/')
+        self.assertEqual(ret, 0)
+        ret = yield from pub_client.publish(topic, data, qos, retain)
+        yield from pub_client.disconnect()
+        return ret

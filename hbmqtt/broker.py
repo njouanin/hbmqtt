@@ -447,7 +447,7 @@ class Broker:
             # Get session from cache
             if client_session.client_id in self._sessions:
                 self.logger.debug("Found old session %s" % repr(self._sessions[client_session.client_id]))
-                (client_session,) = self._sessions[client_session.client_id]
+                (client_session,h) = self._sessions[client_session.client_id]
                 client_session.parent = 1
             else:
                 client_session.parent = 0
@@ -696,9 +696,7 @@ class Broker:
                                               (format_client_message(session=source_session),
                                                topic, format_client_message(session=target_session)))
                             retained_message = RetainedApplicationMessage(source_session, topic, data, qos)
-                            publish_tasks.append(
-                                asyncio.Task(target_session.retained_messages.put(retained_message), loop=self._loop)
-                            )
+                            yield from target_session.retained_messages.put(retained_message)
 
             if publish_tasks:
                 yield from asyncio.wait(publish_tasks, loop=self._loop)
@@ -714,10 +712,11 @@ class Broker:
                           (session.retained_messages.qsize(), format_client_message(session=session))
                           )
         publish_tasks = []
+        handler = self._get_handler(session)
         while not session.retained_messages.empty():
             retained = yield from session.retained_messages.get()
             publish_tasks.append(asyncio.Task(
-                session.handler.mqtt_publish(
+                handler.mqtt_publish(
                     retained.topic, retained.data, retained.qos, True), loop=self._loop))
         if publish_tasks:
             yield from asyncio.wait(publish_tasks, loop=self._loop)
