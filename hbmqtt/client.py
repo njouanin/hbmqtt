@@ -248,11 +248,11 @@ class MQTTClient:
         deliver_task = asyncio.ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
         self.client_tasks.append(deliver_task)
         self.logger.debug("Waiting message delivery")
-        message = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
+        yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
         if deliver_task.exception():
             raise deliver_task.exception()
         self.client_tasks.pop()
-        return message
+        return deliver_task.result()
 
     @asyncio.coroutine
     def _connect_coro(self):
