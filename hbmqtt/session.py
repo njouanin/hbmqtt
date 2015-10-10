@@ -27,6 +27,8 @@ class ApplicationMessage:
     def build_publish_packet(self, dup=False):
         return PublishPacket.build(self.topic, self.data, self.packet_id, dup, self.qos, self.retain)
 
+    def __eq__(self, other):
+        return self.packet_id == other.packet_id
 
 class IncomingApplicationMessage(ApplicationMessage):
     pass

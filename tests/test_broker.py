@@ -214,3 +214,71 @@ class BrokerTest(unittest.TestCase):
         self.loop.run_until_complete(test_coro())
         if future.exception():
             raise future.exception()
+
+    @patch('hbmqtt.broker.PluginManager')
+    def test_client_publish(self, MockPluginManager):
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+                pub_client = MQTTClient()
+                ret = yield from pub_client.connect('mqtt://localhost/')
+                self.assertEqual(ret, 0)
+
+                ret_message = yield from pub_client.publish('/topic', b'data', QOS_0)
+                yield from pub_client.disconnect()
+                self.assertEquals(broker._retained_messages, {})
+
+                yield from asyncio.sleep(0.1)
+                yield from broker.shutdown()
+                self.assertTrue(broker.transitions.is_stopped())
+                MockPluginManager.assert_has_calls(
+                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                                       client_id=pub_client.session.client_id,
+                                       message=ret_message),
+                    ], any_order=True)
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    @patch('hbmqtt.broker.PluginManager')
+    def test_client_publish_retain(self, MockPluginManager):
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+                pub_client = MQTTClient()
+                ret = yield from pub_client.connect('mqtt://localhost/')
+                self.assertEqual(ret, 0)
+
+                ret_message = yield from pub_client.publish('/topic', b'data', QOS_0, retain=True)
+                yield from pub_client.disconnect()
+                yield from asyncio.sleep(0.1)
+                self.assertIn('/topic', broker._retained_messages)
+                retained_message = broker._retained_messages['/topic']
+                self.assertEquals(retained_message.source_session, pub_client.session)
+                self.assertEquals(retained_message.topic, '/topic')
+                self.assertEquals(retained_message.data, b'data')
+                self.assertEquals(retained_message.qos, QOS_0)
+                yield from broker.shutdown()
+                self.assertTrue(broker.transitions.is_stopped())
+                MockPluginManager.assert_has_calls(
+                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                                       client_id=pub_client.session.client_id,
+                                       message=ret_message),
+                    ], any_order=True)
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
