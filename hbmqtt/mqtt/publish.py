@@ -112,7 +112,7 @@ class PublishPacket(MQTTPacket):
 
     @qos.setter
     def qos(self, val: int):
-        self.fixed_header.flags &= (0x00 << 1)
+        self.fixed_header.flags &= 0xf9
         self.fixed_header.flags |= (val << 1)
 
     @classmethod
