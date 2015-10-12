@@ -53,7 +53,9 @@ class BrokerProtocolHandler(ProtocolHandler):
 
     @asyncio.coroutine
     def handle_disconnect(self, disconnect):
+        self.logger.debug("Client disconnecting")
         if self._disconnect_waiter and not self._disconnect_waiter.done():
+            self.logger.debug("Setting waiter result to %r" % disconnect)
             self._disconnect_waiter.set_result(disconnect)
 
     @asyncio.coroutine

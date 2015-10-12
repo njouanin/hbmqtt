@@ -133,6 +133,10 @@ class ProtocolHandler:
             self.logger.debug("Handler writer close failed: %s" % e)
 
     def _stop_waiters(self):
+        self.logger.debug("Stopping %d puback waiters" % len(self._puback_waiters))
+        self.logger.debug("Stopping %d pucomp waiters" % len(self._pubcomp_waiters))
+        self.logger.debug("Stopping %d purec waiters" % len(self._pubrec_waiters))
+        self.logger.debug("Stopping %d purel waiters" % len(self._pubrel_waiters))
         for waiter in itertools.chain(
                 self._puback_waiters.values(),
                 self._pubcomp_waiters.values(),
@@ -167,7 +171,7 @@ class ProtocolHandler:
 
         message = OutgoingApplicationMessage(packet_id, topic, qos, data, retain)
         # Handle message flow
-        yield from asyncio.wait_for(self._handle_message_flow(message), 10, loop=self._loop)
+        yield from asyncio.wait_for(self._handle_message_flow(message), 60, loop=self._loop)
         return message
 
     @asyncio.coroutine
@@ -394,8 +398,6 @@ class ProtocolHandler:
                     break
             except asyncio.CancelledError:
                 self.logger.debug("Task cancelled, reader loop ending")
-                while running_tasks:
-                    running_tasks.popleft().cancel()
                 break
             except asyncio.TimeoutError:
                 self.logger.debug("%s Input stream read timeout" % self.session.client_id)
@@ -405,9 +407,12 @@ class ProtocolHandler:
             except BaseException as e:
                 self.logger.warning("%s Unhandled exception in reader coro: %s" % (type(self).__name__, e))
                 break
+        while running_tasks:
+            running_tasks.popleft().cancel()
         yield from self.handle_connection_closed()
         self._reader_stopped.set()
         self.logger.debug("%s Reader coro stopped" % self.session.client_id)
+        yield from self.stop()
 
     @asyncio.coroutine
     def _send_packet(self, packet):

@@ -193,7 +193,8 @@ class BrokerTest(unittest.TestCase):
                 self.assertEquals(qos, QOS_0)
 
                 yield from client.unsubscribe(['/topic'])
-                self.assertNotIn('/topic', broker._subscriptions)
+                yield from asyncio.sleep(0.1)
+                self.assertEquals(broker._subscriptions['/topic'], [])
                 yield from client.disconnect()
                 yield from asyncio.sleep(0.1)
                 yield from broker.shutdown()
