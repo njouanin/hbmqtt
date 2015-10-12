@@ -4,7 +4,7 @@
 import logging
 import ssl
 import websockets
-import asyncio
+from asyncio import Queue, CancelledError
 from datetime import datetime
 from collections import deque
 
@@ -179,6 +179,9 @@ class Broker:
         self._sessions = dict()
         self._subscriptions = dict()
         self._retained_messages = dict()
+        self._broadcast_queue = asyncio.Queue()
+
+        self._broadcast_task = None
 
         # Broker statistics initialization
         self._stats = dict()
@@ -286,6 +289,10 @@ class Broker:
 
             self.transitions.starting_success()
             yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
+
+            #Start broadcast loop
+            self._broadcast_task = asyncio.ensure_future(self._broadcast_loop(), loop=self._loop)
+
             self.logger.debug("Broker started")
         except Exception as e:
             self.logger.error("Broker startup failed: %s" % e)
@@ -306,6 +313,11 @@ class Broker:
         # Fire broker_shutdown event to plugins
         yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_SHUTDOWN)
 
+        # Stop broadcast loop
+        if self._broadcast_task:
+            self._broadcast_task.cancel()
+        if self._broadcast_queue.qsize() > 0:
+            self.logger.warning("%d messages not broadcasted" % self._broadcast_queue.qsize())
         # Stop $SYS topics broadcasting
         if self.sys_handle:
             self.sys_handle.cancel()
@@ -399,8 +411,8 @@ class Broker:
     def _broadcast_sys_topic(self, topic_basename, data):
         return self._internal_message_broadcast(DOLLAR_SYS_ROOT + topic_basename, data)
 
-    def _internal_message_broadcast(self, topic, data):
-        return asyncio.Task(self.broadcast_application_message(None, topic, data), loop=self._loop)
+    def _internal_message_broadcast(self, topic, data, qos=None):
+        return asyncio.ensure_future(self._broadcast_message(None, topic, data), loop=self._loop)
 
     @asyncio.coroutine
     def ws_connected(self, websocket, uri, listener_name):
@@ -502,8 +514,9 @@ class Broker:
                         if client_session.will_flag:
                             self.logger.debug("Client %s disconnected abnormally, sending will message" %
                                               format_client_message(client_session))
-                            yield from self.broadcast_application_message(
-                                client_session, client_session.will_topic,
+                            yield from self._broadcast_message(
+                                client_session,
+                                client_session.will_topic,
                                 client_session.will_message,
                                 client_session.will_qos)
                             if client_session.will_retain:
@@ -551,7 +564,7 @@ class Broker:
                     yield from self.plugins_manager.fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
                                                                client_id=client_session.client_id,
                                                                message=app_message)
-                    yield from self.broadcast_application_message(client_session, app_message.topic, app_message.data)
+                    yield from self._broadcast_message(client_session, app_message.topic, app_message.data)
                     if app_message.publish_packet.retain_flag:
                         self.retain_message(client_session, app_message.topic, app_message.data, app_message.qos)
                     wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message(), loop=self._loop)
@@ -707,40 +720,52 @@ class Broker:
             return False
 
     @asyncio.coroutine
-    def broadcast_application_message(self, source_session, topic, data, force_qos=None):
-        #self.logger.debug("Broadcasting message from %s on topic %s" %
-        #                  (format_client_message(session=source_session), topic)
-        #                  )
-        publish_tasks = []
+    def _broadcast_loop(self):
+        running_tasks = deque()
         try:
-            for k_filter in self._subscriptions:
-                if self.matches(topic, k_filter):
-                    subscriptions = self._subscriptions[k_filter]
-                    for (target_session, qos) in subscriptions:
-                        if force_qos is not None:
-                            qos = force_qos
-                        if target_session.transitions.state == 'connected':
-                            self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
-                                              (format_client_message(session=source_session),
-                                               topic, format_client_message(session=target_session)))
-                            handler = self._get_handler(target_session)
-                            publish_tasks.append(
-                                asyncio.Task(handler.mqtt_publish(topic, data, qos, retain=False), loop=self._loop)
-                            )
-                        else:
-                            self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
-                                              (format_client_message(session=source_session),
-                                               topic, format_client_message(session=target_session)))
-                            retained_message = RetainedApplicationMessage(source_session, topic, data, qos)
-                            yield from target_session.retained_messages.put(retained_message)
+            while True:
+                while running_tasks and running_tasks[0].done():
+                    running_tasks.popleft()
+                broadcast = yield from self._broadcast_queue.get()
+                self.logger.debug("broadcasting %r" % broadcast)
+                for k_filter in self._subscriptions:
+                    if self.matches(broadcast['topic'], k_filter):
+                        subscriptions = self._subscriptions[k_filter]
+                        for (target_session, qos) in subscriptions:
+                            if 'qos' in broadcast:
+                                qos = broadcast['qos']
+                            if target_session.transitions.state == 'connected':
+                                self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
+                                                  (format_client_message(session=broadcast['session']),
+                                                   broadcast['topic'], format_client_message(session=target_session)))
+                                handler = self._get_handler(target_session)
+                                task = asyncio.ensure_future(
+                                    handler.mqtt_publish(broadcast['topic'], broadcast['data'], qos, retain=False),
+                                    loop=self._loop)
+                                running_tasks.append(task)
+                            else:
+                                self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
+                                                  (format_client_message(session=broadcast['session']),
+                                                   broadcast['topic'], format_client_message(session=target_session)))
+                                retained_message = RetainedApplicationMessage(
+                                    broadcast['session'], broadcast['topic'], broadcast['data'], qos)
+                                yield from target_session.retained_messages.put(retained_message)
+        except CancelledError:
+            # Wait until current broadcasting tasks end
+            if running_tasks:
+                yield from asyncio.wait(running_tasks, loop=self._loop)
 
-            if publish_tasks:
-                yield from asyncio.wait(publish_tasks, loop=self._loop)
-        except Exception as e:
-            self.logger.warn("Message broadcasting failed: %s", e)
-        #self.logger.debug("End Broadcasting message from %s on topic %s" %
-        #                  (format_client_message(session=source_session), topic)
-        #                  )
+
+    @asyncio.coroutine
+    def _broadcast_message(self, session, topic, data, force_qos=None):
+        broadcast = {
+            'session': session,
+            'topic': topic,
+            'data': data
+        }
+        if force_qos:
+            broadcast['qos'] = force_qos
+        yield from self._broadcast_queue.put(broadcast)
 
     @asyncio.coroutine
     def publish_session_retained_messages(self, session):
