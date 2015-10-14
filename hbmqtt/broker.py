@@ -37,7 +37,7 @@ _defaults = {
     'auth': {
         'allow-anonymous': True,
         'password-file': None
-    }
+    },
 }
 
 DOLLAR_SYS_ROOT = '$SYS/broker/'
@@ -96,16 +96,22 @@ class Server:
             yield from self.semaphore.acquire()
         self.conn_count += 1
         if self.max_connections > 0:
-            self.logger.debug("Listener '%s': %d/%d connections acquired" %
+            self.logger.info("Listener '%s': %d/%d connections acquired" %
                               (self.listener_name, self.conn_count, self.max_connections))
+        else:
+            self.logger.info("Listener '%s': %d connections acquired" %
+                              (self.listener_name, self.conn_count))
 
     def release_connection(self):
         if self.semaphore:
             self.semaphore.release()
         self.conn_count -= 1
         if self.max_connections > 0:
-            self.logger.debug("Listener '%s': %d/%d connections acquired" %
+            self.logger.info("Listener '%s': %d/%d connections acquired" %
                               (self.listener_name, self.conn_count, self.max_connections))
+        else:
+            self.logger.info("Listener '%s': %d connections acquired" %
+                              (self.listener_name, self.conn_count))
 
     @asyncio.coroutine
     def close_instance(self):
@@ -274,7 +280,8 @@ class Broker:
                     instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop)
                     self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
 
-                self.logger.info("Listener '%s' bind to %s" % (listener_name, listener['bind']))
+                self.logger.info("Listener '%s' bind to %s (max_connecionts=%d)" %
+                                 (listener_name, listener['bind'], max_connections))
 
             # Start $SYS topics management
             try:
@@ -431,7 +438,7 @@ class Broker:
         yield from server.acquire_connection()
 
         remote_address, remote_port = writer.get_peer_info()
-        self.logger.debug("Connection from %s:%d on listener '%s'" % (remote_address, remote_port, listener_name))
+        self.logger.info("Connection from %s:%d on listener '%s'" % (remote_address, remote_port, listener_name))
 
         # Wait for first packet and expect a CONNECT
         try:
@@ -559,7 +566,8 @@ class Broker:
                     subscribe_waiter = asyncio.Task(handler.get_next_pending_subscription(), loop=self._loop)
                     self.logger.debug(repr(self._subscriptions))
                 if wait_deliver in done:
-                    self.logger.debug("%s handling message delivery" % client_session.client_id)
+                    if self.logger.isEnabledFor(logging.DEBUG):
+                        self.logger.debug("%s handling message delivery" % client_session.client_id)
                     app_message = wait_deliver.result()
                     yield from self.plugins_manager.fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
                                                                client_id=client_session.client_id,
@@ -727,7 +735,8 @@ class Broker:
                 while running_tasks and running_tasks[0].done():
                     running_tasks.popleft()
                 broadcast = yield from self._broadcast_queue.get()
-                self.logger.debug("broadcasting %r" % broadcast)
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug("broadcasting %r" % broadcast)
                 for k_filter in self._subscriptions:
                     if self.matches(broadcast['topic'], k_filter):
                         subscriptions = self._subscriptions[k_filter]

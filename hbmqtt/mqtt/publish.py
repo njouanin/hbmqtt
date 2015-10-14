@@ -115,6 +115,30 @@ class PublishPacket(MQTTPacket):
         self.fixed_header.flags &= 0xf9
         self.fixed_header.flags |= (val << 1)
 
+    @property
+    def packet_id(self):
+        return self.variable_header.packet_id
+
+    @packet_id.setter
+    def packet_id(self, val: int):
+        self.variable_header.packet_id = val
+
+    @property
+    def data(self):
+        return self.payload.data
+
+    @data.setter
+    def data(self, data: bytes):
+        self.payload.data = data
+
+    @property
+    def topic_name(self):
+        return self.variable_header.topic_name
+
+    @topic_name.setter
+    def topic_name(self, name: str):
+        self.variable_header.topic_name = name
+
     @classmethod
     def build(cls, topic_name: str, message: bytes, packet_id: int, dup_flag, qos, retain):
         v_header = PublishVariableHeader(topic_name, packet_id)

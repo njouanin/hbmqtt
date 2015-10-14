@@ -49,6 +49,22 @@ class ConnackPacket(MQTTPacket):
     VARIABLE_HEADER = ConnackVariableHeader
     PAYLOAD = None
 
+    @property
+    def return_code(self):
+        return self.variable_header.return_code
+
+    @return_code.setter
+    def return_code(self, return_code):
+        self.variable_header.return_code = return_code
+
+    @property
+    def session_parent(self):
+        return self.variable_header.session_parent
+
+    @session_parent.setter
+    def session_parent(self, session_parent):
+        self.variable_header.session_parent = session_parent
+
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: ConnackVariableHeader=None, payload=None):
         if fixed is None:
             header = MQTTFixedHeader(CONNACK, 0x00)

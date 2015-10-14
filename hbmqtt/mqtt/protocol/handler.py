@@ -25,7 +25,7 @@ from hbmqtt.mqtt.unsubscribe import UnsubscribePacket
 from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
-from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage
+from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage, INCOMING, OUTGOING
 from hbmqtt.mqtt.constants import *
 from hbmqtt.plugins.manager import PluginManager
 from hbmqtt.errors import HBMQTTException
@@ -216,17 +216,20 @@ class ProtocolHandler:
         :return:
         """
         assert app_message.qos == QOS_0
-        if isinstance(app_message, OutgoingApplicationMessage):
+        if app_message.direction == OUTGOING:
             packet = app_message.build_publish_packet()
             # Send PUBLISH packet
             yield from self._send_packet(packet)
             app_message.publish_packet = packet
-        elif isinstance(app_message, IncomingApplicationMessage):
+        elif app_message.direction == INCOMING:
             if app_message.publish_packet.dup_flag:
                 self.logger.warning("[MQTT-3.3.1-2] DUP flag must set to 0 for QOS 0 message. Message ignored: %s" %
                                     repr(app_message.publish_packet))
             else:
-                yield from self.session.delivered_message_queue.put(app_message)
+                try:
+                    self.session.delivered_message_queue.put_nowait(app_message)
+                except:
+                    self.logger.warning("delivered messages queue full. QOS_0 message discarded")
 
     @asyncio.coroutine
     def _handle_qos1_message_flow(self, app_message):
@@ -240,7 +243,7 @@ class ProtocolHandler:
         assert app_message.qos == QOS_1
         if app_message.puback_packet:
             raise HBMQTTException("Message '%d' has already been acknowledged" % app_message.packet_id)
-        if isinstance(app_message, OutgoingApplicationMessage):
+        if app_message.direction == OUTGOING:
             if app_message.packet_id not in self.session.inflight_out:
                 # Store message in session
                 self.session.inflight_out[app_message.packet_id] = app_message
@@ -262,7 +265,7 @@ class ProtocolHandler:
 
             # Discard inflight message
             del self.session.inflight_out[app_message.packet_id]
-        elif isinstance(app_message, IncomingApplicationMessage):
+        elif app_message.direction == INCOMING:
             # Initiate delivery
             self.logger.debug("Add message to delivery")
             yield from self.session.delivered_message_queue.put(app_message)
@@ -282,7 +285,7 @@ class ProtocolHandler:
         :return:
         """
         assert app_message.qos == QOS_2
-        if isinstance(app_message, OutgoingApplicationMessage):
+        if app_message.direction == OUTGOING:
             if app_message.pubrel_packet and app_message.pubcomp_packet:
                 raise HBMQTTException("Message '%d' has already been acknowledged" % app_message.packet_id)
             if not app_message.pubrel_packet:
@@ -323,7 +326,7 @@ class ProtocolHandler:
                 app_message.pubcomp_packet = waiter.result()
             # Discard inflight message
             del self.session.inflight_out[app_message.packet_id]
-        elif isinstance(app_message, IncomingApplicationMessage):
+        elif app_message.direction == INCOMING:
             self.session.inflight_in[app_message.packet_id] = app_message
             # Send pubrec
             pubrec_packet = PubrecPacket.build(app_message.packet_id)
@@ -373,7 +376,6 @@ class ProtocolHandler:
                         packet = yield from cls.from_stream(self.reader, fixed_header=fixed_header)
                         yield from self.plugins_manager.fire_event(
                             EVENT_MQTT_PACKET_RECEIVED, packet=packet, session=self.session)
-                        self._loop.call_soon(self.on_packet_received.send, packet)
                         task = None
                         if packet.fixed_header.packet_type == CONNACK:
                             task = asyncio.ensure_future(self.handle_connack(packet), loop=self._loop)
@@ -448,9 +450,11 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def mqtt_deliver_next_message(self):
-        self.logger.debug("%d message(s) available for delivery" % self.session.delivered_message_queue.qsize())
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug("%d message(s) available for delivery" % self.session.delivered_message_queue.qsize())
         message = yield from self.session.delivered_message_queue.get()
-        self.logger.debug("Delivering message %s" % message)
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug("Delivering message %s" % message)
         return message
 
     def handle_write_timeout(self):

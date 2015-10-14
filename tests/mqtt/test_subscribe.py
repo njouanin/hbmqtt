@@ -18,10 +18,10 @@ class SubscribePacketTest(unittest.TestCase):
         data = b'\x80\x0e\x00\x0a\x00\x03a/b\x01\x00\x03c/d\x02'
         stream = BufferReader(data)
         message = self.loop.run_until_complete(SubscribePacket.from_stream(stream))
-        (topic, qos) = message.topics[0]
+        (topic, qos) = message.payload.topics[0]
         self.assertEqual(topic, 'a/b')
         self.assertEqual(qos, QOS_1)
-        (topic, qos) = message.topics[1]
+        (topic, qos) = message.payload.topics[1]
         self.assertEqual(topic, 'c/d')
         self.assertEqual(qos, QOS_2)
 

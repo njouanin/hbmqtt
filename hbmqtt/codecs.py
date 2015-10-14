@@ -3,6 +3,7 @@
 # See the file license.txt for copying permission.
 import asyncio
 from math import ceil
+from struct import unpack
 
 from hbmqtt.errors import NoDataException
 
@@ -22,10 +23,10 @@ def bytes_to_int(data):
     :param data: byte sequence
     :return: integer value
     """
-    if isinstance(data, int):
-        return data
-    else:
+    try:
         return int.from_bytes(data, byteorder='big')
+    except:
+        return data
 
 
 def int_to_bytes(int_value: int, length=-1) -> bytes:
@@ -64,8 +65,8 @@ def decode_string(reader) -> bytes:
     :return: UTF-8 string read from stream
     """
     length_bytes = yield from read_or_raise(reader, 2)
-    str_length = bytes_to_int(length_bytes)
-    byte_str = yield from read_or_raise(reader, str_length)
+    str_length = unpack("!H", length_bytes)
+    byte_str = yield from read_or_raise(reader, str_length[0])
     return byte_str.decode(encoding='utf-8')
 
 
@@ -77,8 +78,8 @@ def decode_data_with_length(reader) -> bytes:
     :return: bytes read from stream (without length)
     """
     length_bytes = yield from read_or_raise(reader, 2)
-    bytes_length = bytes_to_int(length_bytes)
-    data = yield from read_or_raise(reader, bytes_length)
+    bytes_length = unpack("!H", length_bytes)
+    data = yield from read_or_raise(reader, bytes_length[0])
     return data
 
 
@@ -101,7 +102,8 @@ def decode_packet_id(reader) -> int:
     :return: Packet ID
     """
     packet_id_bytes = yield from read_or_raise(reader, 2)
-    return bytes_to_int(packet_id_bytes)
+    packet_id = unpack("!H", packet_id_bytes)
+    return packet_id[0]
 
 
 def int_to_bytes_str(value: int) -> bytes:

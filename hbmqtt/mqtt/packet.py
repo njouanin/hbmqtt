@@ -5,7 +5,7 @@ from hbmqtt.errors import CodecException, MQTTException
 from hbmqtt.codecs import *
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
 from datetime import datetime
-import abc
+from struct import unpack
 
 
 RESERVED_0 = 0x00
@@ -80,13 +80,13 @@ class MQTTFixedHeader:
             """
             multiplier = 1
             value = 0
-            buffer = b''
+            buffer = bytearray()
             while True:
                 encoded_byte = yield from reader.read(1)
-                buffer += encoded_byte
-                int_byte = bytes_to_int(encoded_byte)
-                value += (int_byte & 0x7f) * multiplier
-                if (int_byte & 0x80) == 0:
+                int_byte = unpack('!B', encoded_byte)
+                buffer.append(int_byte[0])
+                value += (int_byte[0] & 0x7f) * multiplier
+                if (int_byte[0] & 0x80) == 0:
                     break
                 else:
                     multiplier *= 128
@@ -96,9 +96,9 @@ class MQTTFixedHeader:
 
         try:
             byte1 = yield from read_or_raise(reader, 1)
-            int1 = bytes_to_int(byte1)
-            msg_type = (int1 & 0xf0) >> 4
-            flags = int1 & 0x0f
+            int1 = unpack('!B', byte1)
+            msg_type = (int1[0] & 0xf0) >> 4
+            flags = int1[0] & 0x0f
             remain_length = yield from decode_remaining_length()
 
             return cls(msg_type, flags, remain_length)
@@ -110,7 +110,7 @@ class MQTTFixedHeader:
             format(self.remaining_length, hex(self.flags))
 
 
-class MQTTVariableHeader(metaclass=abc.ABCMeta):
+class MQTTVariableHeader:
     def __init__(self):
         pass
 
@@ -131,9 +131,9 @@ class MQTTVariableHeader(metaclass=abc.ABCMeta):
 
     @classmethod
     @asyncio.coroutine
-    @abc.abstractclassmethod
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
-        return
+        pass
+
 
 class PacketIdVariableHeader(MQTTVariableHeader):
     def __init__(self, packet_id):
@@ -154,7 +154,7 @@ class PacketIdVariableHeader(MQTTVariableHeader):
         return type(self).__name__ + '(packet_id={0})'.format(self.packet_id)
 
 
-class MQTTPayload(metaclass=abc.ABCMeta):
+class MQTTPayload:
     def __init__(self):
         pass
 
@@ -163,16 +163,14 @@ class MQTTPayload(metaclass=abc.ABCMeta):
         writer.write(self.to_bytes())
         yield from writer.drain()
 
-    @abc.abstractmethod
     def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
-        return
+        pass
 
     @classmethod
     @asyncio.coroutine
-    @abc.abstractclassmethod
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
-        return
+        pass
 
 
 class MQTTPacket:
@@ -234,29 +232,6 @@ class MQTTPacket:
     @property
     def bytes_length(self):
         return len(self.to_bytes())
-
-    def __getattr__(self, name):
-        """
-        This method is implemented in order to facilitate access to packet data structure
-        attribute is first searched in packet then in fixed_header, variable_header and payload
-        example : packet.packet_id is equivalent to packet.variable_header.packet_id
-        :param name: name of attribute the packet to get
-        :return: the value of the attribute found. Raise AttributeError otherwise.
-        """
-        try:
-            return getattr(self.fixed_header, name)
-        except AttributeError:
-            pass
-        try:
-            return getattr(self.variable_header, name)
-        except AttributeError:
-            pass
-        try:
-            return getattr(self.payload, name)
-        except AttributeError:
-            pass
-        raise AttributeError("Attribute '%s' not found in packet data structure" % name)
-
 
     def __repr__(self):
         return type(self).__name__ + '(ts={0!s}, fixed={1!r}, variable={2!r}, payload={3!r})'.\

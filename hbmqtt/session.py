@@ -9,6 +9,9 @@ from hbmqtt.mqtt.publish import PublishPacket
 from hbmqtt.mqtt.puback import PubackPacket
 
 
+OUTGOING=0
+INCOMING=1
+
 class ApplicationMessage:
     states = ['new', 'published', 'acknowledged', 'received', 'released', 'completed']
 
@@ -30,12 +33,17 @@ class ApplicationMessage:
     def __eq__(self, other):
         return self.packet_id == other.packet_id
 
+
 class IncomingApplicationMessage(ApplicationMessage):
-    pass
+    def __init__(self, packet_id, topic, qos, data, retain):
+        super().__init__(packet_id, topic, qos, data, retain)
+        self.direction = INCOMING
 
 
 class OutgoingApplicationMessage(ApplicationMessage):
-    pass
+    def __init__(self, packet_id, topic, qos, data, retain):
+        super().__init__(packet_id, topic, qos, data, retain)
+        self.direction = OUTGOING
 
 
 class Session:

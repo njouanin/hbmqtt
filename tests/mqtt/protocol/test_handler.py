@@ -73,7 +73,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             try:
                 packet = yield from PublishPacket.from_stream(reader)
-                self.assertEquals(packet.topic_name, '/topic')
+                self.assertEquals(packet.variable_header.topic_name, '/topic')
                 self.assertEquals(packet.qos, QOS_0)
                 self.assertIsNone(packet.packet_id)
             except Exception as ae:
@@ -114,7 +114,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             packet = yield from PublishPacket.from_stream(reader)
             try:
-                self.assertEquals(packet.topic_name, '/topic')
+                self.assertEquals(packet.variable_header.topic_name, '/topic')
                 self.assertEquals(packet.qos, QOS_1)
                 self.assertIsNotNone(packet.packet_id)
                 self.assertIn(packet.packet_id, self.session.inflight_out)

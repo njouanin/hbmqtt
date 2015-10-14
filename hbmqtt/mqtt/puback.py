@@ -9,6 +9,14 @@ class PubackPacket(MQTTPacket):
     VARIABLE_HEADER = PacketIdVariableHeader
     PAYLOAD = None
 
+    @property
+    def packet_id(self):
+        return self.variable_header.packet_id
+
+    @packet_id.setter
+    def packet_id(self, val: int):
+        self.variable_header.packet_id = val
+
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PacketIdVariableHeader=None):
         if fixed is None:
             header = MQTTFixedHeader(PUBACK, 0x00)
