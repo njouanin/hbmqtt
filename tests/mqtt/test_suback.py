@@ -30,6 +30,6 @@ class SubackPacketTest(unittest.TestCase):
              SubackPayload.RETURN_CODE_02,
              SubackPayload.RETURN_CODE_80
              ])
-        publish = SubackPacket(variable_header=variable_header, payload=payload)
-        out = publish.to_bytes()
+        suback = SubackPacket(variable_header=variable_header, payload=payload)
+        out = suback.to_bytes()
         self.assertEqual(out, b'\x90\x06\x00\x0a\x00\x01\x02\x80')

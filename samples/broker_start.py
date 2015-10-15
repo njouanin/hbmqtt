@@ -40,6 +40,12 @@ def test_coro():
 if __name__ == '__main__':
     formatter = "[%(asctime)s] :: %(levelname)s :: %(name)s :: %(message)s"
     #formatter = "%(asctime)s :: %(levelname)s :: %(message)s"
-    logging.basicConfig(level=logging.DEBUG, format=formatter)
+    logging.basicConfig(level=logging.INFO, format=formatter)
+
+    #import selectors
+
+    #selector = selectors.EpollSelector()
+    #loop = asyncio.SelectorEventLoop(selector)
+    #asyncio.set_event_loop(loop)
     asyncio.get_event_loop().run_until_complete(test_coro())
     asyncio.get_event_loop().run_forever()

@@ -355,14 +355,14 @@ class ProtocolHandler:
     def _reader_loop(self):
         self.logger.debug("%s Starting reader coro" % self.session.client_id)
         running_tasks = collections.deque()
+        keepalive_timeout = self.session.keep_alive
+        if keepalive_timeout <= 0:
+            keepalive_timeout = None
         while True:
             try:
                 self._reader_ready.set()
                 while running_tasks and running_tasks[0].done():
                     running_tasks.popleft()
-                keepalive_timeout = self.session.keep_alive
-                if keepalive_timeout <= 0:
-                    keepalive_timeout = None
                 fixed_header = yield from asyncio.wait_for(
                     MQTTFixedHeader.from_stream(self.reader),
                     keepalive_timeout, loop=self._loop)
@@ -440,7 +440,6 @@ class ProtocolHandler:
                 self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
             yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
-            self._loop.call_soon(self.on_packet_sent.send, packet)
         except ConnectionResetError as cre:
             yield from self.handle_connection_closed()
             raise

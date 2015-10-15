@@ -3,7 +3,7 @@
 # See the file license.txt for copying permission.
 import asyncio
 from math import ceil
-from struct import unpack
+from struct import pack, unpack
 
 from hbmqtt.errors import NoDataException
 
@@ -29,18 +29,18 @@ def bytes_to_int(data):
         return data
 
 
-def int_to_bytes(int_value: int, length=-1) -> bytes:
+def int_to_bytes(int_value: int, length: int) -> bytes:
     """
     convert an integer to a sequence of bytes using big endian byte ordering
     :param int_value: integer value to convert
     :param length: (optional) byte length
     :return: byte sequence
     """
-    if length == -1:
-        length = ceil(int_value.bit_length()//8)
-        if length == 0:
-            length = 1
-    return int_value.to_bytes(length, byteorder='big')
+    if length == 1:
+        fmt = "!B"
+    elif length == 2:
+        fmt = "!H"
+    return pack(fmt, int_value)
 
 
 @asyncio.coroutine
@@ -66,8 +66,11 @@ def decode_string(reader) -> bytes:
     """
     length_bytes = yield from read_or_raise(reader, 2)
     str_length = unpack("!H", length_bytes)
-    byte_str = yield from read_or_raise(reader, str_length[0])
-    return byte_str.decode(encoding='utf-8')
+    if str_length[0]:
+        byte_str = yield from read_or_raise(reader, str_length[0])
+        return byte_str.decode(encoding='utf-8')
+    else:
+        return ''
 
 
 @asyncio.coroutine
