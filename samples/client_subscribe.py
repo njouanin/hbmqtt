@@ -15,22 +15,21 @@ logger = logging.getLogger(__name__)
 
 C = MQTTClient()
 
-@asyncio.coroutine
-def uptime_coro():
-    yield from C.connect('mqtt://localhost/')
+async def uptime_coro():
+    await C.connect('mqtt://localhost/')
     # Subscribe to '$SYS/broker/uptime' with QOS=1
-    yield from C.subscribe([
+    await C.subscribe([
                 ('$SYS/broker/uptime', QOS_1),
                 ('$SYS/broker/load/#', QOS_2),
              ])
     logger.info("Subscribed")
     try:
         for i in range(1, 100):
-            packet = yield from C.deliver_message()
+            packet = await C.deliver_message()
             print("%d %s : %s" % (i, packet.variable_header.topic_name, str(packet.payload.data)))
-        yield from C.unsubscribe(['$SYS/broker/uptime'])
+        await C.unsubscribe(['$SYS/broker/uptime'])
         logger.info("UnSubscribed")
-        yield from C.disconnect()
+        await C.disconnect()
     except ClientException as ce:
         logger.error("Client exception: %s" % ce)
 

@@ -12,8 +12,7 @@ class EventLoggerPlugin:
     def __init__(self, context):
         self.context = context
 
-    @asyncio.coroutine
-    def log_event(self, *args, **kwargs):
+    async def log_event(self, *args, **kwargs):
         self.context.logger.info("### '%s' EVENT FIRED ###" % kwargs['event_name'].replace('old', ''))
 
     def __getattr__(self, name):
@@ -25,8 +24,7 @@ class PacketLoggerPlugin:
     def __init__(self, context):
         self.context = context
 
-    @asyncio.coroutine
-    def on_mqtt_packet_received(self, *args, **kwargs):
+    async def on_mqtt_packet_received(self, *args, **kwargs):
         packet = kwargs.get('packet')
         session = kwargs.get('session', None)
         if self.context.logger.isEnabledFor(logging.DEBUG):
@@ -35,8 +33,7 @@ class PacketLoggerPlugin:
             else:
                 self.context.logger.debug("<-in-- %s" % repr(packet))
 
-    @asyncio.coroutine
-    def on_mqtt_packet_sent(self, *args, **kwargs):
+    async def on_mqtt_packet_sent(self, *args, **kwargs):
         packet = kwargs.get('packet')
         session = kwargs.get('session', None)
         if self.context.logger.isEnabledFor(logging.DEBUG):

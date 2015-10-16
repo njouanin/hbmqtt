@@ -58,8 +58,7 @@ class MQTTFixedHeader:
 
         return out
 
-    @asyncio.coroutine
-    def to_stream(self, writer: WriterAdapter):
+    async def to_stream(self, writer: WriterAdapter):
         writer.write(self.to_bytes())
 
     @property
@@ -67,13 +66,12 @@ class MQTTFixedHeader:
         return len(self.to_bytes())
 
     @classmethod
-    def from_stream(cls, reader: ReaderAdapter):
+    async def from_stream(cls, reader: ReaderAdapter):
         """
         Read and decode MQTT message fixed header from stream
         :return: FixedHeader instance
         """
-        @asyncio.coroutine
-        def decode_remaining_length():
+        async def decode_remaining_length():
             """
             Decode message length according to MQTT specifications
             :return:
@@ -82,7 +80,7 @@ class MQTTFixedHeader:
             value = 0
             buffer = bytearray()
             while True:
-                encoded_byte = yield from reader.read(1)
+                encoded_byte = await reader.read(1)
                 int_byte = unpack('!B', encoded_byte)
                 buffer.append(int_byte[0])
                 value += (int_byte[0] & 0x7f) * multiplier
@@ -95,11 +93,11 @@ class MQTTFixedHeader:
             return value
 
         try:
-            byte1 = yield from read_or_raise(reader, 1)
+            byte1 = await read_or_raise(reader, 1)
             int1 = unpack('!B', byte1)
             msg_type = (int1[0] & 0xf0) >> 4
             flags = int1[0] & 0x0f
-            remain_length = yield from decode_remaining_length()
+            remain_length = await decode_remaining_length()
 
             return cls(msg_type, flags, remain_length)
         except NoDataException:
@@ -114,10 +112,9 @@ class MQTTVariableHeader:
     def __init__(self):
         pass
 
-    @asyncio.coroutine
-    def to_stream(self, writer: asyncio.StreamWriter):
+    async def to_stream(self, writer: asyncio.StreamWriter):
         writer.write(self.to_bytes())
-        yield from writer.drain()
+        await writer.drain()
 
     def to_bytes(self) -> bytes:
         """
@@ -130,8 +127,7 @@ class MQTTVariableHeader:
         return len(self.to_bytes())
 
     @classmethod
-    @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
+    async def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         pass
 
 
@@ -146,8 +142,8 @@ class PacketIdVariableHeader(MQTTVariableHeader):
         return out
 
     @classmethod
-    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
-        packet_id = yield from decode_packet_id(reader)
+    async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
+        packet_id = await decode_packet_id(reader)
         return cls(packet_id)
 
     def __repr__(self):
@@ -158,17 +154,15 @@ class MQTTPayload:
     def __init__(self):
         pass
 
-    @asyncio.coroutine
-    def to_stream(self, writer: asyncio.StreamWriter):
+    async def to_stream(self, writer: asyncio.StreamWriter):
         writer.write(self.to_bytes())
-        yield from writer.drain()
+        await writer.drain()
 
     def to_bytes(self, fixed_header: MQTTFixedHeader, variable_header: MQTTVariableHeader):
         pass
 
     @classmethod
-    @asyncio.coroutine
-    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
+    async def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
         pass
 
@@ -184,10 +178,9 @@ class MQTTPacket:
         self.payload = payload
         self.protocol_ts = None
 
-    @asyncio.coroutine
-    def to_stream(self, writer: asyncio.StreamWriter):
+    async def to_stream(self, writer: asyncio.StreamWriter):
         writer.write(self.to_bytes())
-        yield from writer.drain()
+        await writer.drain()
         self.protocol_ts = datetime.now()
 
     def to_bytes(self) -> bytes:
@@ -206,17 +199,16 @@ class MQTTPacket:
         return fixed_header_bytes + variable_header_bytes + payload_bytes
 
     @classmethod
-    @asyncio.coroutine
-    def from_stream(cls, reader: ReaderAdapter, fixed_header=None, variable_header=None):
+    async def from_stream(cls, reader: ReaderAdapter, fixed_header=None, variable_header=None):
         if fixed_header is None:
-            fixed_header = yield from cls.FIXED_HEADER.from_stream(reader)
+            fixed_header = await cls.FIXED_HEADER.from_stream(reader)
         if cls.VARIABLE_HEADER:
             if variable_header is None:
-                variable_header = yield from cls.VARIABLE_HEADER.from_stream(reader, fixed_header)
+                variable_header = await cls.VARIABLE_HEADER.from_stream(reader, fixed_header)
         else:
             variable_header = None
         if cls.PAYLOAD:
-            payload = yield from cls.PAYLOAD.from_stream(reader, fixed_header, variable_header)
+            payload = await cls.PAYLOAD.from_stream(reader, fixed_header, variable_header)
         else:
             payload = None
 

@@ -1,7 +1,6 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-import asyncio
 from hbmqtt.mqtt.packet import CONNACK, MQTTPacket, MQTTFixedHeader, MQTTVariableHeader
 from hbmqtt.codecs import int_to_bytes, read_or_raise, bytes_to_int
 from hbmqtt.errors import HBMQTTException
@@ -22,8 +21,8 @@ class ConnackVariableHeader(MQTTVariableHeader):
         self.return_code = return_code
 
     @classmethod
-    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
-        data = yield from read_or_raise(reader, 2)
+    async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
+        data = await read_or_raise(reader, 2)
         session_parent = data[0] & 0x01
         return_code = bytes_to_int(data[1])
         return cls(session_parent, return_code)

@@ -26,8 +26,7 @@ class AnonymousAuthPlugin(BaseAuthPlugin):
     def __init__(self, context):
         super().__init__(context)
 
-    @asyncio.coroutine
-    def authenticate(self, *args, **kwargs):
+    async def authenticate(self, *args, **kwargs):
         authenticated = super().authenticate(*args, **kwargs)
         if authenticated:
             allow_anonymous = self.auth_config.get('allow-anonymous', True)  # allow anonymous by default
@@ -74,8 +73,7 @@ class FileAuthPlugin(BaseAuthPlugin):
         else:
             self.context.logger.debug("Configuration parameter 'password_file' not found")
 
-    @asyncio.coroutine
-    def authenticate(self, *args, **kwargs):
+    async def authenticate(self, *args, **kwargs):
         authenticated = super().authenticate(*args, **kwargs)
         if authenticated:
             session = kwargs.get('session', None)

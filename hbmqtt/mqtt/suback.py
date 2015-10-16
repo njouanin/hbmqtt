@@ -27,14 +27,13 @@ class SubackPayload(MQTTPayload):
         return out
 
     @classmethod
-    @asyncio.coroutine
-    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader,
+    async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
         return_codes = []
         bytes_to_read = fixed_header.remaining_length - variable_header.bytes_length
         for i in range(0, bytes_to_read):
             try:
-                return_code_byte = yield from read_or_raise(reader, 1)
+                return_code_byte = await read_or_raise(reader, 1)
                 return_code = bytes_to_int(return_code_byte)
                 return_codes.append(return_code)
             except NoDataException:

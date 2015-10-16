@@ -18,12 +18,11 @@ config = {
 }
 C = MQTTClient(config=config)
 
-@asyncio.coroutine
-def test_coro():
-    yield from C.connect('mqtt://test.mosquitto.org:1883/')
-    yield from asyncio.sleep(18)
+async def test_coro():
+    await C.connect('mqtt://test.mosquitto.org:1883/')
+    await asyncio.sleep(18)
 
-    yield from C.disconnect()
+    await C.disconnect()
 
 
 if __name__ == '__main__':

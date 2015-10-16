@@ -29,31 +29,28 @@ def disconnected(future):
     asyncio.get_event_loop().stop()
 
 
-@asyncio.coroutine
-def test_coro():
-    yield from C.connect('mqtt://test:test@localhost:1883/')
+async def test_coro():
+    await C.connect('mqtt://test:test@localhost:1883/')
     tasks = [
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
     ]
-    yield from asyncio.wait(tasks)
+    await asyncio.wait(tasks)
     logger.info("messages published")
-    yield from C.disconnect()
+    await C.disconnect()
 
 
-@asyncio.coroutine
-def test_coro2():
+async def test_coro2():
     try:
-        future = yield from C.connect('mqtt://test.mosquitto.org:1883/')
+        future = await C.connect('mqtt://test.mosquitto.org:1883/')
         future.add_done_callback(disconnected)
-        #yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
-        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_0', qos=0x00)
-        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)
-        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)
+        message = await C.publish('a/b', b'TEST MESSAGE WITH QOS_0', qos=0x00)
+        message = await C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)
+        message = await C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)
         #print(message)
         logger.info("messages published")
-        yield from C.disconnect()
+        await C.disconnect()
     except ConnectException as ce:
         logger.error("Connection failed: %s" % ce)
         asyncio.get_event_loop().stop()

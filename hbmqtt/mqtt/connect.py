@@ -3,7 +3,7 @@
 # See the file license.txt for copying permission.
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, CONNECT, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
-from hbmqtt.errors import MQTTException, HBMQTTException, NoDataException
+from hbmqtt.errors import HBMQTTException, NoDataException
 from hbmqtt.adapters import ReaderAdapter
 
 
@@ -93,21 +93,20 @@ class ConnectVariableHeader(MQTTVariableHeader):
         self.flags |= (val << 3)
 
     @classmethod
-    @asyncio.coroutine
-    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
+    async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
         #  protocol name
-        protocol_name = yield from decode_string(reader)
+        protocol_name = await decode_string(reader)
 
         # protocol level
-        protocol_level_byte = yield from read_or_raise(reader, 1)
+        protocol_level_byte = await read_or_raise(reader, 1)
         protocol_level = bytes_to_int(protocol_level_byte)
 
         # flags
-        flags_byte = yield from read_or_raise(reader, 1)
+        flags_byte = await read_or_raise(reader, 1)
         flags = bytes_to_int(flags_byte)
 
         # keep-alive
-        keep_alive_byte = yield from read_or_raise(reader, 2)
+        keep_alive_byte = await read_or_raise(reader, 2)
         keep_alive = bytes_to_int(keep_alive_byte)
 
         return cls(flags, keep_alive, protocol_name, protocol_level)
@@ -141,34 +140,33 @@ class ConnectPayload(MQTTPayload):
             format(self.client_id, self.will_topic, self.will_message, self.username, self.password)
 
     @classmethod
-    @asyncio.coroutine
-    def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader,
+    async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader,
                     variable_header: ConnectVariableHeader):
         payload = cls()
         #  Client identifier
         try:
-            payload.client_id = yield from decode_string(reader)
+            payload.client_id = await decode_string(reader)
         except NoDataException:
             payload.client_id = None
 
         # Read will topic, username and password
         if variable_header.will_flag:
             try:
-                payload.will_topic = yield from decode_string(reader)
-                payload.will_message = yield from decode_data_with_length(reader)
+                payload.will_topic = await decode_string(reader)
+                payload.will_message = await decode_data_with_length(reader)
             except NoDataException:
                 payload.will_topic = None
                 payload.will_message = None
 
         if variable_header.username_flag:
             try:
-                payload.username = yield from decode_string(reader)
+                payload.username = await decode_string(reader)
             except NoDataException:
                 payload.username = None
 
         if variable_header.password_flag:
             try:
-                payload.password = yield from decode_string(reader)
+                payload.password = await decode_string(reader)
             except NoDataException:
                 payload.password = None
 

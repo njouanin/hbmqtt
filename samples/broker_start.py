@@ -30,22 +30,15 @@ config = {
 
 broker = Broker(config)
 
-@asyncio.coroutine
-def test_coro():
-    yield from broker.start()
-    #yield from asyncio.sleep(5)
-    #yield from broker.shutdown()
+async def test_coro():
+    await broker.start()
+    #await asyncio.sleep(5)
+    #await broker.shutdown()
 
 
 if __name__ == '__main__':
     formatter = "[%(asctime)s] :: %(levelname)s :: %(name)s :: %(message)s"
     #formatter = "%(asctime)s :: %(levelname)s :: %(message)s"
     logging.basicConfig(level=logging.INFO, format=formatter)
-
-    #import selectors
-
-    #selector = selectors.EpollSelector()
-    #loop = asyncio.SelectorEventLoop(selector)
-    #asyncio.set_event_loop(loop)
     asyncio.get_event_loop().run_until_complete(test_coro())
     asyncio.get_event_loop().run_forever()

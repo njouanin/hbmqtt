@@ -6,7 +6,6 @@ import asyncio
 
 from hbmqtt.mqtt.connect import ConnectPacket, ConnectVariableHeader, ConnectPayload
 from hbmqtt.mqtt.packet import MQTTFixedHeader, CONNECT
-from hbmqtt.errors import MQTTException
 from hbmqtt.adapters import BufferReader
 
 

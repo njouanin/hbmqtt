@@ -24,17 +24,16 @@ config = {
 C = MQTTClient(config=config)
 #C = MQTTClient()
 
-@asyncio.coroutine
-def test_coro():
-    yield from C.connect('wss://test.mosquitto.org:8081/', cafile='mosquitto.org.crt')
+async def test_coro():
+    await C.connect('wss://test.mosquitto.org:8081/', cafile='mosquitto.org.crt')
     tasks = [
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
     ]
-    yield from asyncio.wait(tasks)
+    await asyncio.wait(tasks)
     logger.info("messages published")
-    yield from C.disconnect()
+    await C.disconnect()
 
 
 if __name__ == '__main__':
