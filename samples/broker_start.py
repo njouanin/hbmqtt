@@ -17,7 +17,7 @@ config = {
             'max_connections': 10,
         },
     },
-    'sys_interval': 0,
+    'sys_interval': 10,
     'auth': {
         'allow-anonymous': True,
         'password-file': os.path.join(os.path.dirname(os.path.realpath(__file__)), "passwd"),

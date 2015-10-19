@@ -43,6 +43,7 @@ setup(
             'packet_logger_plugin = hbmqtt.plugins.logging:PacketLoggerPlugin',
             'auth_anonymous = hbmqtt.plugins.authentication:AnonymousAuthPlugin',
             'auth_file = hbmqtt.plugins.authentication:FileAuthPlugin',
+            'broker_sys = hbmqtt.plugins.sys.broker:BrokerSysPlugin',
         ],
         'hbmqtt.client.plugins': [
             'packet_logger_plugin = hbmqtt.plugins.logging:PacketLoggerPlugin',

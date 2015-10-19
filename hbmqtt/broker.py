@@ -6,7 +6,6 @@ import ssl
 import websockets
 import asyncio
 from asyncio import Queue, CancelledError
-from datetime import datetime
 from collections import deque
 
 from functools import partial
@@ -15,8 +14,6 @@ from hbmqtt.session import Session
 from hbmqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
 from hbmqtt.errors import HBMQTTException, MQTTException
 from hbmqtt.utils import format_client_message, gen_client_id
-from hbmqtt.mqtt.packet import PUBLISH
-from hbmqtt.codecs import int_to_bytes_str
 from hbmqtt.adapters import (
     StreamReaderAdapter,
     StreamWriterAdapter,
@@ -34,16 +31,6 @@ _defaults = {
         'password-file': None
     },
 }
-
-DOLLAR_SYS_ROOT = '$SYS/broker/'
-STAT_BYTES_SENT = 'bytes_sent'
-STAT_BYTES_RECEIVED = 'bytes_received'
-STAT_MSG_SENT = 'messages_sent'
-STAT_MSG_RECEIVED = 'messages_received'
-STAT_PUBLISH_SENT = 'publish_sent'
-STAT_PUBLISH_RECEIVED = 'publish_received'
-STAT_UPTIME = 'uptime'
-STAT_CLIENTS_MAXIMUM = 'clients_maximum'
 
 EVENT_BROKER_PRE_START = 'broker_pre_start'
 EVENT_BROKER_POST_START = 'broker_post_start'
@@ -118,9 +105,29 @@ class BrokerContext(BaseContext):
     BrokerContext is used as the context passed to plugins interacting with the broker.
     It act as an adapter to broker services from plugins developed for HBMQTT broker
     """
-    def __init__(self):
+    def __init__(self, broker):
         super().__init__()
         self.config = None
+        self._broker_instance = broker
+
+    async def broadcast_message(self, topic, data, qos=None):
+        await self._broker_instance.internal_message_broadcast(topic, data, qos)
+
+    def retain_message(self, topic_name, data, qos=None):
+        self._broker_instance.retain_message(None, topic_name, data, qos)
+
+    @property
+    def sessions(self):
+        for k, session in self._broker_instance._sessions.items():
+            yield session[0]
+
+    @property
+    def retained_messages(self):
+        return self._broker_instance._retained_messages
+
+    @property
+    def subscriptions(self):
+        return self._broker_instance._subscriptions
 
 
 class Broker:
@@ -182,14 +189,8 @@ class Broker:
 
         self._broadcast_task = None
 
-        # Broker statistics initialization
-        self._stats = dict()
-
-        # $SYS tree task handle
-        self.sys_handle = None
-
         # Init plugins manager
-        context = BrokerContext()
+        context = BrokerContext(self)
         context.config = self.config
         if plugin_namespace:
             namespace = plugin_namespace
@@ -231,8 +232,6 @@ class Broker:
             raise BrokerException("Broker instance can't be started: %s" % me)
 
         await self.plugins_manager.fire_event(EVENT_BROKER_PRE_START)
-        # Clear broker stats
-        self._clear_stats()
         try:
             # Start network listeners
             for listener_name in self.listeners_config:
@@ -275,17 +274,6 @@ class Broker:
                 self.logger.info("Listener '%s' bind to %s (max_connecionts=%d)" %
                                  (listener_name, listener['bind'], max_connections))
 
-            # Start $SYS topics management
-            try:
-                sys_interval = int(self.config.get('sys_interval', 0))
-                if sys_interval > 0:
-                    self.logger.debug("Setup $SYS broadcasting every %d secondes" % sys_interval)
-                    self._init_dollar_sys()
-                    self.sys_handle = self._loop.call_later(sys_interval, self.broadcast_dollar_sys_topics)
-            except KeyError:
-                pass
-                # 'sys_internal' config parameter not found
-
             self.transitions.starting_success()
             await self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
 
@@ -316,9 +304,6 @@ class Broker:
             self._broadcast_task.cancel()
         if self._broadcast_queue.qsize() > 0:
             self.logger.warning("%d messages not broadcasted" % self._broadcast_queue.qsize())
-        # Stop $SYS topics broadcasting
-        if self.sys_handle:
-            self.sys_handle.cancel()
 
         for listener_name in self._servers:
             server = self._servers[listener_name]
@@ -328,90 +313,8 @@ class Broker:
         await self.plugins_manager.fire_event(EVENT_BROKER_POST_SHUTDOWN)
         self.transitions.stopping_success()
 
-    def _clear_stats(self):
-        """
-        Initializes broker statistics data structures
-        """
-        for stat in (STAT_BYTES_RECEIVED,
-                     STAT_BYTES_SENT,
-                     STAT_MSG_RECEIVED,
-                     STAT_MSG_SENT,
-                     STAT_CLIENTS_MAXIMUM,
-                     STAT_PUBLISH_RECEIVED,
-                     STAT_PUBLISH_SENT):
-            self._stats[stat] = 0
-        self._stats[STAT_UPTIME] = datetime.now()
-
-    def _init_dollar_sys(self):
-        """
-        Initializes and publish $SYS static topics
-        """
-        from hbmqtt.version import get_version
-        self.sys_handle = None
-        version = 'HBMQTT version ' + get_version()
-        self.retain_message(None, DOLLAR_SYS_ROOT + 'version', version.encode())
-
-    def broadcast_dollar_sys_topics(self):
-        """
-        Broadcast dynamic $SYS topics updates and reschedule next execution depending on 'sys_interval' config
-        parameter.
-        """
-
-        # Update stats
-        uptime = datetime.now() - self._stats[STAT_UPTIME]
-        client_connected = sum(1 for k, session in self._sessions.items() if session.transitions.state == 'connected')
-        if client_connected > self._stats[STAT_CLIENTS_MAXIMUM]:
-            self._stats[STAT_CLIENTS_MAXIMUM] = client_connected
-        client_disconnected = sum(1 for k, session in self._sessions.items() if session.transitions.state == 'disconnected')
-        inflight_in = 0
-        inflight_out = 0
-        messages_stored = 0
-        for k, session in self._sessions.items():
-            inflight_in += session.inflight_in_count
-            inflight_out += session.inflight_out_count
-            messages_stored += session.retained_messages_count
-        messages_stored += len(self._retained_messages)
-        subscriptions_count = 0
-        for topic in self._subscriptions:
-            subscriptions_count += len(self._subscriptions[topic])
-
-        # Broadcast updates
-        tasks = [
-            self._broadcast_sys_topic('load/bytes/received', int_to_bytes_str(self._stats[STAT_BYTES_RECEIVED])),
-            self._broadcast_sys_topic('load/bytes/sent', int_to_bytes_str(self._stats[STAT_BYTES_SENT])),
-            self._broadcast_sys_topic('messages/received', int_to_bytes_str(self._stats[STAT_MSG_RECEIVED])),
-            self._broadcast_sys_topic('messages/sent', int_to_bytes_str(self._stats[STAT_MSG_SENT])),
-            self._broadcast_sys_topic('time', str(datetime.now()).encode('utf-8')),
-            self._broadcast_sys_topic('uptime', int_to_bytes_str(int(uptime.total_seconds()))),
-            self._broadcast_sys_topic('uptime/formated', str(uptime).encode('utf-8')),
-            self._broadcast_sys_topic('clients/connected', int_to_bytes_str(client_connected)),
-            self._broadcast_sys_topic('clients/disconnected', int_to_bytes_str(client_disconnected)),
-            self._broadcast_sys_topic('clients/maximum', int_to_bytes_str(self._stats[STAT_CLIENTS_MAXIMUM])),
-            self._broadcast_sys_topic('clients/total', int_to_bytes_str(client_connected + client_disconnected)),
-            self._broadcast_sys_topic('messages/inflight', int_to_bytes_str(inflight_in + inflight_out)),
-            self._broadcast_sys_topic('messages/inflight/in', int_to_bytes_str(inflight_in)),
-            self._broadcast_sys_topic('messages/inflight/out', int_to_bytes_str(inflight_out)),
-            self._broadcast_sys_topic('messages/inflight/stored', int_to_bytes_str(messages_stored)),
-            self._broadcast_sys_topic('messages/publish/received', int_to_bytes_str(self._stats[STAT_PUBLISH_RECEIVED])),
-            self._broadcast_sys_topic('messages/publish/sent', int_to_bytes_str(self._stats[STAT_PUBLISH_SENT])),
-            self._broadcast_sys_topic('messages/retained/count', int_to_bytes_str(len(self._retained_messages))),
-            self._broadcast_sys_topic('messages/subscriptions/count', int_to_bytes_str(subscriptions_count)),
-        ]
-
-        # Wait until broadcasting tasks end
-        # TODO : Needs some review
-        #if len(tasks) > 0:
-        #    asyncio.wait(tasks, loop=self._loop)
-        # Reschedule
-        sys_interval = int(self.config['sys_interval'])
-        self.logger.debug("Broadcasting $SYS topics")
-        self.sys_handle = self._loop.call_later(sys_interval, self.broadcast_dollar_sys_topics)
-
-    def _broadcast_sys_topic(self, topic_basename, data):
-        return self._internal_message_broadcast(DOLLAR_SYS_ROOT + topic_basename, data)
-
-    def _internal_message_broadcast(self, topic, data, qos=None):
-        return asyncio.ensure_future(self._broadcast_message(None, topic, data), loop=self._loop)
+    async def internal_message_broadcast(self, topic, data, qos=None):
+        return await self._broadcast_message(None, topic, data)
 
     async def ws_connected(self, websocket, uri, listener_name):
         await self.client_connected(listener_name, WebSocketsReader(websocket), WebSocketsWriter(websocket))
@@ -748,7 +651,6 @@ class Broker:
             if running_tasks:
                 await asyncio.wait(running_tasks, loop=self._loop)
 
-
     async def _broadcast_message(self, session, topic, data, force_qos=None):
         broadcast = {
             'session': session,
@@ -767,7 +669,7 @@ class Broker:
         handler = self._get_handler(session)
         while not session.retained_messages.empty():
             retained = await session.retained_messages.get()
-            publish_tasks.append(asyncio.Task(
+            publish_tasks.append(asyncio.ensure_future(
                 handler.mqtt_publish(
                     retained.topic, retained.data, retained.qos, True), loop=self._loop))
         if publish_tasks:
@@ -812,27 +714,11 @@ class Broker:
         self.logger.debug("deleting existing session %s" % repr(self._sessions[client_id]))
         del self._sessions[client_id]
 
-    def sys_handle_packet_received(self, packet):
-        if packet:
-            packet_size = packet.bytes_length
-            self._stats[STAT_BYTES_RECEIVED] += packet_size
-            self._stats[STAT_MSG_RECEIVED] += 1
-            if packet.fixed_header.packet_type == PUBLISH:
-                self._stats[STAT_PUBLISH_RECEIVED] += 1
-
-    def sys_handle_packet_sent(self, packet):
-        if packet:
-            packet_size = packet.bytes_length
-            self._stats[STAT_BYTES_SENT] += packet_size
-            self._stats[STAT_MSG_SENT] += 1
-            if packet.fixed_header.packet_type == PUBLISH:
-                self._stats[STAT_PUBLISH_SENT] += 1
-
     def _get_handler(self, session):
-        """
-        Return the handler attached to a given session
-        :param session:
-        :return:
-        """
-        (s, h) = self._sessions[session.client_id]
-        return h
+        client_id = session.client_id
+        if client_id:
+            try:
+                return self._sessions[client_id][1]
+            except KeyError:
+                pass
+        return None
