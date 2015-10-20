@@ -6,7 +6,6 @@ import collections
 import itertools
 
 from asyncio import InvalidStateError
-from blinker import Signal
 
 from hbmqtt.mqtt import packet_class
 from hbmqtt.mqtt.packet import *
@@ -46,9 +45,6 @@ class ProtocolHandler:
     """
     Class implementing the MQTT communication protocol using asyncio features
     """
-
-    on_packet_sent = Signal()
-    on_packet_received = Signal()
 
     def __init__(self, plugins_manager: PluginManager, session: Session=None, loop=None):
         self.logger = logging.getLogger(__name__)
@@ -355,6 +351,8 @@ class ProtocolHandler:
                 self._reader_ready.set()
                 while running_tasks and running_tasks[0].done():
                     running_tasks.popleft()
+                if len(running_tasks) > 1:
+                    self.logger.debug("handler running tasks: %d" % len(running_tasks))
                 fixed_header = await asyncio.wait_for(
                     MQTTFixedHeader.from_stream(self.reader),
                     keepalive_timeout, loop=self._loop)
