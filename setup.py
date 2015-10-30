@@ -17,9 +17,10 @@ setup(
     platforms='all',
     install_requires=[
         'transitions==0.2.5',
-        'blinker',
         'websockets',
-        'passlib'
+        'passlib',
+        'docopt',
+        'pyyaml'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
@@ -47,6 +48,11 @@ setup(
         ],
         'hbmqtt.client.plugins': [
             'packet_logger_plugin = hbmqtt.plugins.logging:PacketLoggerPlugin',
+        ],
+        'console_scripts': [
+            'hbmqtt = scripts.hbmqtt:main',
+            'hbmqtt_pub = scripts.hbmqtt_pub:main',
+            'hbmqtt_sub = scripts.hbmqtt_sub:main',
         ]
     }
 )
