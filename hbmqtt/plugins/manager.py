@@ -56,11 +56,11 @@ class PluginManager:
         return self.context
 
     def _load_plugins(self, namespace):
-        self.logger.info("Loading plugins for namespace %s" % namespace)
+        self.logger.debug("Loading plugins for namespace %s" % namespace)
         for ep in pkg_resources.iter_entry_points(group=namespace):
             plugin = self._load_plugin(ep)
             self._plugins.append(plugin)
-            self.logger.info(" Plugin %s ready" % plugin.ep.name)
+            self.logger.debug(" Plugin %s ready" % plugin.ep.name)
 
     def _load_plugin(self, ep: pkg_resources.EntryPoint):
         try:
