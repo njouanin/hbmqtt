@@ -205,6 +205,7 @@ class MQTTClient:
     async def publish(self, topic, message, qos=None, retain=None):
         def get_retain_and_qos():
             if qos:
+                assert qos in (QOS_0, QOS_1, QOS_2)
                 _qos = qos
             else:
                 _qos = self.config['default_qos']
@@ -221,7 +222,6 @@ class MQTTClient:
                 except KeyError:
                     pass
             return _qos, _retain
-        assert qos in (QOS_0, QOS_1, QOS_2)
         (app_qos, app_retain) = get_retain_and_qos()
         return await self._handler.mqtt_publish(topic, message, app_qos, app_retain)
 
