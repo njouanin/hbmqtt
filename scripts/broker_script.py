@@ -65,14 +65,14 @@ def main(*args, **kwargs):
         config = read_yaml_config(arguments['-c'])
     else:
         config = read_yaml_config(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_broker.yaml'))
-        logger.warning("Using default configuration")
+        logger.debug("Using default configuration")
     loop = asyncio.get_event_loop()
     broker = Broker(config)
     try:
         loop.run_until_complete(broker.start())
         loop.run_forever()
     except KeyboardInterrupt:
-        asyncio.get_event_loop().run_until_complete(broker.shutdown())
+        loop.run_until_complete(broker.shutdown())
     finally:
         loop.close()
 
