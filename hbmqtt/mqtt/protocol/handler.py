@@ -331,7 +331,7 @@ class ProtocolHandler:
             yield from self._send_packet(pubrec_packet)
             app_message.pubrec_packet = pubrec_packet
             # Wait PUBREL
-            if app_message.packet_id in self._pubrel_waiters:
+            if app_message.packet_id in self._pubrel_waiters and not self._pubrel_waiters[app_message.packet_id].done():
                 # PUBREL waiter already exists for this packet ID
                 message = "Can't add PUBREL waiter, a waiter already exists for message Id '%s'" \
                           % app_message.packet_id
