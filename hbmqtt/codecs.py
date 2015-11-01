@@ -14,6 +14,7 @@ def bytes_to_hex_str(data):
     """
     return '0x' + ''.join(format(b, '02x') for b in data)
 
+
 def bytes_to_int(data):
     """
     convert a sequence of bytes to an integer using big endian byte ordering
@@ -24,6 +25,7 @@ def bytes_to_int(data):
         return int.from_bytes(data, byteorder='big')
     except:
         return data
+
 
 def int_to_bytes(int_value: int, length: int) -> bytes:
     """
@@ -38,28 +40,32 @@ def int_to_bytes(int_value: int, length: int) -> bytes:
         fmt = "!H"
     return pack(fmt, int_value)
 
-async def read_or_raise(reader, n=-1):
+
+@asyncio.coroutine
+def read_or_raise(reader, n=-1):
     """
     Read a given byte number from Stream. NoDataException is raised if read gives no data
     :param reader: reader adapter
     :param n: number of bytes to read
     :return: bytes read
     """
-    data = await reader.read(n)
+    data = yield from reader.read(n)
     if not data:
         raise NoDataException("No more data")
     return data
 
-async def decode_string(reader) -> bytes:
+
+@asyncio.coroutine
+def decode_string(reader) -> bytes:
     """
     Read a string from a reader and decode it according to MQTT string specification
     :param reader: Stream reader
     :return: UTF-8 string read from stream
     """
-    length_bytes = await read_or_raise(reader, 2)
+    length_bytes = yield from read_or_raise(reader, 2)
     str_length = unpack("!H", length_bytes)
     if str_length[0]:
-        byte_str = await read_or_raise(reader, str_length[0])
+        byte_str = yield from read_or_raise(reader, str_length[0])
         try:
             return byte_str.decode(encoding='utf-8')
         except:
@@ -67,15 +73,17 @@ async def decode_string(reader) -> bytes:
     else:
         return ''
 
-async def decode_data_with_length(reader) -> bytes:
+
+@asyncio.coroutine
+def decode_data_with_length(reader) -> bytes:
     """
     Read data from a reader. Data is prefixed with 2 bytes length
     :param reader: Stream reader
     :return: bytes read from stream (without length)
     """
-    length_bytes = await read_or_raise(reader, 2)
+    length_bytes = yield from read_or_raise(reader, 2)
     bytes_length = unpack("!H", length_bytes)
-    data = await read_or_raise(reader, bytes_length[0])
+    data = yield from read_or_raise(reader, bytes_length[0])
     return data
 
 
@@ -89,13 +97,15 @@ def encode_data_with_length(data: bytes) -> bytes:
     data_length = len(data)
     return int_to_bytes(data_length, 2) + data
 
-async def decode_packet_id(reader) -> int:
+
+@asyncio.coroutine
+def decode_packet_id(reader) -> int:
     """
     Read a packet ID as 2-bytes int from stream according to MQTT specification (2.3.1)
     :param reader: Stream reader
     :return: Packet ID
     """
-    packet_id_bytes = await read_or_raise(reader, 2)
+    packet_id_bytes = yield from read_or_raise(reader, 2)
     packet_id = unpack("!H", packet_id_bytes)
     return packet_id[0]
 

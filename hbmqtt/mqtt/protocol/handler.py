@@ -97,20 +97,22 @@ class ProtocolHandler:
         else:
             return False
 
-    async def start(self):
+    @asyncio.coroutine
+    def start(self):
         if not self._is_attached():
             raise ProtocolHandlerException("Handler is not attached to a stream")
         self._reader_ready = asyncio.Event(loop=self._loop)
         self._reader_task = asyncio.Task(self._reader_loop(), loop=self._loop)
-        await asyncio.wait([self._reader_ready.wait()], loop=self._loop)
+        yield from asyncio.wait([self._reader_ready.wait()], loop=self._loop)
         if self.keepalive_timeout:
             self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
         self.logger.debug("Handler tasks started")
-        await self._retry_deliveries()
+        yield from self._retry_deliveries()
         self.logger.debug("Handler ready")
 
-    async def stop(self):
+    @asyncio.coroutine
+    def stop(self):
         # Stop messages flow waiter
         self._stop_waiters()
         if self._keepalive_task:
@@ -118,11 +120,11 @@ class ProtocolHandler:
         self.logger.debug("waiting for tasks to be stopped")
         if not self._reader_task.done():
             self._reader_task.cancel()
-            await asyncio.wait(
+            yield from asyncio.wait(
                 [self._reader_stopped.wait()], loop=self._loop)
         self.logger.debug("closing writer")
         try:
-            await self.writer.close()
+            yield from self.writer.close()
         except Exception as e:
             self.logger.debug("Handler writer close failed: %s" % e)
 
@@ -138,7 +140,8 @@ class ProtocolHandler:
                 self._pubrel_waiters.values()):
             waiter.cancel()
 
-    async def _retry_deliveries(self):
+    @asyncio.coroutine
+    def _retry_deliveries(self):
         """
         Handle [MQTT-4.4.0-1] by resending PUBLISH and PUBREL messages for pending out messages
         :return:
@@ -148,12 +151,13 @@ class ProtocolHandler:
         for message in itertools.chain(self.session.inflight_in.values(), self.session.inflight_out.values()):
             tasks.append(asyncio.wait_for(self._handle_message_flow(message), 10, loop=self._loop))
         if tasks:
-            done, pending = await asyncio.wait(tasks)
+            done, pending = yield from asyncio.wait(tasks)
             self.logger.debug("%d messages redelivered" % len(done))
             self.logger.debug("%d messages not redelivered due to timeout" % len(pending))
         self.logger.debug("End messages delivery retries")
 
-    async def mqtt_publish(self, topic, data, qos, retain, ack_timeout=None):
+    @asyncio.coroutine
+    def mqtt_publish(self, topic, data, qos, retain, ack_timeout=None):
         """
         Sends a MQTT publish message and manages messages flows.
         This methods doesn't return until the message has been acknowledged by receiver or timeout occur
@@ -175,13 +179,14 @@ class ProtocolHandler:
         message = OutgoingApplicationMessage(packet_id, topic, qos, data, retain)
         # Handle message flow
         if ack_timeout is not None and ack_timeout > 0:
-            await asyncio.wait_for(self._handle_message_flow(message), ack_timeout, loop=self._loop)
+            yield from asyncio.wait_for(self._handle_message_flow(message), ack_timeout, loop=self._loop)
         else:
-            await self._handle_message_flow(message)
+            yield from self._handle_message_flow(message)
 
         return message
 
-    async def _handle_message_flow(self, app_message):
+    @asyncio.coroutine
+    def _handle_message_flow(self, app_message):
         """
         Handle protocol flow for incoming and outgoing messages, depending on service level and according to MQTT
         spec. paragraph 4.3-Quality of Service levels and protocol flows
@@ -189,15 +194,16 @@ class ProtocolHandler:
         :return: nothing.
         """
         if app_message.qos == QOS_0:
-            await self._handle_qos0_message_flow(app_message)
+            yield from self._handle_qos0_message_flow(app_message)
         elif app_message.qos == QOS_1:
-            await self._handle_qos1_message_flow(app_message)
+            yield from self._handle_qos1_message_flow(app_message)
         elif app_message.qos == QOS_2:
-            await self._handle_qos2_message_flow(app_message)
+            yield from self._handle_qos2_message_flow(app_message)
         else:
             raise HBMQTTException("Unexcepted QOS value '%d" % str(app_message.qos))
 
-    async def _handle_qos0_message_flow(self, app_message):
+    @asyncio.coroutine
+    def _handle_qos0_message_flow(self, app_message):
         """
         Handle QOS_0 application message acknowledgment
         For incoming messages, this method stores the message
@@ -209,7 +215,7 @@ class ProtocolHandler:
         if app_message.direction == OUTGOING:
             packet = app_message.build_publish_packet()
             # Send PUBLISH packet
-            await self._send_packet(packet)
+            yield from self._send_packet(packet)
             app_message.publish_packet = packet
         elif app_message.direction == INCOMING:
             if app_message.publish_packet.dup_flag:
@@ -221,7 +227,8 @@ class ProtocolHandler:
                 except:
                     self.logger.warning("delivered messages queue full. QOS_0 message discarded")
 
-    async def _handle_qos1_message_flow(self, app_message):
+    @asyncio.coroutine
+    def _handle_qos1_message_flow(self, app_message):
         """
         Handle QOS_1 application message acknowledgment
         For incoming messages, this method stores the message and reply with PUBACK
@@ -242,13 +249,13 @@ class ProtocolHandler:
             else:
                 publish_packet = app_message.build_publish_packet()
             # Send PUBLISH packet
-            await self._send_packet(publish_packet)
+            yield from self._send_packet(publish_packet)
             app_message.publish_packet = publish_packet
 
             # Wait for puback
             waiter = asyncio.Future(loop=self._loop)
             self._puback_waiters[app_message.packet_id] = waiter
-            await waiter
+            yield from waiter
             del self._puback_waiters[app_message.packet_id]
             app_message.puback_packet = waiter.result()
 
@@ -257,13 +264,14 @@ class ProtocolHandler:
         elif app_message.direction == INCOMING:
             # Initiate delivery
             self.logger.debug("Add message to delivery")
-            await self.session.delivered_message_queue.put(app_message)
+            yield from self.session.delivered_message_queue.put(app_message)
             # Send PUBACK
             puback = PubackPacket.build(app_message.packet_id)
-            await self._send_packet(puback)
+            yield from self._send_packet(puback)
             app_message.puback_packet = puback
 
-    async def _handle_qos2_message_flow(self, app_message):
+    @asyncio.coroutine
+    def _handle_qos2_message_flow(self, app_message):
         """
         Handle QOS_2 application message acknowledgment
         For incoming messages, this method stores the message, sends PUBREC, waits for PUBREL, initiate delivery
@@ -288,7 +296,7 @@ class ProtocolHandler:
                     self.session.inflight_out[app_message.packet_id] = app_message
                     publish_packet = app_message.build_publish_packet()
                 # Send PUBLISH packet
-                await self._send_packet(publish_packet)
+                yield from self._send_packet(publish_packet)
                 app_message.publish_packet = publish_packet
                 # Wait PUBREC
                 if app_message.packet_id in self._pubrec_waiters:
@@ -299,17 +307,17 @@ class ProtocolHandler:
                     raise HBMQTTException(message)
                 waiter = asyncio.Future(loop=self._loop)
                 self._pubrec_waiters[app_message.packet_id] = waiter
-                await waiter
+                yield from waiter
                 del self._pubrec_waiters[app_message.packet_id]
                 app_message.pubrec_packet = waiter.result()
             if not app_message.pubcomp_packet:
                 # Send pubrel
                 app_message.pubrel_packet = PubrelPacket.build(app_message.packet_id)
-                await self._send_packet(app_message.pubrel_packet)
+                yield from self._send_packet(app_message.pubrel_packet)
                 # Wait for PUBCOMP
                 waiter = asyncio.Future(loop=self._loop)
                 self._pubcomp_waiters[app_message.packet_id] = waiter
-                await waiter
+                yield from waiter
                 del self._pubcomp_waiters[app_message.packet_id]
                 app_message.pubcomp_packet = waiter.result()
             # Discard inflight message
@@ -318,7 +326,7 @@ class ProtocolHandler:
             self.session.inflight_in[app_message.packet_id] = app_message
             # Send pubrec
             pubrec_packet = PubrecPacket.build(app_message.packet_id)
-            await self._send_packet(pubrec_packet)
+            yield from self._send_packet(pubrec_packet)
             app_message.pubrec_packet = pubrec_packet
             # Wait PUBREL
             if app_message.packet_id in self._pubrel_waiters:
@@ -329,18 +337,19 @@ class ProtocolHandler:
                 raise HBMQTTException(message)
             waiter = asyncio.Future(loop=self._loop)
             self._pubrel_waiters[app_message.packet_id] = waiter
-            await waiter
+            yield from waiter
             del self._pubrel_waiters[app_message.packet_id]
             app_message.pubrel_packet = waiter.result()
             # Initiate delivery and discard message
-            await self.session.delivered_message_queue.put(app_message)
+            yield from self.session.delivered_message_queue.put(app_message)
             del self.session.inflight_in[app_message.packet_id]
             # Send pubcomp
             pubcomp_packet = PubcompPacket.build(app_message.packet_id)
-            await self._send_packet(pubcomp_packet)
+            yield from self._send_packet(pubcomp_packet)
             app_message.pubcomp_packet = pubcomp_packet
 
-    async def _reader_loop(self):
+    @asyncio.coroutine
+    def _reader_loop(self):
         self.logger.debug("%s Starting reader coro" % self.session.client_id)
         running_tasks = collections.deque()
         keepalive_timeout = self.session.keep_alive
@@ -354,17 +363,17 @@ class ProtocolHandler:
                 if len(running_tasks) > 1:
                     self.logger.debug("handler running tasks: %d" % len(running_tasks))
 
-                fixed_header = await asyncio.wait_for(MQTTFixedHeader.from_stream(self.reader),
+                fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.reader),
                     keepalive_timeout, loop=self._loop)
                 if fixed_header:
                     if fixed_header.packet_type == RESERVED_0 or fixed_header.packet_type == RESERVED_15:
                         self.logger.warning("%s Received reserved packet, which is forbidden: closing connection" %
                                          (self.session.client_id))
-                        await self.handle_connection_closed()
+                        yield from self.handle_connection_closed()
                     else:
                         cls = packet_class(fixed_header)
-                        packet = await cls.from_stream(self.reader, fixed_header=fixed_header)
-                        await self.plugins_manager.fire_event(
+                        packet = yield from cls.from_stream(self.reader, fixed_header=fixed_header)
+                        yield from self.plugins_manager.fire_event(
                             EVENT_MQTT_PACKET_RECEIVED, packet=packet, session=self.session)
                         task = None
                         if packet.fixed_header.packet_type == CONNACK:
@@ -418,30 +427,32 @@ class ProtocolHandler:
                 break
         while running_tasks:
             running_tasks.popleft().cancel()
-        await self.handle_connection_closed()
+        yield from self.handle_connection_closed()
         self._reader_stopped.set()
         self.logger.debug("%s Reader coro stopped" % self.session.client_id)
-        await self.stop()
+        yield from self.stop()
 
-    async def _send_packet(self, packet):
+    @asyncio.coroutine
+    def _send_packet(self, packet):
         try:
-            await packet.to_stream(self.writer)
+            yield from packet.to_stream(self.writer)
             if self._keepalive_task:
                 self._keepalive_task.cancel()
                 self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
-            await self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
+            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
         except ConnectionResetError as cre:
-            await self.handle_connection_closed()
+            yield from self.handle_connection_closed()
             raise
         except BaseException as e:
             self.logger.warning("Unhandled exception: %s" % e)
             raise
 
-    async def mqtt_deliver_next_message(self):
+    @asyncio.coroutine
+    def mqtt_deliver_next_message(self):
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug("%d message(s) available for delivery" % self.session.delivered_message_queue.qsize())
-        message = await self.session.delivered_message_queue.get()
+        message = yield from self.session.delivered_message_queue.get()
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug("Delivering message %s" % message)
         return message
@@ -452,37 +463,48 @@ class ProtocolHandler:
     def handle_read_timeout(self):
         self.logger.debug('%s read timeout unhandled' % self.session.client_id)
 
-    async def handle_connack(self, connack: ConnackPacket):
+    @asyncio.coroutine
+    def handle_connack(self, connack: ConnackPacket):
         self.logger.debug('%s CONNACK unhandled' % self.session.client_id)
 
-    async def handle_connect(self, connect: ConnectPacket):
+    @asyncio.coroutine
+    def handle_connect(self, connect: ConnectPacket):
         self.logger.debug('%s CONNECT unhandled' % self.session.client_id)
 
-    async def handle_subscribe(self, subscribe: SubscribePacket):
+    @asyncio.coroutine
+    def handle_subscribe(self, subscribe: SubscribePacket):
         self.logger.debug('%s SUBSCRIBE unhandled' % self.session.client_id)
 
-    async def handle_unsubscribe(self, subscribe: UnsubscribePacket):
+    @asyncio.coroutine
+    def handle_unsubscribe(self, subscribe: UnsubscribePacket):
         self.logger.debug('%s UNSUBSCRIBE unhandled' % self.session.client_id)
 
-    async def handle_suback(self, suback: SubackPacket):
+    @asyncio.coroutine
+    def handle_suback(self, suback: SubackPacket):
         self.logger.debug('%s SUBACK unhandled' % self.session.client_id)
 
-    async def handle_unsuback(self, unsuback: UnsubackPacket):
+    @asyncio.coroutine
+    def handle_unsuback(self, unsuback: UnsubackPacket):
         self.logger.debug('%s UNSUBACK unhandled' % self.session.client_id)
 
-    async def handle_pingresp(self, pingresp: PingRespPacket):
+    @asyncio.coroutine
+    def handle_pingresp(self, pingresp: PingRespPacket):
         self.logger.debug('%s PINGRESP unhandled' % self.session.client_id)
 
-    async def handle_pingreq(self, pingreq: PingReqPacket):
+    @asyncio.coroutine
+    def handle_pingreq(self, pingreq: PingReqPacket):
         self.logger.debug('%s PINGREQ unhandled' % self.session.client_id)
 
-    async def handle_disconnect(self, disconnect: DisconnectPacket):
+    @asyncio.coroutine
+    def handle_disconnect(self, disconnect: DisconnectPacket):
         self.logger.debug('%s DISCONNECT unhandled' % self.session.client_id)
 
-    async def handle_connection_closed(self):
+    @asyncio.coroutine
+    def handle_connection_closed(self):
         self.logger.debug('%s Connection closed unhandled' % self.session.client_id)
 
-    async def handle_puback(self, puback: PubackPacket):
+    @asyncio.coroutine
+    def handle_puback(self, puback: PubackPacket):
         packet_id = puback.variable_header.packet_id
         try:
             waiter = self._puback_waiters[packet_id]
@@ -492,7 +514,8 @@ class ProtocolHandler:
         except InvalidStateError:
             self.logger.warning("PUBACK waiter with Id '%d' already done" % packet_id)
 
-    async def handle_pubrec(self, pubrec: PubrecPacket):
+    @asyncio.coroutine
+    def handle_pubrec(self, pubrec: PubrecPacket):
         packet_id = pubrec.packet_id
         try:
             waiter = self._pubrec_waiters[packet_id]
@@ -502,7 +525,8 @@ class ProtocolHandler:
         except InvalidStateError:
             self.logger.warning("PUBREC waiter with Id '%d' already done" % packet_id)
 
-    async def handle_pubcomp(self, pubcomp: PubcompPacket):
+    @asyncio.coroutine
+    def handle_pubcomp(self, pubcomp: PubcompPacket):
         packet_id = pubcomp.packet_id
         try:
             waiter = self._pubcomp_waiters[packet_id]
@@ -512,7 +536,8 @@ class ProtocolHandler:
         except InvalidStateError:
             self.logger.warning("PUBCOMP waiter with Id '%d' already done" % packet_id)
 
-    async def handle_pubrel(self, pubrel: PubrelPacket):
+    @asyncio.coroutine
+    def handle_pubrel(self, pubrel: PubrelPacket):
         packet_id = pubrel.packet_id
         try:
             waiter = self._pubrel_waiters[packet_id]
@@ -522,11 +547,12 @@ class ProtocolHandler:
         except InvalidStateError:
             self.logger.warning("PUBREL waiter with Id '%d' already done" % packet_id)
 
-    async def handle_publish(self, publish_packet: PublishPacket):
+    @asyncio.coroutine
+    def handle_publish(self, publish_packet: PublishPacket):
         packet_id = publish_packet.variable_header.packet_id
         qos = publish_packet.qos
 
         incoming_message = IncomingApplicationMessage(packet_id, publish_packet.topic_name, qos, publish_packet.data, publish_packet.retain_flag)
         incoming_message.publish_packet = publish_packet
-        await self._handle_message_flow(incoming_message)
+        yield from self._handle_message_flow(incoming_message)
         self.logger.debug("Message queue size: %d" % self.session.delivered_message_queue.qsize())

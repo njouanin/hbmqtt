@@ -42,17 +42,20 @@ class BrokerSysPlugin:
                      STAT_PUBLISH_SENT):
             self._stats[stat] = 0
 
-    async def _broadcast_sys_topic(self, topic_basename, data):
-        return await self.context.broadcast_message(DOLLAR_SYS_ROOT + topic_basename, data)
+    @asyncio.coroutine
+    def _broadcast_sys_topic(self, topic_basename, data):
+        return (yield from self.context.broadcast_message(DOLLAR_SYS_ROOT + topic_basename, data))
 
     def schedule_broadcast_sys_topic(self, topic_basename, data):
         return asyncio.ensure_future(self._broadcast_sys_topic(DOLLAR_SYS_ROOT + topic_basename, data),
                                      loop=self.context.loop)
 
-    async def on_broker_pre_start(self, *args, **kwargs):
+    @asyncio.coroutine
+    def on_broker_pre_start(self, *args, **kwargs):
         self._clear_stats()
 
-    async def on_broker_post_start(self, *args, **kwargs):
+    @asyncio.coroutine
+    def on_broker_post_start(self, *args, **kwargs):
         self._stats[STAT_START_TIME] = datetime.now()
         from hbmqtt.version import get_version
         version = 'HBMQTT version ' + get_version()
@@ -70,7 +73,8 @@ class BrokerSysPlugin:
             pass
             # 'sys_internal' config parameter not found
 
-    async def on_broker_pre_stop(self, *args, **kwargs):
+    @asyncio.coroutine
+    def on_broker_pre_stop(self, *args, **kwargs):
         # Stop $SYS topics broadcasting
         if self.sys_handle:
             self.sys_handle.cancel()
@@ -127,7 +131,8 @@ class BrokerSysPlugin:
         self.context.logger.debug("Broadcasting $SYS topics")
         self.sys_handle = self.context.loop.call_later(sys_interval, self.broadcast_dollar_sys_topics)
 
-    async def on_mqtt_packet_received(self, *args, **kwargs):
+    @asyncio.coroutine
+    def on_mqtt_packet_received(self, *args, **kwargs):
         packet = kwargs.get('packet')
         if packet:
             packet_size = packet.bytes_length
@@ -136,7 +141,8 @@ class BrokerSysPlugin:
             if packet.fixed_header.packet_type == PUBLISH:
                 self._stats[STAT_PUBLISH_RECEIVED] += 1
 
-    async def on_mqtt_packet_sent(self, *args, **kwargs):
+    @asyncio.coroutine
+    def on_mqtt_packet_sent(self, *args, **kwargs):
         packet = kwargs.get('packet')
         if packet:
             packet_size = packet.bytes_length
@@ -145,10 +151,12 @@ class BrokerSysPlugin:
             if packet.fixed_header.packet_type == PUBLISH:
                 self._stats[STAT_PUBLISH_SENT] += 1
 
-    async def on_broker_client_connected(self, *args, **kwargs):
+    @asyncio.coroutine
+    def on_broker_client_connected(self, *args, **kwargs):
         self._stats[STAT_CLIENTS_CONNECTED] += 1
         self._stats[STAT_CLIENTS_MAXIMUM] = max(self._stats[STAT_CLIENTS_MAXIMUM], self._stats[STAT_CLIENTS_CONNECTED])
 
-    async def on_broker_client_disconnected(self, *args, **kwargs):
+    @asyncio.coroutine
+    def on_broker_client_disconnected(self, *args, **kwargs):
         self._stats[STAT_CLIENTS_CONNECTED] -= 1
         self._stats[STAT_CLIENTS_DISCONNECTED] += 1

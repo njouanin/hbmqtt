@@ -107,8 +107,8 @@ def do_pub(client, arguments):
 
 
 def main(*args, **kwargs):
-    if sys.version_info[:2] < (3, 5):
-        logger.fatal("Error: Python 3.5 is required")
+    if sys.version_info[:2] < (3, 4):
+        logger.fatal("Error: Python 3.4+ is required")
         sys.exit(-1)
 
     arguments = docopt(__doc__, version=get_version())

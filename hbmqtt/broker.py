@@ -72,9 +72,10 @@ class Server:
         else:
             self.semaphore = None
 
-    async def acquire_connection(self):
+    @asyncio.coroutine
+    def acquire_connection(self):
         if self.semaphore:
-            await self.semaphore.acquire()
+            yield from self.semaphore.acquire()
         self.conn_count += 1
         if self.max_connections > 0:
             self.logger.info("Listener '%s': %d/%d connections acquired" %
@@ -94,10 +95,11 @@ class Server:
             self.logger.info("Listener '%s': %d connections acquired" %
                               (self.listener_name, self.conn_count))
 
-    async def close_instance(self):
+    @asyncio.coroutine
+    def close_instance(self):
         if self.instance:
             self.instance.close()
-            await self.instance.wait_closed()
+            yield from self.instance.wait_closed()
 
 
 class BrokerContext(BaseContext):
@@ -110,8 +112,9 @@ class BrokerContext(BaseContext):
         self.config = None
         self._broker_instance = broker
 
-    async def broadcast_message(self, topic, data, qos=None):
-        await self._broker_instance.internal_message_broadcast(topic, data, qos)
+    @asyncio.coroutine
+    def broadcast_message(self, topic, data, qos=None):
+        yield from self._broker_instance.internal_message_broadcast(topic, data, qos)
 
     def retain_message(self, topic_name, data, qos=None):
         self._broker_instance.retain_message(None, topic_name, data, qos)
@@ -220,7 +223,8 @@ class Broker:
         self.transitions.add_transition(trigger='stopping_failure', source='stopping', dest='not_stopped')
         self.transitions.add_transition(trigger='start', source='stopped', dest='starting')
 
-    async def start(self):
+    @asyncio.coroutine
+    def start(self):
         try:
             self._sessions = dict()
             self._subscriptions = dict()
@@ -231,7 +235,7 @@ class Broker:
             self.logger.warn("[WARN-0001] Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be started: %s" % me)
 
-        await self.plugins_manager.fire_event(EVENT_BROKER_PRE_START)
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_START)
         try:
             # Start network listeners
             for listener_name in self.listeners_config:
@@ -259,7 +263,7 @@ class Broker:
                 if listener['type'] == 'tcp':
                     address, port = listener['bind'].split(':')
                     cb_partial = partial(self.stream_connected, listener_name=listener_name)
-                    instance = await asyncio.start_server(cb_partial,
+                    instance = yield from asyncio.start_server(cb_partial,
                                                                address,
                                                                port,
                                                                ssl=sc,
@@ -268,14 +272,14 @@ class Broker:
                 elif listener['type'] == 'ws':
                     address, port = listener['bind'].split(':')
                     cb_partial = partial(self.ws_connected, listener_name=listener_name)
-                    instance = await websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop)
+                    instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop)
                     self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
 
                 self.logger.info("Listener '%s' bind to %s (max_connecionts=%d)" %
                                  (listener_name, listener['bind'], max_connections))
 
             self.transitions.starting_success()
-            await self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
+            yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
 
             #Start broadcast loop
             self._broadcast_task = asyncio.ensure_future(self._broadcast_loop(), loop=self._loop)
@@ -286,7 +290,8 @@ class Broker:
             self.transitions.starting_fail()
             raise BrokerException("Broker instance can't be started: %s" % e)
 
-    async def shutdown(self):
+    @asyncio.coroutine
+    def shutdown(self):
         try:
             self._sessions = dict()
             self._subscriptions = dict()
@@ -297,7 +302,7 @@ class Broker:
             raise BrokerException("Broker instance can't be stopped: %s" % me)
 
         # Fire broker_shutdown event to plugins
-        await self.plugins_manager.fire_event(EVENT_BROKER_PRE_SHUTDOWN)
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_SHUTDOWN)
 
         # Stop broadcast loop
         if self._broadcast_task:
@@ -307,44 +312,48 @@ class Broker:
 
         for listener_name in self._servers:
             server = self._servers[listener_name]
-            await server.close_instance()
+            yield from server.close_instance()
         self.logger.debug("Broker closing")
         self.logger.info("Broker closed")
-        await self.plugins_manager.fire_event(EVENT_BROKER_POST_SHUTDOWN)
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_SHUTDOWN)
         self.transitions.stopping_success()
 
-    async def internal_message_broadcast(self, topic, data, qos=None):
-        return await self._broadcast_message(None, topic, data)
+    @asyncio.coroutine
+    def internal_message_broadcast(self, topic, data, qos=None):
+        return (yield from self._broadcast_message(None, topic, data))
 
-    async def ws_connected(self, websocket, uri, listener_name):
-        await self.client_connected(listener_name, WebSocketsReader(websocket), WebSocketsWriter(websocket))
+    @asyncio.coroutine
+    def ws_connected(self, websocket, uri, listener_name):
+        yield from self.client_connected(listener_name, WebSocketsReader(websocket), WebSocketsWriter(websocket))
 
-    async def stream_connected(self, reader, writer, listener_name):
-        await self.client_connected(listener_name, StreamReaderAdapter(reader), StreamWriterAdapter(writer))
+    @asyncio.coroutine
+    def stream_connected(self, reader, writer, listener_name):
+        yield from self.client_connected(listener_name, StreamReaderAdapter(reader), StreamWriterAdapter(writer))
 
-    async def client_connected(self, listener_name, reader: ReaderAdapter, writer: WriterAdapter):
+    @asyncio.coroutine
+    def client_connected(self, listener_name, reader: ReaderAdapter, writer: WriterAdapter):
         # Wait for connection available on listener
         server = self._servers.get(listener_name, None)
         if not server:
             raise BrokerException("Invalid listener name '%s'" % listener_name)
-        await server.acquire_connection()
+        yield from server.acquire_connection()
 
         remote_address, remote_port = writer.get_peer_info()
         self.logger.info("Connection from %s:%d on listener '%s'" % (remote_address, remote_port, listener_name))
 
         # Wait for first packet and expect a CONNECT
         try:
-            handler, client_session = await BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager)
+            handler, client_session = yield from BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager)
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))
-            await writer.close()
+            yield from writer.close()
             self.logger.debug("Connection closed")
             return
         except MQTTException as me:
             self.logger.error('Invalid connection from %s : %s' %
                               (format_client_message(address=remote_address, port=remote_port), me))
-            await writer.close()
+            yield from writer.close()
             self.logger.debug("Connection closed")
             return
 
@@ -371,9 +380,9 @@ class Broker:
         handler.attach(client_session, reader, writer)
         self._sessions[client_session.client_id] = (client_session, handler)
 
-        authenticated = await self.authenticate(client_session, self.listeners_config[listener_name])
+        authenticated = yield from self.authenticate(client_session, self.listeners_config[listener_name])
         if not authenticated:
-            await writer.close()
+            yield from writer.close()
             return
 
         while True:
@@ -383,15 +392,15 @@ class Broker:
             except MachineError:
                 self.logger.warning("Client %s is reconnecting too quickly, make it wait" % client_session.client_id)
                 # Wait a bit may be client is reconnecting too fast
-                await asyncio.sleep(1, loop=self._loop)
-        await handler.mqtt_connack_authorize(authenticated)
+                yield from asyncio.sleep(1, loop=self._loop)
+        yield from handler.mqtt_connack_authorize(authenticated)
 
-        await self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_CONNECTED, client_id=client_session.client_id)
+        yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_CONNECTED, client_id=client_session.client_id)
 
         self.logger.debug("%s Start messages handling" % client_session.client_id)
-        await handler.start()
+        yield from handler.start()
         self.logger.debug("Retained messages queue size: %d" % client_session.retained_messages.qsize())
-        await self.publish_session_retained_messages(client_session)
+        yield from self.publish_session_retained_messages(client_session)
 
         # Init and start loop for handling client messages (publish, subscribe/unsubscribe, disconnect)
         disconnect_waiter = asyncio.ensure_future(handler.wait_disconnect(), loop=self._loop)
@@ -401,7 +410,7 @@ class Broker:
         connected = True
         while connected:
             try:
-                done, pending = await asyncio.wait(
+                done, pending = yield from asyncio.wait(
                     [disconnect_waiter, subscribe_waiter, unsubscribe_waiter, wait_deliver],
                     return_when=asyncio.FIRST_COMPLETED, loop=self._loop)
                 if disconnect_waiter in done:
@@ -413,7 +422,7 @@ class Broker:
                         if client_session.will_flag:
                             self.logger.debug("Client %s disconnected abnormally, sending will message" %
                                               format_client_message(client_session))
-                            await self._broadcast_message(
+                            yield from self._broadcast_message(
                                 client_session,
                                 client_session.will_topic,
                                 client_session.will_message,
@@ -424,21 +433,21 @@ class Broker:
                                                     client_session.will_message,
                                                     client_session.will_qos)
                     self.logger.debug("%s Disconnecting session" % client_session.client_id)
-                    await self._stop_handler(handler)
+                    yield from self._stop_handler(handler)
                     client_session.transitions.disconnect()
-                    await self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, client_id=client_session.client_id)
-                    await writer.close()
+                    yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, client_id=client_session.client_id)
+                    yield from writer.close()
                     connected = False
                 if unsubscribe_waiter in done:
                     self.logger.debug("%s handling unsubscription" % client_session.client_id)
                     unsubscription = unsubscribe_waiter.result()
                     for topic in unsubscription['topics']:
                         self._del_subscription(topic, client_session)
-                        await self.plugins_manager.fire_event(
+                        yield from self.plugins_manager.fire_event(
                             EVENT_BROKER_CLIENT_UNSUBSCRIBED,
                             client_id=client_session.client_id,
                             topic=topic)
-                    await handler.mqtt_acknowledge_unsubscription(unsubscription['packet_id'])
+                    yield from handler.mqtt_acknowledge_unsubscription(unsubscription['packet_id'])
                     unsubscribe_waiter = asyncio.Task(handler.get_next_pending_unsubscription(), loop=self._loop)
                 if subscribe_waiter in done:
                     self.logger.debug("%s handling subscription" % client_session.client_id)
@@ -446,25 +455,25 @@ class Broker:
                     return_codes = []
                     for subscription in subscriptions['topics']:
                         return_codes.append(self.add_subscription(subscription, client_session))
-                    await handler.mqtt_acknowledge_subscription(subscriptions['packet_id'], return_codes)
+                    yield from handler.mqtt_acknowledge_subscription(subscriptions['packet_id'], return_codes)
                     for index, subscription in enumerate(subscriptions['topics']):
                         if return_codes[index] != 0x80:
-                            await self.plugins_manager.fire_event(
+                            yield from self.plugins_manager.fire_event(
                                 EVENT_BROKER_CLIENT_SUBSCRIBED,
                                 client_id=client_session.client_id,
                                 topic=subscription[0],
                                 qos=subscription[1])
-                            await self.publish_retained_messages_for_subscription(subscription, client_session)
+                            yield from self.publish_retained_messages_for_subscription(subscription, client_session)
                     subscribe_waiter = asyncio.Task(handler.get_next_pending_subscription(), loop=self._loop)
                     self.logger.debug(repr(self._subscriptions))
                 if wait_deliver in done:
                     if self.logger.isEnabledFor(logging.DEBUG):
                         self.logger.debug("%s handling message delivery" % client_session.client_id)
                     app_message = wait_deliver.result()
-                    await self.plugins_manager.fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                    yield from self.plugins_manager.fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
                                                                client_id=client_session.client_id,
                                                                message=app_message)
-                    await self._broadcast_message(client_session, app_message.topic, app_message.data)
+                    yield from self._broadcast_message(client_session, app_message.topic, app_message.data)
                     if app_message.publish_packet.retain_flag:
                         self.retain_message(client_session, app_message.topic, app_message.data, app_message.qos)
                     wait_deliver = asyncio.Task(handler.mqtt_deliver_next_message(), loop=self._loop)
@@ -489,18 +498,20 @@ class Broker:
         handler.attach(session, reader, writer)
         return handler
 
-    async def _stop_handler(self, handler):
+    @asyncio.coroutine
+    def _stop_handler(self, handler):
         """
         Stop a running handler and detach if from the session
         :param handler:
         :return:
         """
         try:
-            await handler.stop()
+            yield from handler.stop()
         except Exception as e:
             self.logger.error(e)
 
-    async def authenticate(self, session: Session, listener):
+    @asyncio.coroutine
+    def authenticate(self, session: Session, listener):
         """
         This method call the authenticate method on registered plugins to test user authentication.
         User is considered authenticated if all plugins called returns True.
@@ -516,7 +527,7 @@ class Broker:
         auth_config = self.config.get('auth', None)
         if auth_config:
             auth_plugins = auth_config.get('plugins', None)
-        returns = await self.plugins_manager.map_plugin_coro(
+        returns = yield from self.plugins_manager.map_plugin_coro(
             "authenticate",
             session=session,
             filter_plugins=auth_plugins)
@@ -615,13 +626,14 @@ class Broker:
         else:
             return False
 
-    async def _broadcast_loop(self):
+    @asyncio.coroutine
+    def _broadcast_loop(self):
         running_tasks = deque()
         try:
             while True:
                 while running_tasks and running_tasks[0].done():
                     running_tasks.popleft()
-                broadcast = await self._broadcast_queue.get()
+                broadcast = yield from self._broadcast_queue.get()
                 if self.logger.isEnabledFor(logging.DEBUG):
                     self.logger.debug("broadcasting %r" % broadcast)
                 for k_filter in self._subscriptions:
@@ -645,13 +657,14 @@ class Broker:
                                                    broadcast['topic'], format_client_message(session=target_session)))
                                 retained_message = RetainedApplicationMessage(
                                     broadcast['session'], broadcast['topic'], broadcast['data'], qos)
-                                await target_session.retained_messages.put(retained_message)
+                                yield from target_session.retained_messages.put(retained_message)
         except CancelledError:
             # Wait until current broadcasting tasks end
             if running_tasks:
-                await asyncio.wait(running_tasks, loop=self._loop)
+                yield from asyncio.wait(running_tasks, loop=self._loop)
 
-    async def _broadcast_message(self, session, topic, data, force_qos=None):
+    @asyncio.coroutine
+    def _broadcast_message(self, session, topic, data, force_qos=None):
         broadcast = {
             'session': session,
             'topic': topic,
@@ -659,23 +672,25 @@ class Broker:
         }
         if force_qos:
             broadcast['qos'] = force_qos
-        await self._broadcast_queue.put(broadcast)
+        yield from self._broadcast_queue.put(broadcast)
 
-    async def publish_session_retained_messages(self, session):
+    @asyncio.coroutine
+    def publish_session_retained_messages(self, session):
         self.logger.debug("Publishing %d messages retained for session %s" %
                           (session.retained_messages.qsize(), format_client_message(session=session))
                           )
         publish_tasks = []
         handler = self._get_handler(session)
         while not session.retained_messages.empty():
-            retained = await session.retained_messages.get()
+            retained = yield from session.retained_messages.get()
             publish_tasks.append(asyncio.ensure_future(
                 handler.mqtt_publish(
                     retained.topic, retained.data, retained.qos, True), loop=self._loop))
         if publish_tasks:
-            await asyncio.wait(publish_tasks, loop=self._loop)
+            yield from asyncio.wait(publish_tasks, loop=self._loop)
 
-    async def publish_retained_messages_for_subscription(self, subscription, session):
+    @asyncio.coroutine
+    def publish_retained_messages_for_subscription(self, subscription, session):
         self.logger.debug("Begin broadcasting messages retained due to subscription on '%s' from %s" %
                           (subscription[0], format_client_message(session=session)))
         publish_tasks = []
@@ -689,7 +704,7 @@ class Broker:
                     handler.mqtt_publish(
                         retained.topic, retained.data, subscription[1], True), loop=self._loop))
         if publish_tasks:
-            await asyncio.wait(publish_tasks, loop=self._loop)
+            yield from asyncio.wait(publish_tasks, loop=self._loop)
         self.logger.debug("End broadcasting messages retained due to subscription on '%s' from %s" %
                           (subscription[0], format_client_message(session=session)))
 

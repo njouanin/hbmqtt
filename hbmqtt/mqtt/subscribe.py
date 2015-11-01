@@ -19,15 +19,16 @@ class SubscribePayload(MQTTPayload):
         return out
 
     @classmethod
-    async def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
+    @asyncio.coroutine
+    def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
         topics = []
         payload_length = fixed_header.remaining_length - variable_header.bytes_length
         read_bytes = 0
         while read_bytes < payload_length:
             try:
-                topic = await decode_string(reader)
-                qos_byte = await read_or_raise(reader, 1)
+                topic = yield from decode_string(reader)
+                qos_byte = yield from read_or_raise(reader, 1)
                 qos = bytes_to_int(qos_byte)
                 topics.append((topic, qos))
                 read_bytes += 2 + len(topic.encode('utf-8')) + 1

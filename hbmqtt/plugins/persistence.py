@@ -32,7 +32,8 @@ class SQLitePlugin:
         if self.cursor:
             self.cursor.execute("CREATE TABLE IF NOT EXISTS session(client_id TEXT PRIMARY KEY, data BLOB)")
 
-    async def save_session(self, session):
+    @asyncio.coroutine
+    def save_session(self, session):
         if self.cursor:
             dump = pickle.dumps(session)
             try:
@@ -42,7 +43,8 @@ class SQLitePlugin:
             except Exception as e:
                 self.context.logger.error("Failed saving session '%s': %s" % (session, e))
 
-    async def find_session(self, client_id):
+    @asyncio.coroutine
+    def find_session(self, client_id):
         if self.cursor:
             row = self.cursor.execute("SELECT data FROM session where client_id=?", (client_id,)).fetchone()
             if row:
@@ -50,12 +52,14 @@ class SQLitePlugin:
             else:
                 return None
 
-    async def del_session(self, client_id):
+    @asyncio.coroutine
+    def del_session(self, client_id):
         if self.cursor:
             self.cursor.execute("DELETE FROM session where client_id=?", (client_id,))
             self.conn.commit()
 
-    async def on_broker_post_shutdown(self):
+    @asyncio.coroutine
+    def on_broker_post_shutdown(self):
         if self.conn:
             self.conn.close()
             self.context.logger.info("Database file '%s' closed" % self.db_file)

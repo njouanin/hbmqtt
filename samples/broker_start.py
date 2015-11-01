@@ -30,10 +30,11 @@ config = {
 
 broker = Broker(config)
 
-async def test_coro():
-    await broker.start()
-    #await asyncio.sleep(5)
-    #await broker.shutdown()
+@asyncio.coroutine
+def test_coro():
+    yield from broker.start()
+    #yield from asyncio.sleep(5)
+    #yield from broker.shutdown()
 
 
 if __name__ == '__main__':

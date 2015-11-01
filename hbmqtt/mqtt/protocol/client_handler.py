@@ -1,6 +1,7 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import asyncio
 from asyncio import futures
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler, EVENT_MQTT_PACKET_RECEIVED
 from hbmqtt.mqtt.packet import *
@@ -27,13 +28,15 @@ class ClientProtocolHandler(ProtocolHandler):
         self._disconnect_waiter = None
         self._pingresp_waiter = None
 
-    async def start(self):
-        await super().start()
+    @asyncio.coroutine
+    def start(self):
+        yield from super().start()
         if self._disconnect_waiter is None:
             self._disconnect_waiter = futures.Future(loop=self._loop)
 
-    async def stop(self):
-        await super().stop()
+    @asyncio.coroutine
+    def stop(self):
+        yield from super().stop()
         if self._ping_task:
             try:
                 self.logger.debug("Cancel ping task")
@@ -77,11 +80,12 @@ class ClientProtocolHandler(ProtocolHandler):
         packet = ConnectPacket(vh=vh, payload=payload)
         return packet
 
-    async def mqtt_connect(self):
+    @asyncio.coroutine
+    def mqtt_connect(self):
         connect_packet = self._build_connect_packet()
-        await self._send_packet(connect_packet)
-        connack = await ConnackPacket.from_stream(self.reader)
-        await self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connack, session=self.session)
+        yield from self._send_packet(connect_packet)
+        connack = yield from ConnackPacket.from_stream(self.reader)
+        yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connack, session=self.session)
         return connack.return_code
 
     def handle_write_timeout(self):
@@ -95,7 +99,8 @@ class ClientProtocolHandler(ProtocolHandler):
     def handle_read_timeout(self):
         pass
 
-    async def mqtt_subscribe(self, topics, packet_id):
+    @asyncio.coroutine
+    def mqtt_subscribe(self, topics, packet_id):
         """
         :param topics: array of topics [{'filter':'/a/b', 'qos': 0x00}, ...]
         :return:
@@ -103,17 +108,18 @@ class ClientProtocolHandler(ProtocolHandler):
 
         # Build and send SUBSCRIBE message
         subscribe = SubscribePacket.build(topics, packet_id)
-        await self._send_packet(subscribe)
+        yield from self._send_packet(subscribe)
 
         # Wait for SUBACK is received
         waiter = futures.Future(loop=self._loop)
         self._subscriptions_waiter[subscribe.variable_header.packet_id] = waiter
-        return_codes = await waiter
+        return_codes = yield from waiter
 
         del self._subscriptions_waiter[subscribe.variable_header.packet_id]
         return return_codes
 
-    async def handle_suback(self, suback: SubackPacket):
+    @asyncio.coroutine
+    def handle_suback(self, suback: SubackPacket):
         packet_id = suback.variable_header.packet_id
         try:
             waiter = self._subscriptions_waiter.get(packet_id)
@@ -121,20 +127,22 @@ class ClientProtocolHandler(ProtocolHandler):
         except KeyError as ke:
             self.logger.warning("Received SUBACK for unknown pending subscription with Id: %s" % packet_id)
 
-    async def mqtt_unsubscribe(self, topics, packet_id):
+    @asyncio.coroutine
+    def mqtt_unsubscribe(self, topics, packet_id):
         """
 
         :param topics: array of topics ['/a/b', ...]
         :return:
         """
         unsubscribe = UnsubscribePacket.build(topics, packet_id)
-        await self._send_packet(unsubscribe)
+        yield from self._send_packet(unsubscribe)
         waiter = futures.Future(loop=self._loop)
         self._unsubscriptions_waiter[unsubscribe.variable_header.packet_id] = waiter
-        await waiter
+        yield from waiter
         del self._unsubscriptions_waiter[unsubscribe.variable_header.packet_id]
 
-    async def handle_unsuback(self, unsuback: UnsubackPacket):
+    @asyncio.coroutine
+    def handle_unsuback(self, unsuback: UnsubackPacket):
         packet_id = unsuback.variable_header.packet_id
         try:
             waiter = self._unsubscriptions_waiter.get(packet_id)
@@ -142,25 +150,30 @@ class ClientProtocolHandler(ProtocolHandler):
         except KeyError as ke:
             self.logger.warning("Received UNSUBACK for unknown pending subscription with Id: %s" % packet_id)
 
-    async def mqtt_disconnect(self):
+    @asyncio.coroutine
+    def mqtt_disconnect(self):
         disconnect_packet = DisconnectPacket()
-        await self._send_packet(disconnect_packet)
+        yield from self._send_packet(disconnect_packet)
 
-    async def mqtt_ping(self):
+    @asyncio.coroutine
+    def mqtt_ping(self):
         ping_packet = PingReqPacket()
-        await self._send_packet(ping_packet)
+        yield from self._send_packet(ping_packet)
         self._pingresp_waiter = futures.Future(loop=self._loop)
-        resp = await self._pingresp_queue.get()
+        resp = yield from self._pingresp_queue.get()
         self._pingresp_waiter = None
         return resp
 
-    async def handle_pingresp(self, pingresp: PingRespPacket):
-        await self._pingresp_queue.put(pingresp)
+    @asyncio.coroutine
+    def handle_pingresp(self, pingresp: PingRespPacket):
+        yield from self._pingresp_queue.put(pingresp)
 
-    async def handle_connection_closed(self):
+    @asyncio.coroutine
+    def handle_connection_closed(self):
         self.logger.debug("Broker closed connection")
         if not self._disconnect_waiter.done():
             self._disconnect_waiter.set_result(None)
 
-    async def wait_disconnect(self):
-        await self._disconnect_waiter
+    @asyncio.coroutine
+    def wait_disconnect(self):
+        yield from self._disconnect_waiter

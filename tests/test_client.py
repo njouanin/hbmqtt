@@ -22,12 +22,13 @@ class MQTTClientTest(unittest.TestCase):
         self.loop.close()
 
     def test_connect_tcp(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 client = MQTTClient()
-                ret = await client.connect('mqtt://test.mosquitto.org/')
+                ret = yield from client.connect('mqtt://test.mosquitto.org/')
                 self.assertIsNotNone(client.session)
-                await client.disconnect()
+                yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -38,13 +39,14 @@ class MQTTClientTest(unittest.TestCase):
             raise future.exception()
 
     def test_connect_tcp_secure(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 client = MQTTClient()
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
-                ret = await client.connect('mqtts://test.mosquitto.org/', cafile=ca)
+                ret = yield from client.connect('mqtts://test.mosquitto.org/', cafile=ca)
                 self.assertIsNotNone(client.session)
-                await client.disconnect()
+                yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -55,11 +57,12 @@ class MQTTClientTest(unittest.TestCase):
             raise future.exception()
 
     def test_connect_tcp_failure(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 config = {'auto_reconnect': False}
                 client = MQTTClient(config=config)
-                ret = await client.connect('mqtt://localhost/')
+                ret = yield from client.connect('mqtt://localhost/')
             except ConnectException as e:
                 future.set_result(True)
 
@@ -69,12 +72,13 @@ class MQTTClientTest(unittest.TestCase):
             raise future.exception()
 
     def test_connect_ws(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 client = MQTTClient()
-                await client.connect('ws://test.mosquitto.org:8080/')
+                yield from client.connect('ws://test.mosquitto.org:8080/')
                 self.assertIsNotNone(client.session)
-                await client.disconnect()
+                yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -85,13 +89,14 @@ class MQTTClientTest(unittest.TestCase):
             raise future.exception()
 
     def test_connect_ws_secure(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 client = MQTTClient()
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
-                await client.connect('wss://test.mosquitto.org:8081/', cafile=ca)
+                yield from client.connect('wss://test.mosquitto.org:8081/', cafile=ca)
                 self.assertIsNotNone(client.session)
-                await client.disconnect()
+                yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -102,13 +107,14 @@ class MQTTClientTest(unittest.TestCase):
             raise future.exception()
 
     def test_ping(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 client = MQTTClient()
-                ret = await client.connect('mqtt://test.mosquitto.org/')
+                ret = yield from client.connect('mqtt://test.mosquitto.org/')
                 self.assertIsNotNone(client.session)
-                await client.ping()
-                await client.disconnect()
+                yield from client.ping()
+                yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -119,12 +125,13 @@ class MQTTClientTest(unittest.TestCase):
             raise future.exception()
 
     def test_subscribe(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 client = MQTTClient()
-                await client.connect('mqtt://test.mosquitto.org/')
+                yield from client.connect('mqtt://test.mosquitto.org/')
                 self.assertIsNotNone(client.session)
-                ret = await client.subscribe([
+                ret = yield from client.subscribe([
                     ('$SYS/broker/uptime', QOS_0),
                     ('$SYS/broker/uptime', QOS_1),
                     ('$SYS/broker/uptime', QOS_2),
@@ -132,7 +139,7 @@ class MQTTClientTest(unittest.TestCase):
                 self.assertEquals(ret[0], QOS_0)
                 self.assertEquals(ret[1], QOS_1)
                 self.assertEquals(ret[2], QOS_2)
-                await client.disconnect()
+                yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
@@ -143,17 +150,18 @@ class MQTTClientTest(unittest.TestCase):
             raise future.exception()
 
     def test_unsubscribe(self):
-        async def test_coro():
+        @asyncio.coroutine
+        def test_coro():
             try:
                 client = MQTTClient()
-                await client.connect('mqtt://test.mosquitto.org/')
+                yield from client.connect('mqtt://test.mosquitto.org/')
                 self.assertIsNotNone(client.session)
-                ret = await client.subscribe([
+                ret = yield from client.subscribe([
                     ('$SYS/broker/uptime', QOS_0),
                 ])
                 self.assertEquals(ret[0], QOS_0)
-                await client.unsubscribe(['$SYS/broker/uptime'])
-                await client.disconnect()
+                yield from client.unsubscribe(['$SYS/broker/uptime'])
+                yield from client.disconnect()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
