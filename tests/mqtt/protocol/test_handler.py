@@ -4,6 +4,7 @@
 import unittest
 import asyncio
 import logging
+import random
 from hbmqtt.plugins.manager import PluginManager
 from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
@@ -18,6 +19,10 @@ from hbmqtt.mqtt.pubcomp import PubcompPacket
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)
 log = logging.getLogger(__name__)
+
+
+def rand_packet_id():
+    return random.randint(0, 65535)
 
 
 def adapt(reader, writer):
@@ -211,7 +216,7 @@ class ProtocolHandlerTest(unittest.TestCase):
     def test_receive_qos0(self):
         @asyncio.coroutine
         def server_mock(reader, writer):
-            packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_0, False)
+            packet = PublishPacket.build('/topic', b'test_data', rand_packet_id(), False, QOS_0, False)
             yield from packet.to_stream(writer)
 
         @asyncio.coroutine
@@ -249,7 +254,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         @asyncio.coroutine
         def server_mock(reader, writer):
             try:
-                packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_1, False)
+                packet = PublishPacket.build('/topic', b'test_data', rand_packet_id(), False, QOS_1, False)
                 yield from packet.to_stream(writer)
                 puback = yield from PubackPacket.from_stream(reader)
                 self.assertIsNotNone(puback)
@@ -294,7 +299,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         @asyncio.coroutine
         def server_mock(reader, writer):
             try:
-                packet = PublishPacket.build('/topic', b'test_data', 2, False, QOS_2, False)
+                packet = PublishPacket.build('/topic', b'test_data', rand_packet_id(), False, QOS_2, False)
                 yield from packet.to_stream(writer)
                 pubrec = yield from PubrecPacket.from_stream(reader)
                 self.assertIsNotNone(pubrec)
@@ -394,7 +399,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         self.handler = None
         self.session = Session()
         message = OutgoingApplicationMessage(1, '/topic', QOS_1, b'test_data', False)
-        message.publish_packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_1, False)
+        message.publish_packet = PublishPacket.build('/topic', b'test_data', rand_packet_id(), False, QOS_1, False)
         self.session.inflight_out[1] = message
         future = asyncio.Future(loop=self.loop)
 
@@ -442,7 +447,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         self.handler = None
         self.session = Session()
         message = OutgoingApplicationMessage(1, '/topic', QOS_2, b'test_data', False)
-        message.publish_packet = PublishPacket.build('/topic', b'test_data', 1, False, QOS_2, False)
+        message.publish_packet = PublishPacket.build('/topic', b'test_data', rand_packet_id(), False, QOS_2, False)
         self.session.inflight_out[1] = message
         future = asyncio.Future(loop=self.loop)
 

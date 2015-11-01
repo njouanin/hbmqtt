@@ -333,7 +333,7 @@ class ProtocolHandler:
             # Wait PUBREL
             if app_message.packet_id in self._pubrel_waiters:
                 # PUBREL waiter already exists for this packet ID
-                message = "Can't add PUBREC waiter, a waiter already exists for message Id '%s'" \
+                message = "Can't add PUBREL waiter, a waiter already exists for message Id '%s'" \
                           % app_message.packet_id
                 self.logger.warning(message)
                 raise HBMQTTException(message)
