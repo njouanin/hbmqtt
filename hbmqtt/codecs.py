@@ -60,7 +60,10 @@ async def decode_string(reader) -> bytes:
     str_length = unpack("!H", length_bytes)
     if str_length[0]:
         byte_str = await read_or_raise(reader, str_length[0])
-        return byte_str.decode(encoding='utf-8')
+        try:
+            return byte_str.decode(encoding='utf-8')
+        except:
+            return str(byte_str)
     else:
         return ''
 
