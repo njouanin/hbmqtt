@@ -3,6 +3,11 @@
 # See the file license.txt for copying permission.
 import asyncio
 from asyncio import futures
+import sys
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+else:
+    from asyncio import ensure_future
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler, EVENT_MQTT_PACKET_RECEIVED
 from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.disconnect import DisconnectPacket
@@ -92,7 +97,7 @@ class ClientProtocolHandler(ProtocolHandler):
         try:
             self.logger.debug("Scheduling Ping")
             if not self._ping_task:
-                self._ping_task = asyncio.ensure_future(self.mqtt_ping())
+                self._ping_task = ensure_future(self.mqtt_ping())
         except BaseException as be:
             self.logger.debug("Exception ignored in ping task: %r" % be)
 

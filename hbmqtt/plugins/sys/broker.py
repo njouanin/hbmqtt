@@ -5,6 +5,10 @@ from datetime import datetime
 from hbmqtt.mqtt.packet import PUBLISH
 from hbmqtt.codecs import int_to_bytes_str
 import asyncio
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+else:
+    from asyncio import ensure_future
 from collections import deque
 
 DOLLAR_SYS_ROOT = '$SYS/broker/'
@@ -47,7 +51,7 @@ class BrokerSysPlugin:
         return (yield from self.context.broadcast_message(DOLLAR_SYS_ROOT + topic_basename, data))
 
     def schedule_broadcast_sys_topic(self, topic_basename, data):
-        return asyncio.ensure_future(self._broadcast_sys_topic(DOLLAR_SYS_ROOT + topic_basename, data),
+        return ensure_future(self._broadcast_sys_topic(DOLLAR_SYS_ROOT + topic_basename, data),
                                      loop=self.context.loop)
 
     @asyncio.coroutine
