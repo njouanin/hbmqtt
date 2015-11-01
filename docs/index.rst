@@ -9,7 +9,7 @@ highly concurrent applications.
 Requirements
 ------------
 
-``HBMQTT`` is built on Python :mod:`asyncio` library which was introduced in Python 3.4. Tests shown that ``HBMQTT`` runs best on Python 3.4.3. Python 3.5.0 is also fully supported and recommended.
+``HBMQTT`` is built on Python :mod:`asyncio` library which was introduced in Python 3.4. Tests have shown that HBMQTT run best with Python 3.4.3. Python 3.5.0 is also fully supported and recommended. Make use you use one of these version before installing ``HBMQTT``.
 
 Installation
 ------------
