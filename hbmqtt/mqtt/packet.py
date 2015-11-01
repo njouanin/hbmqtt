@@ -89,7 +89,7 @@ class MQTTFixedHeader:
                 else:
                     multiplier *= 128
                     if multiplier > 128 * 128 * 128:
-                        raise MQTTException("Invalid remaining length bytes:%s" % bytes_to_hex_str(buffer))
+                        raise MQTTException("Invalid remaining length bytes:%s, packet_type=%d" % (bytes_to_hex_str(buffer), msg_type))
             return value
 
         try:
