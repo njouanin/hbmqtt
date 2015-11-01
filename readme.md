@@ -15,6 +15,7 @@ MQTT client resides in the `Client` class. The examples scripts in `samples/` su
 ## Build status
 [![Build Status](https://travis-ci.org/beerfactory/hbmqtt.svg?branch=master)](https://travis-ci.org/beerfactory/hbmqtt)
 [![Coverage Status](https://coveralls.io/repos/beerfactory/hbmqtt/badge.svg?branch=develop&service=github)](https://coveralls.io/github/beerfactory/hbmqtt?branch=develop)
+[![Documentation Status](https://readthedocs.org/projects/hbmqtt/badge/?version=latest)](http://hbmqtt.readthedocs.org/en/latest/?badge=latest)
 
 ## Support
 
