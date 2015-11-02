@@ -95,8 +95,8 @@ class ClientProtocolHandler(ProtocolHandler):
 
     def handle_write_timeout(self):
         try:
-            self.logger.debug("Scheduling Ping")
             if not self._ping_task:
+                self.logger.debug("Scheduling Ping")
                 self._ping_task = ensure_future(self.mqtt_ping())
         except BaseException as be:
             self.logger.debug("Exception ignored in ping task: %r" % be)
@@ -167,6 +167,8 @@ class ClientProtocolHandler(ProtocolHandler):
         self._pingresp_waiter = futures.Future(loop=self._loop)
         resp = yield from self._pingresp_queue.get()
         self._pingresp_waiter = None
+        if self._ping_task:
+            self._ping_task = None
         return resp
 
     @asyncio.coroutine
