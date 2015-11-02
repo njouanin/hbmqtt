@@ -164,9 +164,7 @@ class ClientProtocolHandler(ProtocolHandler):
     def mqtt_ping(self):
         ping_packet = PingReqPacket()
         yield from self._send_packet(ping_packet)
-        self._pingresp_waiter = futures.Future(loop=self._loop)
         resp = yield from self._pingresp_queue.get()
-        self._pingresp_waiter = None
         if self._ping_task:
             self._ping_task = None
         return resp
