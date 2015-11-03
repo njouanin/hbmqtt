@@ -19,4 +19,4 @@ MQTT client resides in the `Client` class. The examples scripts in `samples/` su
 
 ## Support
 
-Support is available on the [project forum](http://forum.beerfactory.org/c/hbmqtt). Issues can be reported directly on Beerfactory project [Jira instance](http://community.beerfactory.org/jira/).
+Support is available on the [project forum](http://forum.beerfactory.org/c/hbmqtt). 
