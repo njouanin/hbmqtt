@@ -13,7 +13,7 @@ Features
 
 HBMQTT implements the full set of `MQTT 3.1.1`_ protocol specifications and provides the following features:
 
-- Support QOS_0, QOS_1 and QOS_2 messages flow
+- Support QoS 0, QoS 1 and QoS 2 messages flow
 - Client auto-reconnection on network lost
 - Authentication through password file (more methods can be added through a plugin system)
 - Basic ``$SYS`` topics
