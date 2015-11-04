@@ -74,10 +74,17 @@ def _get_message(arguments):
                     yield line.encode(encoding='utf-8')
         except:
             logger.error("%s Failed to read file '%s'" % (client.client_id, arguments['-f']))
-    if arguments['-s']:
+    if arguments['-l']:
         import sys
         for line in sys.stdin:
-            yield line.encode(encoding='utf-8')
+            if line:
+                yield line.encode(encoding='utf-8')
+    if arguments['-s']:
+        import sys
+        message = bytearray()
+        for line in sys.stdin:
+            message.extend(line.encode(encoding='utf-8'))
+        yield message
 
 
 
