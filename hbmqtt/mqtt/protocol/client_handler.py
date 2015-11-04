@@ -31,7 +31,6 @@ class ClientProtocolHandler(ProtocolHandler):
         self._subscriptions_waiter = dict()
         self._unsubscriptions_waiter = dict()
         self._disconnect_waiter = None
-        self._pingresp_waiter = None
 
     @asyncio.coroutine
     def start(self):
@@ -48,8 +47,6 @@ class ClientProtocolHandler(ProtocolHandler):
                 self._ping_task.cancel()
             except BaseException:
                 pass
-        if self._pingresp_waiter:
-            self._pingresp_waiter.cancel()
         if not self._disconnect_waiter.done():
             self._disconnect_waiter.cancel()
         self._disconnect_waiter = None
