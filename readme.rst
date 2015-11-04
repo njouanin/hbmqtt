@@ -54,4 +54,3 @@ Bug reports, patches and suggestions welcome! Just `open an issue`_ or join the 
 .. _Read the Docs: http://hbmqtt.readthedocs.org/
 .. _open an issue: https://github.com/beerfactory/hbmqtt/issues/new
 .. _forum: http://forum.beerfactory.org/c/hbmqtt
-
