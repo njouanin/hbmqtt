@@ -111,6 +111,8 @@ def do_pub(client, arguments):
         logger.info("%s Disconnected from broker" % client.client_id)
     except ConnectException as ce:
         logger.fatal("connection to '%s' failed: %r" % (arguments['--url'], ce))
+    except asyncio.CancelledError as cae:
+        logger.fatal("Publish canceled due to prvious error")
 
 
 def main(*args, **kwargs):

@@ -85,6 +85,8 @@ def do_sub(client, arguments):
         yield from client.disconnect()
     except ConnectException as ce:
         logger.fatal("connection to '%s' failed: %r" % (arguments['--url'], ce))
+    except asyncio.CancelledError as cae:
+        logger.fatal("Publish canceled due to prvious error")
 
 
 def main(*args, **kwargs):
