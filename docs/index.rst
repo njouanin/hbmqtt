@@ -3,13 +3,13 @@ HBMQTT
 
 ``HBMQTT`` is an open source `MQTT`_ client and broker implementation.
 
-Built on top of :mod:`asyncio`, Python's standard asynchronous I/O framework, ``HBMQTT`` provides a straightforward API based on coroutines, making it easy to write
-highly concurrent applications.
+Built on top of :mod:`asyncio`, Python's standard asynchronous I/O framework, HBMQTT provides a straightforward API
+based on coroutines, making it easy to write highly concurrent applications.
 
 Features
 --------
 
-``HBMQTT`` implements the full set of `MQTT 3.1.1`_ protocol specifications and provides the following features:
+HBMQTT implements the full set of `MQTT 3.1.1`_ protocol specifications and provides the following features:
 
 - Support QOS_0, QOS_1 and QOS_2 messages flow
 - Client auto-reconnection on network lost
@@ -23,28 +23,35 @@ Features
 Requirements
 ------------
 
-``HBMQTT`` is built on Python :mod:`asyncio` library which was introduced in Python 3.4. Tests have shown that HBMQTT run best with Python 3.4.3. Python 3.5.0 is also fully supported and recommended. Make use you use one of these version before installing ``HBMQTT``.
+HBMQTT is built on Python :mod:`asyncio` library which was introduced in Python 3.4. Tests have shown that HBMQTT run
+best with Python 3.4.3. Python 3.5.0 is also fully supported and recommended. Make use you use one of these version
+before installing HBMQTT.
 
 Installation
 ------------
 
-It is not recommended to install third-party library in Python system packages directory. The preferred way for installing ``HBMQTT`` is to create a virtual environment and then install all the dependencies you need. Refer `PEP 405`_ to learn more.
+It is not recommended to install third-party library in Python system packages directory. The preferred way for
+installing HBMQTT is to create a virtual environment and then install all the dependencies you need. Refer to
+`PEP 405`_ to learn more.
 
-Once you have a environment setup and ready, ``HBMQTT`` can be installed with the following command ::
+Once you have a environment setup and ready, HBMQTT can be installed with the following command ::
 
   (venv) $ pip install hbmqtt
 
-pip will download and install ``HBMQTT`` and all its dependencies.
+pip will download and install HBMQTT and all its dependencies.
 
 
 User guide
 ----------
 
-If you need ``HBMQTT`` for running a MQTT client or deploying a MQTT broker, the :doc:`quickstart` describes how to use console scripts provided by ``HBMQTT``.
+If you need HBMQTT for running a MQTT client or deploying a MQTT broker, the :doc:`quickstart` describes how to use
+console scripts provided by HBMQTT.
 
-If you want to develop an application which needs to connect to a MQTT broker, the :doc:`client` reference documentation explains how to use HBMQTT API for connecting, publishing and subscribing with a MQTT broker.
+If you want to develop an application which needs to connect to a MQTT broker, the :doc:`client` reference documentation
+ explains how to use HBMQTT API for connecting, publishing and subscribing with a MQTT broker.
 
-If you want to run you own MQTT broker, th :doc:`broker` reference documentation explains how to embed a MQTT broker inside a Python application.
+If you want to run you own MQTT broker, th :doc:`broker` reference documentation explains how to embed a MQTT broker
+inside a Python application.
 
 News and updates are listed in the :doc:`changelog`.
 
@@ -57,6 +64,7 @@ News and updates are listed in the :doc:`changelog`.
    :maxdepth: 2
    :hidden:
 
+   quickstart
    changelog
    license
 
