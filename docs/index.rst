@@ -38,7 +38,7 @@ Once you have a environment setup and ready, HBMQTT can be installed with the fo
 
   (venv) $ pip install hbmqtt
 
-pip will download and install HBMQTT and all its dependencies.
+``pip`` will download and install HBMQTT and all its dependencies.
 
 
 User guide
