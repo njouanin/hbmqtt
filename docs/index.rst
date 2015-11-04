@@ -26,6 +26,13 @@ pip will download and install ``HBMQTT`` and all its dependencies.
 User guide
 ----------
 
+If you need ``HBMQTT`` for running a MQTT client or deploying a MQTT broker, the :doc:`quickstart` describes how to use console scripts provided by ``HBMQTT``.
+
+If you want to develop an application which needs to connect to a MQTT broker, the :doc:`client` reference documentation explains how to use HBMQTT API for connecting, publishing and subscribing with a MQTT broker.
+
+If you want to run you own MQTT broker, th :doc:`broker` reference documentation explains how to embed a MQTT broker inside a Python application.
+
+News and updates are listed in the :doc:`changelog`.
 
 
 .. _MQTT: http://www.mqtt.org
@@ -35,4 +42,7 @@ User guide
 .. toctree::
    :maxdepth: 2
    :hidden:
+
+   changelog
+   license
 
