@@ -5,6 +5,7 @@ from datetime import datetime
 from hbmqtt.mqtt.packet import PUBLISH
 from hbmqtt.codecs import int_to_bytes_str
 import asyncio
+import sys
 if sys.version_info < (3, 5):
     from asyncio import async as ensure_future
 else:
