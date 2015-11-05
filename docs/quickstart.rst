@@ -25,7 +25,10 @@ Usage
 
   hbmqtt_pub --version
   hbmqtt_pub (-h | --help)
-  hbmqtt_pub --url BROKER_URL -t TOPIC (-f FILE | -l | -m MESSAGE | -n | -s) [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
+  hbmqtt_pub --url BROKER_URL -t TOPIC (-f FILE | -l | -m MESSAGE | -n | -s) [-c CONFIG_FILE] [-i CLIENT_ID]
+             [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session]
+             [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA]
+             [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
 
 Note that for simplicity, ``hbmqtt_pub`` uses mostly the same argument syntax as `mosquitto_pub`_.
 
@@ -57,12 +60,36 @@ Options
 --will-retain       If given, if the client disconnects unexpectedly the message sent out will be treated as a retained message. This must be used in conjunction with ``--will-topic``.
 
 
-
 .. _MQTT URL scheme: https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme
 
 Examples
 ........
 
+Examples below are adapted from `mosquitto_pub`_ documentation.
 
 
+Publish temperature information to localhost with QoS 1:
+::
+
+    hbmqtt_pub --url mqtt://localhost -t sensors/temperature -m 32 -q 1
+
+Publish timestamp and temperature information to a remote host on a non-standard port and QoS 0:
+::
+
+    hbmqttt_pub --url mqtt://192.168.1.1:1885 -t sensors/temperature -m "1266193804 32"
+
+Publish light switch status. Message is set to retained because there may be a long period of time between light switch events:
+::
+
+    hbmqtt_pub --url mqtt://localhost -r -t switches/kitchen_lights/status -m "on"
+
+Send the contents of a file in two ways:
+::
+
+    hbmqtt_pub --url mqtt://localhost -t my/topic -f ./data
+
+    hbmqtt_pub --url mqtt://localhost -t my/topic -s < ./data
+
+
+.. _mosquitto_pub : http://mosquitto.org/man/mosquitto_pub-1.html
 
