@@ -7,7 +7,7 @@ hbmqtt_pub - MQTT 3.1.1 publisher
 Usage:
     hbmqtt_pub --version
     hbmqtt_pub (-h | --help)
-    hbmqtt_pub --url BROKER_URL -t TOPIC (-f FILE | -l | -m MESSAGE | -n | -s) [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
+    hbmqtt_pub --url BROKER_URL -t TOPIC (-f FILE | -l | -m MESSAGE | -n | -s) [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ] [-r]
 
 Options:
     -h --help           Show this screen.
@@ -16,6 +16,7 @@ Options:
     -c CONFIG_FILE      Broker configuration file (YAML format)
     -i CLIENT_ID        Id to use as client ID.
     -q | --qos QOS      Quality of service to use for the message, from 0, 1 and 2. Defaults to 0.
+    -r                  Set retain flag on connect
     -t TOPIC            Message topic
     -m MESSAGE          Message data to send
     -f FILE             Read file by line and publish message for each line
@@ -73,7 +74,7 @@ def _get_message(arguments):
                 for line in f:
                     yield line.encode(encoding='utf-8')
         except:
-            logger.error("%s Failed to read file '%s'" % (client.client_id, arguments['-f']))
+            logger.error("Failed to read file '%s'" % arguments['-f'])
     if arguments['-l']:
         import sys
         for line in sys.stdin:
@@ -85,7 +86,6 @@ def _get_message(arguments):
         for line in sys.stdin:
             message.extend(line.encode(encoding='utf-8'))
         yield message
-
 
 
 @asyncio.coroutine
@@ -103,7 +103,7 @@ def do_pub(client, arguments):
         topic = arguments['-t']
         for message in _get_message(arguments):
             logger.info("%s Publishing to '%s'" % (client.client_id, topic))
-            yield from client.publish(topic, message, qos)
+            yield from client.publish(topic, message, qos, arguments['-r'])
         yield from client.disconnect()
         logger.info("%s Disconnected from broker" % client.client_id)
     except KeyboardInterrupt:
