@@ -106,9 +106,10 @@ def do_pub(client, arguments):
                                   cadata=arguments['--ca-data'])
         qos = _get_qos(arguments)
         topic = arguments['-t']
+        retain = arguments['-r']
         for message in _get_message(arguments):
             logger.info("%s Publishing to '%s'" % (client.client_id, topic))
-            task = ensure_future(client.publish(topic, message, qos, arguments['-r']))
+            task = ensure_future(client.publish(topic, message, qos, retain))
             running_tasks.append(task)
         if running_tasks:
             yield from asyncio.wait(running_tasks)
