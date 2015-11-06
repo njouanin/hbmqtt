@@ -52,7 +52,7 @@ def _gen_client_id():
     import socket
     pid = os.getpid()
     hostname = socket.gethostname()
-    return "hbmqtt_pub/%d-%s" % (pid, hostname)
+    return "hbmqtt_sub/%d-%s" % (pid, hostname)
 
 
 def _get_qos(arguments):
