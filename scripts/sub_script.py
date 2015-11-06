@@ -7,7 +7,7 @@ hbmqtt_sub - MQTT 3.1.1 publisher
 Usage:
     hbmqtt_sub --version
     hbmqtt_sub (-h | --help)
-    hbmqtt_sub --url BROKER_URL -t TOPIC... [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
+    hbmqtt_sub --url BROKER_URL -t TOPIC... [-n COUNT] [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
 
 Options:
     -h --help           Show this screen.
@@ -15,8 +15,9 @@ Options:
     --url BROKER_URL    Broker connection URL (musr conform to MQTT URI scheme (see https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>)
     -c CONFIG_FILE      Broker configuration file (YAML format)
     -i CLIENT_ID        Id to use as client ID.
+    -n COUNT            Number of messages to read before ending.
     -q | --qos QOS      Quality of service desired to receive messages, from 0, 1 and 2. Defaults to 0.
-    -t TOPIC...            Topic filter to subcribe
+    -t TOPIC...         Topic filter to subcribe
     -k KEEP_ALIVE       Keep alive timeout in second
     --clean-session     Clean session on connect (defaults to False)
     --ca-file CAFILE]   CA file
@@ -74,13 +75,22 @@ def do_sub(client, arguments):
         for topic in arguments['-t']:
             filters.append((topic, qos))
         yield from client.subscribe(filters)
+        if arguments['-n']:
+            max_count = int(arguments['-n'])
+        else:
+            max_count = None
+        count = 0
         while True:
+            if max_count and count >= max_count:
+                break
             try:
                 message = yield from client.deliver_message()
+                count += 1
                 sys.stdout.buffer.write(message.publish_packet.data)
                 sys.stdout.write('\n')
             except MQTTException:
                 logger.debug("Error reading packet")
+        yield from client.disconnect()
     except KeyboardInterrupt:
         yield from client.disconnect()
     except ConnectException as ce:
