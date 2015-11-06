@@ -13,6 +13,9 @@ Console scripts
 Programming API
 ---------------
 
+* :doc:`mqttclient` : MQTT client API reference
+* :doc:`broker` : MQTT broker API reference
+
 TBD
 
 .. toctree::
@@ -21,5 +24,5 @@ TBD
    hbmqtt_pub
    hbmqtt_sub
    hbmqtt
-
-
+   mqttclient
+   broker

@@ -30,7 +30,6 @@ from .plugins.manager import PluginManager, BaseContext
 
 _defaults = {
     'timeout-disconnect-delay': 2,
-    'publish-retry-delay': 5,
     'auth': {
         'allow-anonymous': True,
         'password-file': None
@@ -166,7 +165,6 @@ class Broker:
                     bind: 0.0.0.0:8080
                     type: ws
             timeout-disconnect-delay: 2
-            publish-retry-delay: 5
             auth:
                 plugins: ['auth.anonymous'] #List of plugins to activate for authentication among all registered plugins
                 allow-anonymous: true / false
@@ -380,7 +378,6 @@ class Broker:
         if client_session.keep_alive > 0:
             client_session.keep_alive += self.config['timeout-disconnect-delay']
         self.logger.debug("Keep-alive timeout=%d" % client_session.keep_alive)
-        client_session.publish_retry_delay = self.config['publish-retry-delay']
 
         handler.attach(client_session, reader, writer)
         self._sessions[client_session.client_id] = (client_session, handler)

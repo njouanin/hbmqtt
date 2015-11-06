@@ -44,14 +44,11 @@ Once you have a environment setup and ready, HBMQTT can be installed with the fo
 User guide
 ----------
 
-If you need HBMQTT for running a MQTT client or deploying a MQTT broker, the :doc:`quickstart` describes how to use
-console scripts provided by HBMQTT.
+If you need HBMQTT for running a MQTT client or deploying a MQTT broker, the :doc:`quickstart` describes how to use console scripts provided by HBMQTT.
 
-If you want to develop an application which needs to connect to a MQTT broker, the :doc:`client` reference documentation
- explains how to use HBMQTT API for connecting, publishing and subscribing with a MQTT broker.
+If you want to develop an application which needs to connect to a MQTT broker, the :doc:`references/mqttclient` documentation explains how to use HBMQTT API for connecting, publishing and subscribing with a MQTT broker.
 
-If you want to run you own MQTT broker, th :doc:`broker` reference documentation explains how to embed a MQTT broker
-inside a Python application.
+If you want to run you own MQTT broker, th :doc:`references/broker` reference documentation explains how to embed a MQTT broker inside a Python application.
 
 News and updates are listed in the :doc:`changelog`.
 
