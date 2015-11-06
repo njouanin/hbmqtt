@@ -1,7 +1,7 @@
 Quickstart
 ==========
 
-``HBMQTT`` provides console scripts for :
+A quick way for getting started with ``HBMQTT`` is to use console scripts provided for :
 
 * publishing a message on some topic on an external MQTT broker.
 * subscribing some topics and getting published messages.
@@ -11,85 +11,76 @@ These scripts are installed automatically when installing ``HBMQTT`` with the fo
 
   (venv) $ pip install hbmqtt
 
-Read the foloowing sections to learn how to uses these scripts.
+Publishing messages
+-------------------
 
-hbmqtt_pub
+``hbmqtt_pub`` is a command-line tool which can be used for publishing some messages on a topic. It requires a few arguments like broker URL, topic name, QoS and data to send. Additional options allow more complex use case.
+
+Publishing ```some_data`` to as ``/test`` topic on is as simple as :
+::
+
+    $ hbmqtt_pub --url mqtt://test.mosquitto.org -t /test -m some_data
+    [2015-11-06 22:21:55,108] :: INFO - hbmqtt_pub/5135-MacBook-Pro.local Connecting to broker
+    [2015-11-06 22:21:55,333] :: INFO - hbmqtt_pub/5135-MacBook-Pro.local Publishing to '/test'
+    [2015-11-06 22:21:55,336] :: INFO - hbmqtt_pub/5135-MacBook-Pro.local Disconnected from broker
+
+This will use insecure TCP connection to connect to test.mosquitto.org. ``hbmqtt_pub`` also allows websockets and secure connection:
+::
+
+    $ hbmqtt_pub --url ws://test.mosquitto.org:8080 -t /test -m some_data
+    [2015-11-06 22:22:42,542] :: INFO - hbmqtt_pub/5157-MacBook-Pro.local Connecting to broker
+    [2015-11-06 22:22:42,924] :: INFO - hbmqtt_pub/5157-MacBook-Pro.local Publishing to '/test'
+    [2015-11-06 22:22:52,926] :: INFO - hbmqtt_pub/5157-MacBook-Pro.local Disconnected from broker
+
+``hbmqtt_pub`` can read from file or stdin and use data read as message payload:
+::
+
+    $ some_command | hbmqtt_pub --url mqtt://localhost -t /test -l
+
+See :doc:`references/hbmqtt_pub` reference documentation for details about available options and settings.
+
+Subscribing a topic
+-------------------
+
+``hbmqtt_sub`` is a command-line tool which can be used to subscribe for some pattern(s) on a broker and get date from messages published on topics matching these patterns by other MQTT clients.
+
+Subscribing a ``/test/#`` topic pattern is done with :
+::
+
+  $ hbmqtt_sub --url mqtt://localhost -t /test/#
+
+This command will run forever and print on the standard output every messages received from the broker. The ``-n`` option allows to set a maximum number of messages to receive before stopping.
+
+See :doc:`references/hbmqtt_sub` reference documentation for details about available options and settings.
+
+
+URL Scheme
 ----------
 
-``hbmqtt_pub`` is a MQTT client that publishes simple messages on a topic from the command line.
+HBMQTT command line tools use the ``--url`` to establish a network connection with the broker. The ``--url`` parameter value must conform to the `MQTT URL scheme`_. The general accepted form is :
+::
 
-Usage
-.....
+    [mqtt|ws][s]://[username][:password]@host.domain[:port]
 
-``hbmqtt_pub`` usage : ::
+Here are some examples of URL:
+::
 
-  hbmqtt_pub --version
-  hbmqtt_pub (-h | --help)
-  hbmqtt_pub --url BROKER_URL -t TOPIC (-f FILE | -l | -m MESSAGE | -n | -s) [-c CONFIG_FILE] [-i CLIENT_ID]
-             [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session]
-             [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA]
-             [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
-
-Note that for simplicity, ``hbmqtt_pub`` uses mostly the same argument syntax as `mosquitto_pub`_.
-
-.. _mosquitto_pub: http://mosquitto.org/man/mosquitto_pub-1.html
-
-Options
-.......
-
---version           HBMQTT version information
--h, --help          Display ``hbmqtt_pub`` usage help
--c                  Set the YAML configuration file to read and pass to the client runtime.
---ca-file           Define the path to a file containing PEM encoded CA certificates that are trusted. Used to enable SSL communication.
---ca-path           Define the path to a directory containing PEM encoded CA certificates that are trusted. Used to enable SSL communication.
---ca-data           Set the PEM encoded CA certificates that are trusted. Used to enable SSL communication.
---clean-session     If given, set the CONNECT clean session flag to True.
--f                  Send the contents of a file as the message. The file is read line by line, and ``hbmqtt_pub`` will publish a message for each line read.
--i                  The id to use for this client. If not given, defaults to ``hbmqtt_pub/`` appended with the process id and the hostname of the client.
--l                  Send messages read from stdin. ``hbmqtt_pub`` will publish a message for each line read. Blank lines won't be sent.
--k                  Set the CONNECT keep alive timeout.
--m                  Send a single message from the command line.
--n                  Send a null (zero length) message.
--q, --qos           Specify the quality of service to use for the message, from 0, 1 and 2. Defaults to 0.
--s                  Send a message read from stdin, sending the entire content as a single message.
--t                  The MQTT topic on which to publish the message.
---url               Broker connection URL, conforming to `MQTT URL scheme`_.
---will-topic        The topic on which to send a Will, in the event that the client disconnects unexpectedly.
---will-message      Specify a message that will be stored by the broker and sent out if this client disconnects unexpectedly. This must be used in conjunction with ``--will-topic``.
---will-qos          The QoS to use for the Will. Defaults to 0. This must be used in conjunction with ``--will-topic``.
---will-retain       If given, if the client disconnects unexpectedly the message sent out will be treated as a retained message. This must be used in conjunction with ``--will-topic``.
-
+    mqtt://localhost
+    mqtt://localhost:1884
+    mqtt://user@password:localhost
+    ws://test.mosquitto.org
+    wss://user@password:localhost
 
 .. _MQTT URL scheme: https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme
 
-Examples
-........
 
-Examples below are adapted from `mosquitto_pub`_ documentation.
+Running a broker
+----------------
 
-
-Publish temperature information to localhost with QoS 1:
+``hbmqtt`` is a command-line tool for running a MQTT broker:
 ::
 
-    hbmqtt_pub --url mqtt://localhost -t sensors/temperature -m 32 -q 1
+    $ hbmqtt
+    [2015-11-06 22:45:16,470] :: INFO - Listener 'default' bind to 0.0.0.0:1883 (max_connecionts=-1)
 
-Publish timestamp and temperature information to a remote host on a non-standard port and QoS 0:
-::
-
-    hbmqttt_pub --url mqtt://192.168.1.1:1885 -t sensors/temperature -m "1266193804 32"
-
-Publish light switch status. Message is set to retained because there may be a long period of time between light switch events:
-::
-
-    hbmqtt_pub --url mqtt://localhost -r -t switches/kitchen_lights/status -m "on"
-
-Send the contents of a file in two ways:
-::
-
-    hbmqtt_pub --url mqtt://localhost -t my/topic -f ./data
-
-    hbmqtt_pub --url mqtt://localhost -t my/topic -s < ./data
-
-
-.. _mosquitto_pub : http://mosquitto.org/man/mosquitto_pub-1.html
-
+See :doc:`references/hbmqtt` reference documentation for details about available options and settings.
