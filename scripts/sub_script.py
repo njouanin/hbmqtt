@@ -38,6 +38,7 @@ from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.errors import MQTTException
 from hbmqtt.version import get_version
 from docopt import docopt
+from hbmqtt.mqtt.constants import QOS_0
 try:
     from .utils import read_yaml_config
 except:
@@ -58,7 +59,7 @@ def _get_qos(arguments):
     try:
         return int(arguments['--qos'][0])
     except:
-        return None
+        return QOS_0
 
 
 @asyncio.coroutine
