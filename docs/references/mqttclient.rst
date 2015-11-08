@@ -1,4 +1,6 @@
 MQTTClient API reference
 ========================
 
-TBD
+.. autoclass:: hbmqtt.client.MQTTClient
+    :members:
+    :undoc-members:

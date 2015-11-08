@@ -72,31 +72,15 @@ def mqtt_connected(func):
 
 
 class MQTTClient:
-    def __init__(self, client_id=None, config=None, loop=None):
-        """
+    """
+    MQTT client implementation. Create ``MQTTClient`` instances to connect to a broker and send/receive messages using the MQTT protocol
 
-        :param config: Example yaml config
-            broker:
-                uri: mqtt:username@password//localhost:1883/
-                cafile: somefile.cert  #Server authority file
-                capath: /some/path # certficate file path
-                cadata: certificate as string data
-            keep_alive: 60
-            cleansession: true
-            will:
-                retain: false
-                topic: some/topic
-                message: Will message
-                qos: 0
-            default_qos: 0
-            default_retain: false
-            topics:
-                a/b:
-                    qos: 2
-                    retain: true
-        :param loop:
-        :return:
-        """
+    :param client_id: MWTT client ID to use when connecting to the broker. If none, it will generated randomly
+    :param config: Client configuration
+    :param loop: asynio loop to use
+    :return:
+    """
+    def __init__(self, client_id=None, config=None, loop=None):
         self.logger = logging.getLogger(__name__)
         self.config = _defaults
         if config is not None:
@@ -133,6 +117,7 @@ class MQTTClient:
                 cadata=None):
         """
         Connect to a remote broker
+
         :param uri: Broker URI connection, conforming to `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_.
         :param cleansession: MQTT CONNECT clean session flaf
         :param cafile: server certificate authority file
