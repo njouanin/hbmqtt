@@ -27,15 +27,16 @@ Build status
 .. image:: https://travis-ci.org/beerfactory/hbmqtt.svg?branch=develop
     :target: https://travis-ci.org/beerfactory/hbmqtt
 
-    [![Build Status](https://travis-ci.org/beerfactory/hbmqtt.svg?branch=master)](https://travis-ci.org/beerfactory/hbmqtt)
-
-
 .. image:: https://coveralls.io/repos/beerfactory/hbmqtt/badge.svg?branch=develop&service=github
     :target: https://coveralls.io/github/beerfactory/hbmqtt?branch=develop
 
 .. image:: https://readthedocs.org/projects/hbmqtt/badge/?version=latest
     :target: http://hbmqtt.readthedocs.org/en/latest/?badge=latest
     :alt: Documentation Status
+
+.. image:: https://badge.waffle.io/beerfactory/hbmqtt.svg?label=ready&title=Ready
+    :target: https://waffle.io/beerfactory/hbmqtt
+    :alt: 'Stories in Ready'
 
 Getting started
 ---------------
