@@ -54,5 +54,8 @@ setup(
             'hbmqtt_pub = scripts.pub_script:main',
             'hbmqtt_sub = scripts.sub_script:main',
         ]
-    }
+    },
+    data_files = [
+        ('scripts', ['scripts/default_broker.yaml', 'scripts/default_client.yaml'])
+    ]
 )
