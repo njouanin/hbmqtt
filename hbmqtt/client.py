@@ -73,12 +73,12 @@ def mqtt_connected(func):
 
 class MQTTClient:
     """
-    MQTT client implementation. Create ``MQTTClient`` instances to connect to a broker and send/receive messages using the MQTT protocol
+    MQTT client implementation. instances provides API for connecting to a broker and send/receive messages using the MQTT protocol
 
-    :param client_id: MWTT client ID to use when connecting to the broker. If none, it will generated randomly
+    :param client_id: MQTT client ID to use when connecting to the broker. If none, it will generated randomly by :func:`hbmqtt.utils.gen_client_id`
     :param config: Client configuration
     :param loop: asynio loop to use
-    :return:
+    :return: class instance
     """
     def __init__(self, client_id=None, config=None, loop=None):
         self.logger = logging.getLogger(__name__)
@@ -116,12 +116,15 @@ class MQTTClient:
                 capath=None,
                 cadata=None):
         """
-        Connect to a remote broker
+        Connect to a remote broker. Establish the network connection and send a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message.
 
-        :param uri: Broker URI connection, conforming to `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_.
-        :param cleansession: MQTT CONNECT clean session flaf
-        :param cafile: server certificate authority file
-        :return:
+        :param uri: Broker URI connection, conforming to `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_. Uses ``uri`` config attribute by default.
+        :param cleansession: MQTT CONNECT clean session flag
+        :param cafile: server certificate authority file (optional, used for secured connection)
+        :param capath: server certificate authority path (optional, used for secured connection)
+        :param cadata: server certificate authority data (optional, used for secured connection)
+        :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
+        :raise: :class:`hbmqtt.client.ConnectException` if connection fails
         """
         self.session = self._initsession(uri, cleansession, cafile, capath, cadata)
         self.logger.debug("Connect to: %s" % uri)
@@ -139,6 +142,10 @@ class MQTTClient:
     @mqtt_connected
     @asyncio.coroutine
     def disconnect(self):
+        """
+        Disconnect from the connected broker.
+        This method sends a `DISCONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090>`_ message and closes the network connection.
+        """
         if self.session.transitions.is_connected():
             if not self._disconnect_task.done():
                 self._disconnect_task.cancel()
@@ -151,6 +158,15 @@ class MQTTClient:
 
     @asyncio.coroutine
     def reconnect(self, cleansession=None):
+        """
+        Reconnect a previously connectd broker (and which has been disconnected unexpectedly).
+        Reconnection tries to establish a network connection and send a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message.
+        Retries interval and attempts can be controled with the ``reconnect_max_interval`` and ``reconnect_retries`` configuration parameters.
+
+        :param cleansession: clean session flag used in MQTT CONNECT messages sent for reconnections.
+        :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
+        :raise: :class:`hbmqtt.client.ConnectException` if re-connection fails after max retries.
+        """
         if self.session.transitions.is_connected():
             self.logger.warn("Client already connected")
             return CONNECTION_ACCEPTED
@@ -189,6 +205,7 @@ class MQTTClient:
     def ping(self):
         """
         Send a MQTT ping request and wait for response
+
         :return: None
         """
         if self.session.transitions.is_connected():

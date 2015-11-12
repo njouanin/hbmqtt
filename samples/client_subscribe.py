@@ -13,11 +13,10 @@ from hbmqtt.mqtt.constants import QOS_1, QOS_2
 
 logger = logging.getLogger(__name__)
 
-C = MQTTClient()
-
 @asyncio.coroutine
 def uptime_coro():
-    yield from C.connect('mqtt://localhost/')
+    C = MQTTClient()
+    yield from C.connect('mqtt://test.mosquitto.org/')
     # Subscribe to '$SYS/broker/uptime' with QOS=1
     yield from C.subscribe([
                 ('$SYS/broker/uptime', QOS_1),
@@ -28,8 +27,8 @@ def uptime_coro():
         for i in range(1, 100):
             message = yield from C.deliver_message()
             packet = message.publish_packet
-            print("%d %s : %s" % (i, packet.variable_header.topic_name, str(packet.payload.data)))
-        yield from C.unsubscribe(['$SYS/broker/uptime'])
+            print("%d: %s => %s" % (i, packet.variable_header.topic_name, str(packet.payload.data)))
+        yield from C.unsubscribe(['$SYS/broker/uptime', '$SYS/broker/load/#'])
         logger.info("UnSubscribed")
         yield from C.disconnect()
     except ClientException as ce:
@@ -38,5 +37,5 @@ def uptime_coro():
 
 if __name__ == '__main__':
     formatter = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
-    logging.basicConfig(level=logging.DEBUG, format=formatter)
+    logging.basicConfig(level=logging.INFO, format=formatter)
     asyncio.get_event_loop().run_until_complete(uptime_coro())
