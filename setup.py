@@ -14,6 +14,7 @@ setup(
     url="https://github.com/beerfactory/hbmqtt",
     license='MIT',
     packages=find_packages(exclude=['tests']),
+    include_package_data=True,
     platforms='all',
     install_requires=[
         'transitions==0.2.5',
@@ -54,8 +55,5 @@ setup(
             'hbmqtt_pub = scripts.pub_script:main',
             'hbmqtt_sub = scripts.sub_script:main',
         ]
-    },
-    data_files = [
-        ('scripts', ['scripts/default_broker.yaml', 'scripts/default_client.yaml'])
-    ]
+    }
 )
