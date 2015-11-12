@@ -5,6 +5,7 @@
 import logging
 import ssl
 from urllib.parse import urlparse, urlunparse
+from functools import wraps
 
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session
@@ -46,8 +47,8 @@ class ConnectException(ClientException):
 
 class ClientContext(BaseContext):
     """
-    ClientContext is used as the context passed to plugins interacting with the client.
-    It act as an adapter to client services from plugins
+        ClientContext is used as the context passed to plugins interacting with the client.
+        It act as an adapter to client services from plugins
     """
     def __init__(self):
         super().__init__()
@@ -58,11 +59,12 @@ base_logger = logging.getLogger(__name__)
 
 def mqtt_connected(func):
     """
-    MQTTClient coroutines decorator which will wait until connection before calling the decorated method.
-    :param func: coroutine to be called once connected
-    :return: coroutine result
+        MQTTClient coroutines decorator which will wait until connection before calling the decorated method.
+        :param func: coroutine to be called once connected
+        :return: coroutine result
     """
     @asyncio.coroutine
+    @wraps(func)
     def wrapper(self, *args, **kwargs):
         if not self._connected_state.is_set():
             base_logger.warning("Client not connected, waiting for it")
@@ -73,13 +75,16 @@ def mqtt_connected(func):
 
 class MQTTClient:
     """
-    MQTT client implementation. instances provides API for connecting to a broker and send/receive messages using the MQTT protocol
+        MQTT client implementation.
 
-    :param client_id: MQTT client ID to use when connecting to the broker. If none, it will generated randomly by :func:`hbmqtt.utils.gen_client_id`
-    :param config: Client configuration
-    :param loop: asynio loop to use
-    :return: class instance
+        MQTTClient instances provides API for connecting to a broker and send/receive messages using the MQTT protocol.
+
+        :param client_id: MQTT client ID to use when connecting to the broker. If none, it will generated randomly by :func:`hbmqtt.utils.gen_client_id`
+        :param config: Client configuration
+        :param loop: asynio loop to use
+        :return: class instance
     """
+
     def __init__(self, client_id=None, config=None, loop=None):
         self.logger = logging.getLogger(__name__)
         self.config = _defaults
@@ -116,16 +121,19 @@ class MQTTClient:
                 capath=None,
                 cadata=None):
         """
-        Connect to a remote broker. Establish the network connection and send a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message.
+            Connect to a remote broker.
 
-        :param uri: Broker URI connection, conforming to `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_. Uses ``uri`` config attribute by default.
-        :param cleansession: MQTT CONNECT clean session flag
-        :param cafile: server certificate authority file (optional, used for secured connection)
-        :param capath: server certificate authority path (optional, used for secured connection)
-        :param cadata: server certificate authority data (optional, used for secured connection)
-        :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
-        :raise: :class:`hbmqtt.client.ConnectException` if connection fails
+            At first, a network connection is established with the server using the given protocol (``mqtt``, ``mqtts``, ``ws`` or ``wss``). Once the socket is connected, a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message is sent with the requested informations.
+
+            :param uri: Broker URI connection, conforming to `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_. Uses ``uri`` config attribute by default.
+            :param cleansession: MQTT CONNECT clean session flag
+            :param cafile: server certificate authority file (optional, used for secured connection)
+            :param capath: server certificate authority path (optional, used for secured connection)
+            :param cadata: server certificate authority data (optional, used for secured connection)
+            :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
+            :raise: :class:`hbmqtt.client.ConnectException` if connection fails
         """
+
         self.session = self._initsession(uri, cleansession, cafile, capath, cadata)
         self.logger.debug("Connect to: %s" % uri)
 
@@ -143,9 +151,11 @@ class MQTTClient:
     @asyncio.coroutine
     def disconnect(self):
         """
-        Disconnect from the connected broker.
-        This method sends a `DISCONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090>`_ message and closes the network connection.
+            Disconnect from the connected broker.
+
+            This method sends a `DISCONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090>`_ message and closes the network socket.
         """
+
         if self.session.transitions.is_connected():
             if not self._disconnect_task.done():
                 self._disconnect_task.cancel()
@@ -159,14 +169,16 @@ class MQTTClient:
     @asyncio.coroutine
     def reconnect(self, cleansession=None):
         """
-        Reconnect a previously connectd broker (and which has been disconnected unexpectedly).
-        Reconnection tries to establish a network connection and send a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message.
-        Retries interval and attempts can be controled with the ``reconnect_max_interval`` and ``reconnect_retries`` configuration parameters.
+            Reconnect a previously connected broker.
 
-        :param cleansession: clean session flag used in MQTT CONNECT messages sent for reconnections.
-        :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
-        :raise: :class:`hbmqtt.client.ConnectException` if re-connection fails after max retries.
+            Reconnection tries to establish a network connection and send a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message.
+            Retries interval and attempts can be controled with the ``reconnect_max_interval`` and ``reconnect_retries`` configuration parameters.
+
+            :param cleansession: clean session flag used in MQTT CONNECT messages sent for reconnections.
+            :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
+            :raise: :class:`hbmqtt.client.ConnectException` if re-connection fails after max retries.
         """
+
         if self.session.transitions.is_connected():
             self.logger.warn("Client already connected")
             return CONNECTION_ACCEPTED
@@ -204,10 +216,11 @@ class MQTTClient:
     @asyncio.coroutine
     def ping(self):
         """
-        Send a MQTT ping request and wait for response
+            Ping the broker.
 
-        :return: None
+            Send a MQTT `PINGREQ <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718081>`_ message for response.
         """
+
         if self.session.transitions.is_connected():
             yield from self._handler.mqtt_ping()
         else:
@@ -217,6 +230,17 @@ class MQTTClient:
     @mqtt_connected
     @asyncio.coroutine
     def publish(self, topic, message, qos=None, retain=None):
+        """
+            Publish a message to the broker.
+
+            Send a MQTT `PUBLISH <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718037>`_ message and wait for acknowledgment depending on Quality Of Service
+
+            :param topic: topic name to which message data is published
+            :param message: payload message (as bytes) to send.
+            :param qos: requested publish quality of service : QOS_0, QOS_1 or QOS_2. Defaults to ``default_qos`` config parameter or QOS_0.
+            :param retain: retain flag. Defaults to ``default_retain`` config parameter or False.
+        """
+
         def get_retain_and_qos():
             if qos:
                 assert qos in (QOS_0, QOS_1, QOS_2)
@@ -242,15 +266,51 @@ class MQTTClient:
     @mqtt_connected
     @asyncio.coroutine
     def subscribe(self, topics):
+        """
+            Subscribe to some topics.
+
+            Send a MQTT `SUBSCRIBE <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718063>`_ message and wait for broker acknowledgment.
+
+            :param topics: array of topics pattern to subscribe with associated QoS.
+            :return: `SUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718068>`_ message return code.
+
+            Example of ``topics`` argument expected structure:
+            ::
+
+                [
+                    ('$SYS/broker/uptime', QOS_1),
+                    ('$SYS/broker/load/#', QOS_2),
+                ]
+        """
         return (yield from self._handler.mqtt_subscribe(topics, self.session.next_packet_id))
 
     @mqtt_connected
     @asyncio.coroutine
     def unsubscribe(self, topics):
+        """
+            Unsubscribe from some topics.
+
+            Send a MQTT `UNSUBSCRIBE <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718072>`_ message and wait for broker `UNSUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718077>`_ message.
+
+            :param topics: array of topics to unsubscribe from.
+
+            Example of ``topics`` argument expected structure:
+            ::
+
+                ['$SYS/broker/uptime', QOS_1), '$SYS/broker/load/#', QOS_2]
+        """
         yield from self._handler.mqtt_unsubscribe(topics, self.session.next_packet_id)
 
     @asyncio.coroutine
     def deliver_message(self, timeout=None):
+        """
+            Deliver next received message.
+
+            Deliver next message received from the broker. If no message is available, this methods waits until next message arrives or ``timeout`` occurs.
+
+            :param timeout: maximum number of seconds to wait before returning. If timeout is not specified or None, there is no limit to the wait time until next message arrives.
+            :return: instance of :class:`hbmqtt.session.ApplicationMessage` containing received message information flow.
+        """
         deliver_task = ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
         self.client_tasks.append(deliver_task)
         self.logger.debug("Waiting message delivery")

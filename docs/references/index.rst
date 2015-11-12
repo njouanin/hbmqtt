@@ -15,6 +15,7 @@ Programming API
 
 * :doc:`mqttclient` : MQTT client API reference
 * :doc:`broker` : MQTT broker API reference
+* :doc:`common` : Common API
 
 TBD
 
@@ -26,3 +27,4 @@ TBD
    hbmqtt
    mqttclient
    broker
+   common

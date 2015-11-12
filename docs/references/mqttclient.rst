@@ -127,21 +127,14 @@ MQTTClient API
 
     .. autoclass:: MQTTClient
 
-        .. automethod:: connect(uri=None, cleansession=None, cafile=None, capath=None, cadata=None)
-
-        .. automethod:: disconnect()
-
-        .. automethod:: reconnect(cleansession=None)
-
-        .. automethod:: ping()
-
-        .. automethod:: publish()
-
-        .. automethod:: subscribe()
-
-        .. automethod:: unsubscribe()
-
-        .. automethod:: deliver_message()
+        .. automethod:: connect
+        .. automethod:: disconnect
+        .. automethod:: reconnect
+        .. automethod:: ping
+        .. automethod:: publish
+        .. automethod:: subscribe
+        .. automethod:: unsubscribe
+        .. automethod:: deliver_message
 
 MQTTClient configuration
 ........................

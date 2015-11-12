@@ -9,20 +9,29 @@ from hbmqtt.mqtt.publish import PublishPacket
 from hbmqtt.mqtt.puback import PubackPacket
 
 
-OUTGOING=0
-INCOMING=1
+OUTGOING = 0
+INCOMING = 1
+
 
 class ApplicationMessage:
-    states = ['new', 'published', 'acknowledged', 'received', 'released', 'completed']
-
+    """
+        ApplicationMessage and subclasses are used to store published message information flow. These objects can contain different information depending on the way they were created (incoming or outgoing) and the quality of service used between peers.
+    """
     def __init__(self, packet_id, topic, qos, data, retain):
         self.packet_id = packet_id
+        """ Publish message `packet identifier <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718025>`_"""
         self.topic = topic
+        """ Publish message topic"""
         self.qos = qos
+        """ Publish message Quality of Service"""
         self.data = data
+        """ Publish message payload data"""
         self.retain = retain
+        """ Publish message retain flag"""
         self.publish_packet = None
+        """ :class:`hbmqtt.mqtt.publish.PublishPacket` instance corresponding to the `PUBLISH <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718037>`_ packet in the messages flow. ``None`` if the PUBLISH packet has not already been received or sent."""
         self.puback_packet = None
+        """ :class:`hbmqtt.mqtt.puback.PubackPacket` instance corresponding to the `PUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718043>`_ packet in the messages flow. ``None`` if QoS != QOS_1 or if the PUBACK packet has not already been received or sent."""
         self.pubrec_packet = None
         self.pubrel_packet = None
         self.pubcomp_packet = None
@@ -35,12 +44,18 @@ class ApplicationMessage:
 
 
 class IncomingApplicationMessage(ApplicationMessage):
+    """
+        Incoming :class:`~hbmqtt.session.ApplicationMessage`.
+    """
     def __init__(self, packet_id, topic, qos, data, retain):
         super().__init__(packet_id, topic, qos, data, retain)
         self.direction = INCOMING
 
 
 class OutgoingApplicationMessage(ApplicationMessage):
+    """
+        Outgoing :class:`~hbmqtt.session.ApplicationMessage`.
+    """
     def __init__(self, packet_id, topic, qos, data, retain):
         super().__init__(packet_id, topic, qos, data, retain)
         self.direction = OUTGOING
