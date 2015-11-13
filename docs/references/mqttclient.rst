@@ -115,7 +115,7 @@ while ``test_coro2()`` runs:
     hbmqtt/LYRf52W[56SOjW04 -out-> PubrelPacket(ts=2015-11-11 21:54:48.661925, fixed=MQTTFixedHeader(length=2, flags=0x2), variable=PacketIdVariableHeader(packet_id=2), payload=None)
     hbmqtt/LYRf52W[56SOjW04 <-in-- PubcompPacket(ts=2015-11-11 21:54:48.713107, fixed=MQTTFixedHeader(length=2, flags=0x0), variable=PacketIdVariableHeader(packet_id=2), payload=None)
 
-Both coroutines have the same results except that``test_coro2()`` manages messages flow in parallel which may be more efficient.
+Both coroutines have the same results except that ``test_coro2()`` manages messages flow in parallel which may be more efficient.
 
 Reference
 ---------
