@@ -138,3 +138,38 @@ MQTTClient API
 
 MQTTClient configuration
 ........................
+
+The :class:`~hbmqtt.client.MQTTClient` ``__init__`` method accepts a ``config`` parameter which allow to setup some behaviour and defaults settings. This argument must be a Python dict object which may contain the following entries:
+
+* ``keep_alive``: keep alive (in seconds) to send when connecting to the broker (defaults to ``10`` seconds). :class:`~hbmqtt.client.MQTTClient` will *auto-ping* the broker if not message is sent within the keep-alive interval. This avoids disconnection from the broker.
+* ``ping_delay``: *auto-ping* delay before keep-alive times out (defaults to ``1`` seconds).
+* ``default_qos``: Default QoS used by :meth:`~hbmqtt.client.MQTTClient.publish` if ``qos`` argument is not given.
+* ``default_retain``: Default retain used by :meth:`~hbmqtt.client.MQTTClient.publish` if ``qos`` argument is not given.,
+* ``auto_reconnect``: enable or disable auto-reconnect feature (defaults to ``True``).
+* ``reconnect_max_interval``: maximum interval (in seconds) to wait before two connection retries (defaults to ``10``).
+* ``reconnect_retries``: maximum number of connect retries (defaults to ``2``).
+
+Default QoS and default retain can also be overriden by adding a ``topics`` with may contain QoS and retain values for specific topics. See the following example:
+
+.. code-block:: python
+
+    config = {
+        'keep_alive': 10,
+        'ping_delay': 1,
+        'default_qos': 0,
+        'default_retain': False,
+        'auto_reconnect': True,
+        'reconnect_max_interval': 5,
+        'reconnect_retries': 10,
+        'topics': {
+            '/test': { 'qos': 1 },
+            '/some_topic': { 'qos': 2, 'retain': True }
+        }
+    }
+
+With this setting any message published will set with QOS_0 and retain flag unset except for :
+
+* messages sent to ``/test`` topic : they will be sent with QOS_1
+* messages sent to ``/some_topic`` topic : they will be sent with QOS_2 and retain flag set
+
+In any case, the ``qos`` and ``retain`` argument values passed to method :meth:`~hbmqtt.client.MQTTClient.publish` will override these settings.
