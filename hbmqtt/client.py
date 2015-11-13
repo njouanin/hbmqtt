@@ -125,6 +125,8 @@ class MQTTClient:
 
             At first, a network connection is established with the server using the given protocol (``mqtt``, ``mqtts``, ``ws`` or ``wss``). Once the socket is connected, a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message is sent with the requested informations.
 
+            This method is a *coroutine*.
+
             :param uri: Broker URI connection, conforming to `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_. Uses ``uri`` config attribute by default.
             :param cleansession: MQTT CONNECT clean session flag
             :param cafile: server certificate authority file (optional, used for secured connection)
@@ -154,6 +156,8 @@ class MQTTClient:
             Disconnect from the connected broker.
 
             This method sends a `DISCONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090>`_ message and closes the network socket.
+
+            This method is a *coroutine*.
         """
 
         if self.session.transitions.is_connected():
@@ -173,6 +177,8 @@ class MQTTClient:
 
             Reconnection tries to establish a network connection and send a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message.
             Retries interval and attempts can be controled with the ``reconnect_max_interval`` and ``reconnect_retries`` configuration parameters.
+
+            This method is a *coroutine*.
 
             :param cleansession: clean session flag used in MQTT CONNECT messages sent for reconnections.
             :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
@@ -219,6 +225,8 @@ class MQTTClient:
             Ping the broker.
 
             Send a MQTT `PINGREQ <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718081>`_ message for response.
+
+            This method is a *coroutine*.
         """
 
         if self.session.transitions.is_connected():
@@ -234,6 +242,8 @@ class MQTTClient:
             Publish a message to the broker.
 
             Send a MQTT `PUBLISH <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718037>`_ message and wait for acknowledgment depending on Quality Of Service
+
+            This method is a *coroutine*.
 
             :param topic: topic name to which message data is published
             :param message: payload message (as bytes) to send.
@@ -271,6 +281,8 @@ class MQTTClient:
 
             Send a MQTT `SUBSCRIBE <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718063>`_ message and wait for broker acknowledgment.
 
+            This method is a *coroutine*.
+
             :param topics: array of topics pattern to subscribe with associated QoS.
             :return: `SUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718068>`_ message return code.
 
@@ -292,6 +304,8 @@ class MQTTClient:
 
             Send a MQTT `UNSUBSCRIBE <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718072>`_ message and wait for broker `UNSUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718077>`_ message.
 
+            This method is a *coroutine*.
+
             :param topics: array of topics to unsubscribe from.
 
             Example of ``topics`` argument expected structure:
@@ -307,6 +321,8 @@ class MQTTClient:
             Deliver next received message.
 
             Deliver next message received from the broker. If no message is available, this methods waits until next message arrives or ``timeout`` occurs.
+
+            This method is a *coroutine*.
 
             :param timeout: maximum number of seconds to wait before returning. If timeout is not specified or None, there is no limit to the wait time until next message arrives.
             :return: instance of :class:`hbmqtt.session.ApplicationMessage` containing received message information flow.

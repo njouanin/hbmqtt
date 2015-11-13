@@ -15,7 +15,7 @@ ApplicationMessage
         :members:
 
     .. autoclass:: IncomingApplicationMessage
-        :members:
+        :show-inheritance:
 
     .. autoclass:: OutgoingApplicationMessage
-        :members:
+        :show-inheritance:

@@ -138,43 +138,17 @@ class BrokerContext(BaseContext):
 
 
 class Broker:
+    """
+    MQTT 3.1.1 compliant broker implementation
+
+    :param config: Example Yaml config
+    :param loop: asyncio loop to use. Defaults to ``asyncio.get_event_loop()`` if none is given
+    :param plugin_namespace: Plugin namespace to use when loading plugin entry_points. Defaults to ``hbmqtt.broker.plugins``
+
+    """
     states = ['new', 'starting', 'started', 'not_started', 'stopping', 'stopped', 'not_stopped', 'stopped']
 
     def __init__(self, config=None, loop=None, plugin_namespace=None):
-        """
-
-        :param config: Example Yaml config
-            listeners:
-                default:  #Mandatory
-                    max-connections: 50000
-                    type: tcp
-                my-tcp-1:
-                    bind: 127.0.0.1:1883
-                my-tcp-2:
-                    bind: 1.2.3.4:1883
-                    max-connections: 1000
-                my-tcp-ssl-1:
-                    bind: 127.0.0.1:8883
-                    ssl: on
-                    cafile: /some/cafile
-                    capath: /some/folder
-                    capath: certificate data
-                    certfile: /some/certfile
-                    keyfile: /some/key
-                my-ws-1:
-                    bind: 0.0.0.0:8080
-                    type: ws
-            timeout-disconnect-delay: 2
-            auth:
-                plugins: ['auth.anonymous'] #List of plugins to activate for authentication among all registered plugins
-                allow-anonymous: true / false
-                password-file: /some/passwd_file
-            persistence:
-                plugin: 'persistence-sqlite'
-
-        :param loop:
-        :return:
-        """
         self.logger = logging.getLogger(__name__)
         self.config = _defaults
         if config is not None:
@@ -228,6 +202,13 @@ class Broker:
 
     @asyncio.coroutine
     def start(self):
+        """
+            Start the broker to serve with the given configuration
+
+            Start method opens network sockets and will start listening for incoming connections.
+
+            This method is a *coroutine*.
+        """
         try:
             self._sessions = dict()
             self._subscriptions = dict()
@@ -295,6 +276,11 @@ class Broker:
 
     @asyncio.coroutine
     def shutdown(self):
+        """
+            Stop broker instance.
+
+            Closes all connected session, stop listening on network socket and free resources.
+        """
         try:
             self._sessions = dict()
             self._subscriptions = dict()
