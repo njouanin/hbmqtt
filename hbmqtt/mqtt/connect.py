@@ -3,7 +3,7 @@
 # See the file license.txt for copying permission.
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, CONNECT, MQTTVariableHeader, MQTTPayload
 from hbmqtt.codecs import *
-from hbmqtt.errors import MQTTException, HBMQTTException, NoDataException
+from hbmqtt.errors import HBMQTTException, NoDataException
 from hbmqtt.adapters import ReaderAdapter
 
 
@@ -97,8 +97,6 @@ class ConnectVariableHeader(MQTTVariableHeader):
     def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader):
         #  protocol name
         protocol_name = yield from decode_string(reader)
-        if protocol_name != "MQTT":
-            raise MQTTException('[MQTT-3.1.2-1] Incorrect protocol name: "%s"' % protocol_name)
 
         # protocol level
         protocol_level_byte = yield from read_or_raise(reader, 1)
@@ -197,6 +195,126 @@ class ConnectPayload(MQTTPayload):
 class ConnectPacket(MQTTPacket):
     VARIABLE_HEADER = ConnectVariableHeader
     PAYLOAD = ConnectPayload
+
+    @property
+    def proto_name(self):
+        return self.variable_header.proto_name
+
+    @proto_name.setter
+    def proto_name(self, name: str):
+        self.variable_header.proto_name = name
+
+    @property
+    def proto_level(self):
+        return self.variable_header.proto_level
+
+    @proto_level.setter
+    def proto_level(self, level):
+        self.variable_header.proto_level = level
+
+    @property
+    def username_flag(self):
+        return self.variable_header.username_flag
+
+    @username_flag.setter
+    def username_flag(self, flag):
+        self.variable_header.username_flag = flag
+
+    @property
+    def password_flag(self):
+        return self.variable_header.password_flag
+
+    @password_flag.setter
+    def password_flag(self, flag):
+        self.variable_header.password_flag = flag
+
+    @property
+    def clean_session_flag(self):
+        return self.variable_header.clean_session_flag
+
+    @clean_session_flag.setter
+    def clean_session_flag(self, flag):
+        self.variable_header.clean_session_flag = flag
+
+    @property
+    def will_retain_flag(self):
+        return self.variable_header.will_retain_flag
+
+    @will_retain_flag.setter
+    def will_retain_flag(self, flag):
+        self.variable_header.will_retain_flag = flag
+
+    @property
+    def will_qos(self):
+        return self.variable_header.will_qos
+
+    @will_qos.setter
+    def will_qos(self, flag):
+        self.variable_header.will_qos = flag
+
+    @property
+    def will_flag(self):
+        return self.variable_header.will_flag
+
+    @will_flag.setter
+    def will_flag(self, flag):
+        self.variable_header.will_flag = flag
+
+    @property
+    def reserved_flag(self):
+        return self.variable_header.reserved_flag
+
+    @reserved_flag.setter
+    def reserved_flag(self, flag):
+        self.variable_header.reserved_flag = flag
+
+    @property
+    def client_id(self):
+        return self.payload.client_id
+
+    @client_id.setter
+    def client_id(self, client_id):
+        self.payload.client_id = client_id
+
+    @property
+    def will_topic(self):
+        return self.payload.will_topic
+
+    @will_topic.setter
+    def will_topic(self, will_topic):
+        self.payload.will_topic = will_topic
+
+    @property
+    def will_message(self):
+        return self.payload.will_message
+
+    @will_message.setter
+    def will_message(self, will_message):
+        self.payload.will_message = will_message
+
+    @property
+    def username(self):
+        return self.payload.username
+
+    @username.setter
+    def username(self, username):
+        self.payload.username = username
+
+    @property
+    def password(self):
+        return self.payload.password
+
+    @password.setter
+    def password(self, password):
+        self.payload.password = password
+
+    @property
+    def keep_alive(self):
+        return self.variable_header.keep_alive
+
+    @keep_alive.setter
+    def keep_alive(self, keep_alive):
+        self.variable_header.keep_alive = keep_alive
 
     def __init__(self, fixed: MQTTFixedHeader=None, vh: ConnectVariableHeader=None, payload: ConnectPayload=None):
         if fixed is None:

@@ -5,6 +5,7 @@ import unittest
 
 from hbmqtt.mqtt.subscribe import SubscribePacket, SubscribePayload
 from hbmqtt.mqtt.packet import PacketIdVariableHeader
+from hbmqtt.mqtt.constants import *
 from hbmqtt.codecs import *
 from hbmqtt.adapters import BufferReader
 
@@ -17,17 +18,19 @@ class SubscribePacketTest(unittest.TestCase):
         data = b'\x80\x0e\x00\x0a\x00\x03a/b\x01\x00\x03c/d\x02'
         stream = BufferReader(data)
         message = self.loop.run_until_complete(SubscribePacket.from_stream(stream))
-        self.assertEqual(message.payload.topics[0]['filter'], 'a/b')
-        self.assertEqual(message.payload.topics[0]['qos'], 0x01)
-        self.assertEqual(message.payload.topics[1]['filter'], 'c/d')
-        self.assertEqual(message.payload.topics[1]['qos'], 0x02)
+        (topic, qos) = message.payload.topics[0]
+        self.assertEqual(topic, 'a/b')
+        self.assertEqual(qos, QOS_1)
+        (topic, qos) = message.payload.topics[1]
+        self.assertEqual(topic, 'c/d')
+        self.assertEqual(qos, QOS_2)
 
     def test_to_stream(self):
         variable_header = PacketIdVariableHeader(10)
         payload = SubscribePayload(
             [
-                {'filter': 'a/b', 'qos': 0x01},
-                {'filter': 'c/d', 'qos': 0x02}
+                ('a/b', QOS_1),
+                ('c/d', QOS_2)
             ])
         publish = SubscribePacket(variable_header=variable_header, payload=payload)
         out = publish.to_bytes()

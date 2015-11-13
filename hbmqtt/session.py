@@ -3,6 +3,80 @@
 # See the file license.txt for copying permission.
 from transitions import Machine, MachineError
 from asyncio import Queue
+from collections import OrderedDict
+from hbmqtt.mqtt.constants import *
+from hbmqtt.mqtt.publish import PublishPacket
+from hbmqtt.mqtt.puback import PubackPacket
+
+
+OUTGOING = 0
+INCOMING = 1
+
+
+class ApplicationMessage:
+    """
+        ApplicationMessage and subclasses are used to store published message information flow. These objects can contain different information depending on the way they were created (incoming or outgoing) and the quality of service used between peers.
+    """
+    def __init__(self, packet_id, topic, qos, data, retain):
+        self.packet_id = packet_id
+        """ Publish message `packet identifier <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718025>`_"""
+
+        self.topic = topic
+        """ Publish message topic"""
+
+        self.qos = qos
+        """ Publish message Quality of Service"""
+
+        self.data = data
+        """ Publish message payload data"""
+
+        self.retain = retain
+        """ Publish message retain flag"""
+
+        self.publish_packet = None
+        """ :class:`hbmqtt.mqtt.publish.PublishPacket` instance corresponding to the `PUBLISH <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718037>`_ packet in the messages flow. ``None`` if the PUBLISH packet has not already been received or sent."""
+
+        self.puback_packet = None
+        """ :class:`hbmqtt.mqtt.puback.PubackPacket` instance corresponding to the `PUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718043>`_ packet in the messages flow. ``None`` if QoS != QOS_1 or if the PUBACK packet has not already been received or sent."""
+
+        self.pubrec_packet = None
+        """ :class:`hbmqtt.mqtt.puback.PubrecPacket` instance corresponding to the `PUBREC <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718048>`_ packet in the messages flow. ``None`` if QoS != QOS_2 or if the PUBREC packet has not already been received or sent."""
+
+        self.pubrel_packet = None
+        """ :class:`hbmqtt.mqtt.puback.PubrelPacket` instance corresponding to the `PUBREL <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718053>`_ packet in the messages flow. ``None`` if QoS != QOS_2 or if the PUBREL packet has not already been received or sent."""
+
+        self.pubcomp_packet = None
+        """ :class:`hbmqtt.mqtt.puback.PubrelPacket` instance corresponding to the `PUBCOMP <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718058>`_ packet in the messages flow. ``None`` if QoS != QOS_2 or if the PUBCOMP packet has not already been received or sent."""
+
+    def build_publish_packet(self, dup=False):
+        """
+            Build :class:`hbmqtt.mqtt.publish.PublishPacket` from attributes
+
+        :param dup: force dup flag
+        :return: :class:`hbmqtt.mqtt.publish.PublishPacket` built from ApplicationMessage instance attributes
+        """
+        return PublishPacket.build(self.topic, self.data, self.packet_id, dup, self.qos, self.retain)
+
+    def __eq__(self, other):
+        return self.packet_id == other.packet_id
+
+
+class IncomingApplicationMessage(ApplicationMessage):
+    """
+        Incoming :class:`~hbmqtt.session.ApplicationMessage`.
+    """
+    def __init__(self, packet_id, topic, qos, data, retain):
+        super().__init__(packet_id, topic, qos, data, retain)
+        self.direction = INCOMING
+
+
+class OutgoingApplicationMessage(ApplicationMessage):
+    """
+        Outgoing :class:`~hbmqtt.session.ApplicationMessage`.
+    """
+    def __init__(self, packet_id, topic, qos, data, retain):
+        super().__init__(packet_id, topic, qos, data, retain)
+        self.direction = OUTGOING
 
 
 class Session:
@@ -10,8 +84,6 @@ class Session:
 
     def __init__(self):
         self._init_states()
-        self.reader = None
-        self.writer = None
         self.remote_address = None
         self.remote_port = None
         self.client_id = None
@@ -31,13 +103,12 @@ class Session:
         self.cadata = None
         self._packet_id = 0
         self.parent = 0
-        self.handler = None
 
-        # Used to store outgoing InflightMessage while publish protocol flows
-        self.outgoing_msg = dict()
+        # Used to store outgoing ApplicationMessage while publish protocol flows
+        self.inflight_out = OrderedDict()
 
-        # Used to store incoming InflightMessage while publish protocol flows
-        self.incoming_msg = dict()
+        # Used to store incoming ApplicationMessage while publish protocol flows
+        self.inflight_in = OrderedDict()
 
         # Stores messages retained for this session
         self.retained_messages = Queue()
@@ -60,11 +131,11 @@ class Session:
 
     @property
     def inflight_in_count(self):
-        return len(self.incoming_msg)
+        return len(self.inflight_in)
 
     @property
     def inflight_out_count(self):
-        return len(self.outgoing_msg)
+        return len(self.inflight_out)
 
     @property
     def retained_messages_count(self):
@@ -72,3 +143,19 @@ class Session:
 
     def __repr__(self):
         return type(self).__name__ + '(clientId={0}, state={1})'.format(self.client_id, self.transitions.state)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        # del state['transitions']
+        del state['retained_messages']
+        del state['delivered_message_queue']
+        return state
+
+    def __setstate(self, state):
+        self.__dict__.update(state)
+        self.retained_messages = Queue()
+        self.delivered_message_queue = Queue()
+
+    def __eq__(self, other):
+        return self.client_id == other.client_id

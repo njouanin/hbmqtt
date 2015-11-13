@@ -2,7 +2,7 @@ import logging
 import asyncio
 
 from hbmqtt.client import MQTTClient, ConnectException
-
+from hbmqtt.mqtt.constants import *
 
 
 #
@@ -20,22 +20,16 @@ config = {
         'retain': True
     }
 }
-#C = MQTTClient(config=config)
-C = MQTTClient()
-
-
-def disconnected(future):
-    print("DISCONNECTED")
-    asyncio.get_event_loop().stop()
 
 
 @asyncio.coroutine
 def test_coro():
-    yield from C.connect('mqtt://localhost:1883/')
+    C = MQTTClient()
+    yield from C.connect('mqtt://test.mosquitto.org/')
     tasks = [
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=QOS_1)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=QOS_2)),
     ]
     yield from asyncio.wait(tasks)
     logger.info("messages published")
@@ -45,9 +39,12 @@ def test_coro():
 @asyncio.coroutine
 def test_coro2():
     try:
-        future = yield from C.connect('mqtt://localhost:1883/')
-        future.add_done_callback(disconnected)
-        yield from asyncio.wait([asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01))])
+        C = MQTTClient()
+        ret = yield from C.connect('mqtt://test.mosquitto.org:1883/')
+        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_0', qos=0x00)
+        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)
+        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)
+        #print(message)
         logger.info("messages published")
         yield from C.disconnect()
     except ConnectException as ce:
@@ -56,10 +53,8 @@ def test_coro2():
 
 
 if __name__ == '__main__':
-    formatter = "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+    formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+    formatter = "%(message)s"
     logging.basicConfig(level=logging.DEBUG, format=formatter)
-    asyncio.async(test_coro2())
-    try:
-        asyncio.get_event_loop().run_forever()
-    finally:
-        asyncio.get_event_loop().close()
+    asyncio.get_event_loop().run_until_complete(test_coro())
+    asyncio.get_event_loop().run_until_complete(test_coro2())

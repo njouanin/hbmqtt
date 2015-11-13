@@ -6,6 +6,7 @@ import unittest
 from hbmqtt.mqtt.publish import PublishPacket, PublishVariableHeader, PublishPayload
 from hbmqtt.adapters import BufferReader
 from hbmqtt.codecs import *
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 
 
 class PublishPacketTest(unittest.TestCase):
@@ -45,3 +46,76 @@ class PublishPacketTest(unittest.TestCase):
         publish = PublishPacket(variable_header=variable_header, payload=payload)
         out = publish.to_bytes()
         self.assertEqual(out, b'\x30\x13\x00\x05topic\00\x0a0123456789')
+
+    def test_build(self):
+        packet = PublishPacket.build('/topic', b'data', 1, False, QOS_0, False)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertFalse(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_0)
+        self.assertFalse(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, False, QOS_1, False)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertFalse(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_1)
+        self.assertFalse(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, False, QOS_2, False)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertFalse(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_2)
+        self.assertFalse(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, True, QOS_0, False)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertTrue(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_0)
+        self.assertFalse(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, True, QOS_1, False)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertTrue(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_1)
+        self.assertFalse(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, True, QOS_2, False)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertTrue(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_2)
+        self.assertFalse(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, False, QOS_0, True)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertFalse(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_0)
+        self.assertTrue(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, False, QOS_1, True)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertFalse(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_1)
+        self.assertTrue(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, False, QOS_2, True)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertFalse(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_2)
+        self.assertTrue(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, True, QOS_0, True)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertTrue(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_0)
+        self.assertTrue(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, True, QOS_1, True)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertTrue(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_1)
+        self.assertTrue(packet.retain_flag)
+
+        packet = PublishPacket.build('/topic', b'data', 1, True, QOS_2, True)
+        self.assertEquals(packet.packet_id, 1)
+        self.assertTrue(packet.dup_flag)
+        self.assertEquals(packet.qos, QOS_2)
+        self.assertTrue(packet.retain_flag)

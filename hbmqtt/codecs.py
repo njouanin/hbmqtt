@@ -2,8 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from math import ceil
-
+from struct import pack, unpack
 from hbmqtt.errors import NoDataException
 
 
@@ -22,24 +21,24 @@ def bytes_to_int(data):
     :param data: byte sequence
     :return: integer value
     """
-    if isinstance(data, int):
-        return data
-    else:
+    try:
         return int.from_bytes(data, byteorder='big')
+    except:
+        return data
 
 
-def int_to_bytes(int_value: int, length=-1) -> bytes:
+def int_to_bytes(int_value: int, length: int) -> bytes:
     """
     convert an integer to a sequence of bytes using big endian byte ordering
     :param int_value: integer value to convert
     :param length: (optional) byte length
     :return: byte sequence
     """
-    if length == -1:
-        length = ceil(int_value.bit_length()//8)
-        if length == 0:
-            length = 1
-    return int_value.to_bytes(length, byteorder='big')
+    if length == 1:
+        fmt = "!B"
+    elif length == 2:
+        fmt = "!H"
+    return pack(fmt, int_value)
 
 
 @asyncio.coroutine
@@ -64,9 +63,15 @@ def decode_string(reader) -> bytes:
     :return: UTF-8 string read from stream
     """
     length_bytes = yield from read_or_raise(reader, 2)
-    str_length = bytes_to_int(length_bytes)
-    byte_str = yield from read_or_raise(reader, str_length)
-    return byte_str.decode(encoding='utf-8')
+    str_length = unpack("!H", length_bytes)
+    if str_length[0]:
+        byte_str = yield from read_or_raise(reader, str_length[0])
+        try:
+            return byte_str.decode(encoding='utf-8')
+        except:
+            return str(byte_str)
+    else:
+        return ''
 
 
 @asyncio.coroutine
@@ -77,8 +82,8 @@ def decode_data_with_length(reader) -> bytes:
     :return: bytes read from stream (without length)
     """
     length_bytes = yield from read_or_raise(reader, 2)
-    bytes_length = bytes_to_int(length_bytes)
-    data = yield from read_or_raise(reader, bytes_length)
+    bytes_length = unpack("!H", length_bytes)
+    data = yield from read_or_raise(reader, bytes_length[0])
     return data
 
 
@@ -101,7 +106,8 @@ def decode_packet_id(reader) -> int:
     :return: Packet ID
     """
     packet_id_bytes = yield from read_or_raise(reader, 2)
-    return bytes_to_int(packet_id_bytes)
+    packet_id = unpack("!H", packet_id_bytes)
+    return packet_id[0]
 
 
 def int_to_bytes_str(value: int) -> bytes:

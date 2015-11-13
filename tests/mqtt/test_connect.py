@@ -6,7 +6,6 @@ import asyncio
 
 from hbmqtt.mqtt.connect import ConnectPacket, ConnectVariableHeader, ConnectPayload
 from hbmqtt.mqtt.packet import MQTTFixedHeader, CONNECT
-from hbmqtt.errors import MQTTException
 from hbmqtt.adapters import BufferReader
 
 
@@ -52,12 +51,6 @@ class ConnectPacketTest(unittest.TestCase):
         self.assertEqual(message.payload.username, 'user')
         self.assertEqual(message.payload.password, 'password')
 
-    def test_decode_fail_protocol_name(self):
-        data = b'\x10\x3e\x00\x04TTQM\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
-        stream = BufferReader(data)
-        with self.assertRaises(MQTTException):
-            self.loop.run_until_complete(ConnectPacket.from_stream(stream))
-
     def test_decode_fail_reserved_flag(self):
         data = b'\x10\x3e\x00\x04MQTT\x04\xcf\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
         stream = BufferReader(data)
@@ -95,3 +88,36 @@ class ConnectPacketTest(unittest.TestCase):
         message = ConnectPacket(header, variable_header, payload)
         encoded = message.to_bytes()
         self.assertEqual(encoded, b'\x10\x3e\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password')
+
+    def test_getattr_ok(self):
+        data = b'\x10\x3e\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789\x00\x09WillTopic\x00\x0bWillMessage\x00\x04user\x00\x08password'
+        stream = BufferReader(data)
+        message = self.loop.run_until_complete(ConnectPacket.from_stream(stream))
+        self.assertEqual(message.variable_header.proto_name, "MQTT")
+        self.assertEqual(message.proto_name, "MQTT")
+        self.assertEqual(message.variable_header.proto_level, 4)
+        self.assertEqual(message.proto_level, 4)
+        self.assertTrue(message.variable_header.username_flag)
+        self.assertTrue(message.username_flag)
+        self.assertTrue(message.variable_header.password_flag)
+        self.assertTrue(message.password_flag)
+        self.assertFalse(message.variable_header.will_retain_flag)
+        self.assertFalse(message.will_retain_flag)
+        self.assertEqual(message.variable_header.will_qos, 1)
+        self.assertEqual(message.will_qos, 1)
+        self.assertTrue(message.variable_header.will_flag)
+        self.assertTrue(message.will_flag)
+        self.assertTrue(message.variable_header.clean_session_flag)
+        self.assertTrue(message.clean_session_flag)
+        self.assertFalse(message.variable_header.reserved_flag)
+        self.assertFalse(message.reserved_flag)
+        self.assertEqual(message.payload.client_id, '0123456789')
+        self.assertEqual(message.client_id, '0123456789')
+        self.assertEqual(message.payload.will_topic, 'WillTopic')
+        self.assertEqual(message.will_topic, 'WillTopic')
+        self.assertEqual(message.payload.will_message, b'WillMessage')
+        self.assertEqual(message.will_message, b'WillMessage')
+        self.assertEqual(message.payload.username, 'user')
+        self.assertEqual(message.username, 'user')
+        self.assertEqual(message.payload.password, 'password')
+        self.assertEqual(message.password, 'password')

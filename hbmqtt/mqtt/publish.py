@@ -18,13 +18,14 @@ class PublishVariableHeader(MQTTVariableHeader):
         return type(self).__name__ + '(topic={0}, packet_id={1})'.format(self.topic_name, self.packet_id)
 
     def to_bytes(self):
-        out = b''
-        out += encode_string(self.topic_name)
+        out = bytearray()
+        out.extend(encode_string(self.topic_name))
         if self.packet_id is not None:
-            out += int_to_bytes(self.packet_id, 2)
+            out.extend(int_to_bytes(self.packet_id, 2))
         return out
 
     @classmethod
+    @asyncio.coroutine
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader):
         topic_name = yield from decode_string(reader)
         has_qos = (fixed_header.flags >> 1) & 0x03
@@ -44,6 +45,7 @@ class PublishPayload(MQTTPayload):
         return self.data
 
     @classmethod
+    @asyncio.coroutine
     def from_stream(cls, reader: asyncio.StreamReader, fixed_header: MQTTFixedHeader,
                     variable_header: MQTTVariableHeader):
         data = yield from reader.read(fixed_header.remaining_length-variable_header.bytes_length)
@@ -112,8 +114,32 @@ class PublishPacket(MQTTPacket):
 
     @qos.setter
     def qos(self, val: int):
-        self.fixed_header.flags &= (0x00 << 1)
+        self.fixed_header.flags &= 0xf9
         self.fixed_header.flags |= (val << 1)
+
+    @property
+    def packet_id(self):
+        return self.variable_header.packet_id
+
+    @packet_id.setter
+    def packet_id(self, val: int):
+        self.variable_header.packet_id = val
+
+    @property
+    def data(self):
+        return self.payload.data
+
+    @data.setter
+    def data(self, data: bytes):
+        self.payload.data = data
+
+    @property
+    def topic_name(self):
+        return self.variable_header.topic_name
+
+    @topic_name.setter
+    def topic_name(self, name: str):
+        self.variable_header.topic_name = name
 
     @classmethod
     def build(cls, topic_name: str, message: bytes, packet_id: int, dup_flag, qos, retain):

@@ -27,9 +27,9 @@ C = MQTTClient(config=config)
 def test_coro():
     yield from C.connect('mqtts://test.mosquitto.org/', cafile='mosquitto.org.crt')
     tasks = [
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
-        asyncio.async(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
     ]
     yield from asyncio.wait(tasks)
     logger.info("messages published")

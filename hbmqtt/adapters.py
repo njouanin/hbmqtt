@@ -23,6 +23,11 @@ class ReaderAdapter:
         :return: packet read as bytes data
         """
 
+    def feed_eof(self):
+        """
+        Acknowleddge EOF
+        """
+
 
 class WriterAdapter:
     """
@@ -133,6 +138,9 @@ class StreamReaderAdapter(ReaderAdapter):
     def read(self, n=-1) -> bytes:
         return (yield from self._reader.read(n))
 
+    def feed_eof(self):
+        return self._reader.feed_eof()
+
 
 class StreamWriterAdapter(WriterAdapter):
     """
@@ -157,6 +165,9 @@ class StreamWriterAdapter(WriterAdapter):
 
     @asyncio.coroutine
     def close(self):
+        yield from self._writer.drain()
+        if self._writer.can_write_eof():
+            self._writer.write_eof()
         self._writer.close()
 
 
@@ -165,8 +176,8 @@ class BufferReader(ReaderAdapter):
     Byte Buffer reader adapter
     This adapter simply adapt reading a byte buffer.
     """
-    def __init__(self, data: bytes):
-        self._stream = io.BytesIO(data)
+    def __init__(self, buffer: bytes):
+        self._stream = io.BytesIO(buffer)
 
     @asyncio.coroutine
     def read(self, n=-1) -> bytes:
@@ -178,8 +189,8 @@ class BufferWriter(WriterAdapter):
     ByteBuffer writer adapter
     This adapter simply adapt writing to a byte buffer
     """
-    def __init__(self):
-        self._stream = io.BytesIO(b'')
+    def __init__(self, buffer=b''):
+        self._stream = io.BytesIO(buffer)
 
     def write(self, data):
         """
@@ -189,7 +200,7 @@ class BufferWriter(WriterAdapter):
 
     @asyncio.coroutine
     def drain(self):
-        self._stream = io.BytesIO(b'')
+        pass
 
     def get_buffer(self):
         return self._stream.getvalue()
