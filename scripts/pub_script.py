@@ -35,7 +35,11 @@ Options:
 
 import sys
 import logging
-import asyncio
+try:
+    import uasyncio as asyncio
+except:
+    raise
+    import asyncio
 import os
 from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.version import get_version
