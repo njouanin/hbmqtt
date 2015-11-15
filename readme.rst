@@ -30,9 +30,20 @@ Build status
 .. image:: https://coveralls.io/repos/beerfactory/hbmqtt/badge.svg?branch=develop&service=github
     :target: https://coveralls.io/github/beerfactory/hbmqtt?branch=develop
 
+
+Project status
+--------------
+
 .. image:: https://readthedocs.org/projects/hbmqtt/badge/?version=latest
     :target: http://hbmqtt.readthedocs.org/en/latest/?badge=latest
     :alt: Documentation Status
+
+.. image:: https://badge.fury.io/py/hbmqtt.svg
+    :target: https://badge.fury.io/py/hbmqtt
+
+.. image:: https://pypip.in/d/$REPO/badge.png
+    :target: https://crate.io/packages/$REPO/
+    :alt: Number of PyPI downloads
 
 .. image:: https://badge.waffle.io/beerfactory/hbmqtt.svg?label=ready&title=Ready
     :target: https://waffle.io/beerfactory/hbmqtt
