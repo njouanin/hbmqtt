@@ -30,7 +30,6 @@ Build status
 .. image:: https://coveralls.io/repos/beerfactory/hbmqtt/badge.svg?branch=develop&service=github
     :target: https://coveralls.io/github/beerfactory/hbmqtt?branch=develop
 
-
 Project status
 --------------
 
