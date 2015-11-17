@@ -1,8 +1,14 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
-from transitions import Machine, MachineError
-from asyncio import Queue
+#from transitions import Machine, MachineError
+try:
+    import uasyncio as asyncio
+    from uasyncio.queues import Queue
+except:
+    raise
+    import asyncio
+    from asyncio import Queue
 from collections import OrderedDict
 from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.publish import PublishPacket

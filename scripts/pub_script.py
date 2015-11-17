@@ -38,7 +38,6 @@ import logging
 try:
     import uasyncio as asyncio
 except:
-    raise
     import asyncio
 import os
 from hbmqtt.client import MQTTClient, ConnectException

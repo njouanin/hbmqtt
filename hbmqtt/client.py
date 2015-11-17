@@ -3,7 +3,10 @@
 # See the file license.txt for copying permission.
 
 import logging
-import ssl
+try:
+    import ussl as ssl
+except:
+    import ssl
 from urllib.parse import urlparse, urlunparse
 from functools import wraps
 
