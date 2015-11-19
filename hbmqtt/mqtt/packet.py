@@ -4,7 +4,10 @@
 from hbmqtt.errors import CodecException, MQTTException
 from hbmqtt.codecs import *
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
-from datetime import datetime
+try:
+    from datetime import datetime
+except:
+    pass
 from struct import unpack
 
 

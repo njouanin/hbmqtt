@@ -19,9 +19,6 @@ from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSockets
 from hbmqtt.plugins.manager import PluginManager, BaseContext
 from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED, ProtocolHandlerException
 from hbmqtt.mqtt.constants import *
-import websockets
-from websockets.uri import InvalidURI
-from websockets.handshake import InvalidHandshake
 from collections import deque
 import sys
 if sys.version_info < (3, 5):
@@ -390,6 +387,10 @@ class MQTTClient:
                 reader = StreamReaderAdapter(conn_reader)
                 writer = StreamWriterAdapter(conn_writer)
             elif scheme in ('ws', 'wss'):
+		import websockets
+		from websockets.uri import InvalidURI
+		from websockets.handshake import InvalidHandshake
+
                 websocket = yield from websockets.connect(
                     self.session.broker_uri,
                     subprotocols=['mqtt'],

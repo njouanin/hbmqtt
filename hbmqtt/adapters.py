@@ -3,11 +3,11 @@
 # See the file license.txt for copying permission.
 try:
     import uasyncio as asyncio
+    from uasyncio import StreamReader, StreamWriter
 except:
     import asyncio
+    from asyncio import StreamReader, StreamWriter
 import io
-from websockets.protocol import WebSocketCommonProtocol
-from asyncio import StreamReader, StreamWriter
 import logging
 
 
