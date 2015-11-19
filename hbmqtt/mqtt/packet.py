@@ -5,9 +5,9 @@ from hbmqtt.errors import CodecException, MQTTException
 from hbmqtt.codecs import *
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
 try:
-    from datetime import datetime
+    from datetime import datetime.now as now
 except:
-    pass
+    from time import localtime as now
 from struct import unpack
 
 
@@ -193,7 +193,7 @@ class MQTTPacket:
     def to_stream(self, writer: asyncio.StreamWriter):
         writer.write(self.to_bytes())
         yield from writer.drain()
-        self.protocol_ts = datetime.now()
+        self.protocol_ts = now()
 
     def to_bytes(self) -> bytes:
         if self.variable_header:
@@ -231,7 +231,7 @@ class MQTTPacket:
             instance = cls(fixed_header, variable_header)
         else:
             instance = cls(fixed_header, variable_header, payload)
-        instance.protocol_ts = datetime.now()
+        instance.protocol_ts = now()
         return instance
 
     @property
