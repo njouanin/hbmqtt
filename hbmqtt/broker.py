@@ -424,7 +424,6 @@ class Broker:
                     yield from self._stop_handler(handler)
                     client_session.transitions.disconnect()
                     yield from self.plugins_manager.fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, client_id=client_session.client_id)
-                    yield from writer.close()
                     connected = False
                 if unsubscribe_waiter in done:
                     self.logger.debug("%s handling unsubscription" % client_session.client_id)
