@@ -256,7 +256,8 @@ class Broker:
                 elif listener['type'] == 'ws':
                     address, port = listener['bind'].split(':')
                     cb_partial = partial(self.ws_connected, listener_name=listener_name)
-                    instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop)
+                    instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop,
+                                                           subprotocols=['mqtt'])
                     self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
 
                 self.logger.info("Listener '%s' bind to %s (max_connecionts=%d)" %

@@ -1,6 +1,17 @@
 Changelog
 ---------
 
+0.6.2
+.....
+
+* Fix issue `#20 <https://github.com/beerfactory/hbmqtt/issues/20>`_  (``mqtt`` subprotocol was missing).
+* Upgrade to ``websockets`` 3.0.
+
+0.6.1
+.....
+
+* Fix issue `#19 <https://github.com/beerfactory/hbmqtt/issues/19>`_
+
 0.6
 ...
 
