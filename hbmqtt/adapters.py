@@ -4,6 +4,7 @@
 import asyncio
 import io
 from websockets.protocol import WebSocketCommonProtocol
+from websockets.exceptions import ConnectionClosed
 from asyncio import StreamReader, StreamWriter
 import logging
 
@@ -82,7 +83,10 @@ class WebSocketsReader(ReaderAdapter):
         """
         buffer = bytearray(self._stream.read())
         while len(buffer) < n:
-            message = yield from self._protocol.recv()
+            try:
+                message = yield from self._protocol.recv()
+            except ConnectionClosed:
+                message = None
             if message is None:
                 break
             if not isinstance(message, bytes):

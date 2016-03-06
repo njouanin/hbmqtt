@@ -1,5 +1,5 @@
 transitions==0.2.5
-websockets
+websockets=3.0.0
 passlib
 docopt
 pyyaml
