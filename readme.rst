@@ -54,10 +54,14 @@ hbmqtt is available on `Pypi <https://pypi.python.org/pypi/hbmqtt>`_ and can ins
 
 Documentation is available on `Read the Docs`_.
 
-Bug reports, patches and suggestions welcome! Just `open an issue`_ or join the `forum`_.
+Bug reports, patches and suggestions welcome! Just `open an issue`_ or join the `gitter channel`_.
+
+.. image:: https://badges.gitter.im/Join%20Chat.svg
+    :target: https://gitter.im/beerfactory/hbmqtt?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+    :alt: 'Join the chat at https://gitter.im/beerfactory/hbmqtt'
 
 .. _MQTT: http://www.mqtt.org
 .. _MQTT 3.1.1: http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
 .. _Read the Docs: http://hbmqtt.readthedocs.org/
 .. _open an issue: https://github.com/beerfactory/hbmqtt/issues/new
-.. _forum: http://forum.beerfactory.org/c/hbmqtt
+.. _gitter channel: https://gitter.im/beerfactory/hbmqtt
