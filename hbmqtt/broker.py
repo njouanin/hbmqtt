@@ -165,7 +165,7 @@ class Broker:
         self._sessions = dict()
         self._subscriptions = dict()
         self._retained_messages = dict()
-        self._broadcast_queue = asyncio.Queue()
+        self._broadcast_queue = asyncio.Queue(loop=self._loop)
 
         self._broadcast_task = None
 
@@ -333,7 +333,7 @@ class Broker:
 
         # Wait for first packet and expect a CONNECT
         try:
-            handler, client_session = yield from BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager)
+            handler, client_session = yield from BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager, loop=self._loop)
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))

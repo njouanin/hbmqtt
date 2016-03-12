@@ -1,6 +1,7 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import asyncio
 from transitions import Machine, MachineError
 from asyncio import Queue
 from collections import OrderedDict
@@ -82,7 +83,7 @@ class OutgoingApplicationMessage(ApplicationMessage):
 class Session:
     states = ['new', 'connected', 'disconnected']
 
-    def __init__(self):
+    def __init__(self, loop=None):
         self._init_states()
         self.remote_address = None
         self.remote_port = None
@@ -103,6 +104,10 @@ class Session:
         self.cadata = None
         self._packet_id = 0
         self.parent = 0
+        if loop is not None:
+            self._loop = loop
+        else:
+            self._loop = asyncio.get_event_loop()
 
         # Used to store outgoing ApplicationMessage while publish protocol flows
         self.inflight_out = OrderedDict()
@@ -111,10 +116,10 @@ class Session:
         self.inflight_in = OrderedDict()
 
         # Stores messages retained for this session
-        self.retained_messages = Queue()
+        self.retained_messages = Queue(loop=self._loop)
 
         # Stores PUBLISH messages ID received in order and ready for application process
-        self.delivered_message_queue = Queue()
+        self.delivered_message_queue = Queue(loop=self._loop)
 
     def _init_states(self):
         self.transitions = Machine(states=Session.states, initial='new')

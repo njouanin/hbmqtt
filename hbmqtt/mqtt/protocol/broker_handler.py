@@ -163,7 +163,7 @@ class BrokerProtocolHandler(ProtocolHandler):
             yield from writer.close()
             raise MQTTException(error_msg)
 
-        incoming_session = Session()
+        incoming_session = Session(loop)
         incoming_session.client_id = connect.client_id
         incoming_session.clean_session = connect.clean_session_flag
         incoming_session.will_flag = connect.will_flag
@@ -178,5 +178,5 @@ class BrokerProtocolHandler(ProtocolHandler):
         else:
             incoming_session.keep_alive = 0
 
-        handler = cls(plugins_manager, loop)
+        handler = cls(plugins_manager, loop=loop)
         return handler, incoming_session
