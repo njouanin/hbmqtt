@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+0.6.3
+.....
+
+* Fix issue `#22 <https://github.com/beerfactory/hbmqtt/issues/22>`_.
+
 0.6.2
 .....
 
