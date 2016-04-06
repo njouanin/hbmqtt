@@ -260,7 +260,7 @@ class Broker:
                                                            subprotocols=['mqtt'])
                     self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
 
-                self.logger.info("Listener '%s' bind to %s (max_connecionts=%d)" %
+                self.logger.info("Listener '%s' bind to %s (max_connections=%d)" %
                                  (listener_name, listener['bind'], max_connections))
 
             self.transitions.starting_success()
