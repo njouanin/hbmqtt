@@ -454,7 +454,10 @@ class ProtocolHandler:
     def mqtt_deliver_next_message(self):
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug("%d message(s) available for delivery" % self.session.delivered_message_queue.qsize())
-        message = yield from self.session.delivered_message_queue.get()
+        try:
+            message = yield from self.session.delivered_message_queue.get()
+        except asyncio.CancelledError:
+            message = None
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug("Delivering message %s" % message)
         return message

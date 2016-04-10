@@ -330,7 +330,10 @@ class MQTTClient:
         deliver_task = ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
         self.client_tasks.append(deliver_task)
         self.logger.debug("Waiting message delivery")
-        yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
+        done, pending = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
+        if pending:
+            #timeout occured before message received
+            deliver_task.cancel()
         if deliver_task.exception():
             raise deliver_task.exception()
         self.client_tasks.pop()
