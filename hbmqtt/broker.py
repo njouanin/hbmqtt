@@ -458,6 +458,9 @@ class Broker:
                     if self.logger.isEnabledFor(logging.DEBUG):
                         self.logger.debug("%s handling message delivery" % client_session.client_id)
                     app_message = wait_deliver.result()
+                    if not app_message.topic:
+                        self.logger.warn("[MQTT-4.7.3-1] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
+                        break
                     if "#" in app_message.topic or "+" in app_message.topic:
                         self.logger.warn("[MQTT-3.3.2-2] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
                         break
