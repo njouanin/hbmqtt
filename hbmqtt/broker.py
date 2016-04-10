@@ -556,9 +556,11 @@ class Broker:
             if '#' in a_filter and not a_filter.endswith('#'):
                 # [MQTT-4.7.1-2] Wildcard character '#' is only allowed as last character in filter
                 return 0x80
-            if '+' in a_filter and not wildcard_pattern.match(a_filter):
-                # [MQTT-4.7.1-3] + wildcard character must occupy entire level
-                return 0x80
+            if a_filter != "+":
+                if '+' in a_filter:
+                    if "/+" not in a_filter and "+/" not in a_filter:
+                        # [MQTT-4.7.1-3] + wildcard character must occupy entire level
+                        return 0x80
 
             qos = subscription[1]
             if 'max-qos' in self.config and qos > self.config['max-qos']:
