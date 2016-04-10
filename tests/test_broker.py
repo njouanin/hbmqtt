@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch, call, MagicMock
 from hbmqtt.broker import *
 from hbmqtt.mqtt.constants import *
-from hbmqtt.client import MQTTClient
+from hbmqtt.client import MQTTClient, ConnectException
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)
@@ -90,6 +90,34 @@ class BrokerTest(unittest.TestCase):
                     [call().fire_event(EVENT_BROKER_CLIENT_CONNECTED, client_id=client.session.client_id),
                      call().fire_event(EVENT_BROKER_CLIENT_DISCONNECTED, client_id=client.session.client_id)],
                     any_order=True)
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    @patch('hbmqtt.broker.PluginManager')
+    def test_client_connect_clean_session_false(self, MockPluginManager):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+                client = MQTTClient(client_id="", config={'auto_reconnect': False})
+                return_code=None
+                try:
+                    yield from client.connect('mqtt://localhost/', cleansession=False)
+                except ConnectException as ce:
+                    return_code = ce.return_code
+                self.assertEqual(return_code, 0x02)
+                self.assertNotIn(client.session.client_id, broker._sessions)
+                yield from client.disconnect()
+                yield from asyncio.sleep(0.1)
+                yield from broker.shutdown()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)

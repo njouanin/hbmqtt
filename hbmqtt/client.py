@@ -149,7 +149,6 @@ class MQTTClient:
             else:
                 return (yield from self.reconnect())
 
-    @mqtt_connected
     @asyncio.coroutine
     def disconnect(self):
         """

@@ -337,7 +337,7 @@ class Broker:
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))
-            yield from writer.close()
+            #yield from writer.close()
             self.logger.debug("Connection closed")
             return
         except MQTTException as me:
