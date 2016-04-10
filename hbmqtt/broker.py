@@ -608,7 +608,7 @@ class Broker:
 
     def matches(self, topic, a_filter):
         import re
-        match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[\$\s\w\d]+'))
+        match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[/\$\s\w\d]+'))
         if match_pattern.match(topic):
             return True
         else:
@@ -625,7 +625,9 @@ class Broker:
                 if self.logger.isEnabledFor(logging.DEBUG):
                     self.logger.debug("broadcasting %r" % broadcast)
                 for k_filter in self._subscriptions:
-                    if self.matches(broadcast['topic'], k_filter):
+                    if broadcast['topic'].startswith("$") and (k_filter.startswith("+") or k_filter.startswith("#")):
+                        self.logger.debug("[MQTT-4.7.2-1] - ignoring brodcasting $ topic to subscriptions starting with + or #")
+                    elif self.matches(broadcast['topic'], k_filter):
                         subscriptions = self._subscriptions[k_filter]
                         for (target_session, qos) in subscriptions:
                             if 'qos' in broadcast:
