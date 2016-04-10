@@ -143,8 +143,7 @@ class BrokerProtocolHandler(ProtocolHandler):
         if connect.proto_level != 4:
             # only MQTT 3.1.1 supported
             error_msg = 'Invalid protocol from %s: %d' % \
-                              (format_client_message(address=remote_address, port=remote_port),
-                               connect.variable_header.protocol_level)
+                              (format_client_message(address=remote_address, port=remote_port), connect.proto_level)
             connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.username_flag and connect.username is None:
             error_msg = 'Invalid username from %s' % \
