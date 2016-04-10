@@ -260,6 +260,39 @@ class BrokerTest(unittest.TestCase):
             raise future.exception()
 
     @patch('hbmqtt.broker.PluginManager')
+    def test_client_publish_big(self, MockPluginManager):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+                pub_client = MQTTClient()
+                ret = yield from pub_client.connect('mqtt://localhost/')
+                self.assertEqual(ret, 0)
+
+                ret_message = yield from pub_client.publish('/topic', bytearray(b'\x99' * 256 * 1024), QOS_2)
+                yield from pub_client.disconnect()
+                self.assertEquals(broker._retained_messages, {})
+
+                yield from asyncio.sleep(0.1)
+                yield from broker.shutdown()
+                self.assertTrue(broker.transitions.is_stopped())
+                MockPluginManager.assert_has_calls(
+                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                                       client_id=pub_client.session.client_id,
+                                       message=ret_message),
+                    ], any_order=True)
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    @patch('hbmqtt.broker.PluginManager')
     def test_client_publish_retain(self, MockPluginManager):
         @asyncio.coroutine
         def test_coro():
