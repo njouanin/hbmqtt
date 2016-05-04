@@ -225,43 +225,46 @@ class Broker:
             for listener_name in self.listeners_config:
                 listener = self.listeners_config[listener_name]
 
-                # Max connections
-                try:
-                    max_connections = listener['max_connections']
-                except KeyError:
-                    max_connections = -1
-
-                # SSL Context
-                sc = None
-                if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+                if 'bind' not in listener:
+                    self.logger.debug("Listener configuration '%s' is not bound" % listener_name)
+                else:
+                    # Max connections
                     try:
-                        sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                        sc.load_cert_chain(listener['certfile'], listener['keyfile'])
-                        sc.verify_mode = ssl.CERT_OPTIONAL
-                    except KeyError as ke:
-                        raise BrokerException("'certfile' or 'keyfile' configuration parameter missing: %s" % ke)
-                    except FileNotFoundError as fnfe:
-                        raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
-                                              (listener['certfile'], listener['keyfile'], fnfe))
+                        max_connections = listener['max_connections']
+                    except KeyError:
+                        max_connections = -1
 
-                if listener['type'] == 'tcp':
-                    address, port = listener['bind'].split(':')
-                    cb_partial = partial(self.stream_connected, listener_name=listener_name)
-                    instance = yield from asyncio.start_server(cb_partial,
-                                                               address,
-                                                               port,
-                                                               ssl=sc,
-                                                               loop=self._loop)
-                    self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
-                elif listener['type'] == 'ws':
-                    address, port = listener['bind'].split(':')
-                    cb_partial = partial(self.ws_connected, listener_name=listener_name)
-                    instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop,
-                                                           subprotocols=['mqtt'])
-                    self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
+                    # SSL Context
+                    sc = None
+                    if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+                        try:
+                            sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                            sc.load_cert_chain(listener['certfile'], listener['keyfile'])
+                            sc.verify_mode = ssl.CERT_OPTIONAL
+                        except KeyError as ke:
+                            raise BrokerException("'certfile' or 'keyfile' configuration parameter missing: %s" % ke)
+                        except FileNotFoundError as fnfe:
+                            raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
+                                                  (listener['certfile'], listener['keyfile'], fnfe))
 
-                self.logger.info("Listener '%s' bind to %s (max_connections=%d)" %
-                                 (listener_name, listener['bind'], max_connections))
+                    if listener['type'] == 'tcp':
+                        address, port = listener['bind'].split(':')
+                        cb_partial = partial(self.stream_connected, listener_name=listener_name)
+                        instance = yield from asyncio.start_server(cb_partial,
+                                                                   address,
+                                                                   port,
+                                                                   ssl=sc,
+                                                                   loop=self._loop)
+                        self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
+                    elif listener['type'] == 'ws':
+                        address, port = listener['bind'].split(':')
+                        cb_partial = partial(self.ws_connected, listener_name=listener_name)
+                        instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop,
+                                                               subprotocols=['mqtt'])
+                        self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
+
+                    self.logger.info("Listener '%s' bind to %s (max_connections=%d)" %
+                                     (listener_name, listener['bind'], max_connections))
 
             self.transitions.starting_success()
             yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
