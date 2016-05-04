@@ -103,6 +103,53 @@ class BrokerTest(unittest.TestCase):
             raise future.exception()
 
     @patch('hbmqtt.broker.PluginManager')
+    def test_client_connect_will_flag(self, MockPluginManager):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+
+                conn_reader, conn_writer = \
+                    yield from asyncio.open_connection('localhost', 1883, loop=self.loop)
+                reader = StreamReaderAdapter(conn_reader)
+                writer = StreamWriterAdapter(conn_writer)
+
+                vh = ConnectVariableHeader()
+                payload = ConnectPayload()
+
+                vh.keep_alive = 10
+                vh.clean_session_flag = False
+                vh.will_retain_flag = False
+                vh.will_flag = True
+                vh.will_qos = QOS_0
+                payload.client_id = 'test_id'
+                payload.will_message = b'test'
+                payload.will_topic = '/topic'
+                connect = ConnectPacket(vh=vh, payload=payload)
+                yield from connect.to_stream(writer)
+                yield from ConnackPacket.from_stream(reader)
+
+                yield from asyncio.sleep(0.1)
+
+                disconnect = DisconnectPacket()
+                yield from disconnect.to_stream(writer)
+
+                yield from asyncio.sleep(0.1)
+                yield from broker.shutdown()
+                self.assertTrue(broker.transitions.is_stopped())
+                self.assertDictEqual(broker._sessions, {})
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    @patch('hbmqtt.broker.PluginManager')
     def test_client_connect_clean_session_false(self, MockPluginManager):
         @asyncio.coroutine
         def test_coro():
