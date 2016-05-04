@@ -40,10 +40,8 @@ import os
 from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.version import get_version
 from docopt import docopt
-try:
-    from .utils import read_yaml_config
-except:
-    from utils import read_yaml_config
+from hbmqtt.utils import read_yaml_config
+
 if sys.version_info < (3, 5):
     from asyncio import async as ensure_future
 else:

@@ -225,43 +225,46 @@ class Broker:
             for listener_name in self.listeners_config:
                 listener = self.listeners_config[listener_name]
 
-                # Max connections
-                try:
-                    max_connections = listener['max_connections']
-                except KeyError:
-                    max_connections = -1
-
-                # SSL Context
-                sc = None
-                if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+                if 'bind' not in listener:
+                    self.logger.debug("Listener configuration '%s' is not bound" % listener_name)
+                else:
+                    # Max connections
                     try:
-                        sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                        sc.load_cert_chain(listener['certfile'], listener['keyfile'])
-                        sc.verify_mode = ssl.CERT_OPTIONAL
-                    except KeyError as ke:
-                        raise BrokerException("'certfile' or 'keyfile' configuration parameter missing: %s" % ke)
-                    except FileNotFoundError as fnfe:
-                        raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
-                                              (listener['certfile'], listener['keyfile'], fnfe))
+                        max_connections = listener['max_connections']
+                    except KeyError:
+                        max_connections = -1
 
-                if listener['type'] == 'tcp':
-                    address, port = listener['bind'].split(':')
-                    cb_partial = partial(self.stream_connected, listener_name=listener_name)
-                    instance = yield from asyncio.start_server(cb_partial,
-                                                               address,
-                                                               port,
-                                                               ssl=sc,
-                                                               loop=self._loop)
-                    self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
-                elif listener['type'] == 'ws':
-                    address, port = listener['bind'].split(':')
-                    cb_partial = partial(self.ws_connected, listener_name=listener_name)
-                    instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop,
-                                                           subprotocols=['mqtt'])
-                    self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
+                    # SSL Context
+                    sc = None
+                    if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+                        try:
+                            sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                            sc.load_cert_chain(listener['certfile'], listener['keyfile'])
+                            sc.verify_mode = ssl.CERT_OPTIONAL
+                        except KeyError as ke:
+                            raise BrokerException("'certfile' or 'keyfile' configuration parameter missing: %s" % ke)
+                        except FileNotFoundError as fnfe:
+                            raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
+                                                  (listener['certfile'], listener['keyfile'], fnfe))
 
-                self.logger.info("Listener '%s' bind to %s (max_connecionts=%d)" %
-                                 (listener_name, listener['bind'], max_connections))
+                    if listener['type'] == 'tcp':
+                        address, port = listener['bind'].split(':')
+                        cb_partial = partial(self.stream_connected, listener_name=listener_name)
+                        instance = yield from asyncio.start_server(cb_partial,
+                                                                   address,
+                                                                   port,
+                                                                   ssl=sc,
+                                                                   loop=self._loop)
+                        self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
+                    elif listener['type'] == 'ws':
+                        address, port = listener['bind'].split(':')
+                        cb_partial = partial(self.ws_connected, listener_name=listener_name)
+                        instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop,
+                                                               subprotocols=['mqtt'])
+                        self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
+
+                    self.logger.info("Listener '%s' bind to %s (max_connections=%d)" %
+                                     (listener_name, listener['bind'], max_connections))
 
             self.transitions.starting_success()
             yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
@@ -337,7 +340,7 @@ class Broker:
         except HBMQTTException as exc:
             self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))
-            yield from writer.close()
+            #yield from writer.close()
             self.logger.debug("Connection closed")
             return
         except MQTTException as me:
@@ -458,6 +461,12 @@ class Broker:
                     if self.logger.isEnabledFor(logging.DEBUG):
                         self.logger.debug("%s handling message delivery" % client_session.client_id)
                     app_message = wait_deliver.result()
+                    if not app_message.topic:
+                        self.logger.warn("[MQTT-4.7.3-1] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
+                        break
+                    if "#" in app_message.topic or "+" in app_message.topic:
+                        self.logger.warn("[MQTT-3.3.2-2] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
+                        break
                     yield from self.plugins_manager.fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
                                                                client_id=client_session.client_id,
                                                                message=app_message)
@@ -539,8 +548,9 @@ class Broker:
             self._retained_messages[topic_name] = retained_message
         else:
             # [MQTT-3.3.1-10]
-            self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
-            del self._retained_messages[topic_name]
+            if topic_name in self._retained_messages:
+                self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
+                del self._retained_messages[topic_name]
 
     def add_subscription(self, subscription, session):
         import re
@@ -550,9 +560,11 @@ class Broker:
             if '#' in a_filter and not a_filter.endswith('#'):
                 # [MQTT-4.7.1-2] Wildcard character '#' is only allowed as last character in filter
                 return 0x80
-            if '+' in a_filter and not wildcard_pattern.match(a_filter):
-                # [MQTT-4.7.1-3] + wildcard character must occupy entire level
-                return 0x80
+            if a_filter != "+":
+                if '+' in a_filter:
+                    if "/+" not in a_filter and "+/" not in a_filter:
+                        # [MQTT-4.7.1-3] + wildcard character must occupy entire level
+                        return 0x80
 
             qos = subscription[1]
             if 'max-qos' in self.config and qos > self.config['max-qos']:
@@ -608,7 +620,7 @@ class Broker:
 
     def matches(self, topic, a_filter):
         import re
-        match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[\$\s\w\d]+'))
+        match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[/\$\s\w\d]+'))
         if match_pattern.match(topic):
             return True
         else:
@@ -625,7 +637,9 @@ class Broker:
                 if self.logger.isEnabledFor(logging.DEBUG):
                     self.logger.debug("broadcasting %r" % broadcast)
                 for k_filter in self._subscriptions:
-                    if self.matches(broadcast['topic'], k_filter):
+                    if broadcast['topic'].startswith("$") and (k_filter.startswith("+") or k_filter.startswith("#")):
+                        self.logger.debug("[MQTT-4.7.2-1] - ignoring brodcasting $ topic to subscriptions starting with + or #")
+                    elif self.matches(broadcast['topic'], k_filter):
                         subscriptions = self._subscriptions[k_filter]
                         for (target_session, qos) in subscriptions:
                             if 'qos' in broadcast:

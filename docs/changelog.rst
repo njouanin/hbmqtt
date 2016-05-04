@@ -1,6 +1,16 @@
 Changelog
 ---------
 
+0.7.0
+.....
+
+* Fix a `serie of issues <https://github.com/beerfactory/hbmqtt/issues?q=milestone%3A0.7+is%3Aclosed>`_ reported by `Christoph Krey <https://github.com/ckrey>`_
+
+0.6.3
+.....
+
+* Fix issue `#22 <https://github.com/beerfactory/hbmqtt/issues/22>`_.
+
 0.6.2
 .....
 

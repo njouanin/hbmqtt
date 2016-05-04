@@ -23,7 +23,7 @@ import os
 from hbmqtt.broker import Broker
 from hbmqtt.version import get_version
 from docopt import docopt
-from .utils import read_yaml_config
+from hbmqtt.utils import read_yaml_config
 
 
 default_config = {
