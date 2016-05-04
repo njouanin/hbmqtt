@@ -6,6 +6,9 @@ from unittest.mock import patch, call, MagicMock
 from hbmqtt.broker import *
 from hbmqtt.mqtt.constants import *
 from hbmqtt.client import MQTTClient, ConnectException
+from hbmqtt.mqtt import ConnectPacket, ConnackPacket, PublishPacket, PubrecPacket, \
+    PubrelPacket, PubcompPacket, DisconnectPacket
+from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPayload
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)
@@ -278,6 +281,58 @@ class BrokerTest(unittest.TestCase):
                                        client_id=pub_client.session.client_id,
                                        message=ret_message),
                     ], any_order=True)
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
+
+    #@patch('hbmqtt.broker.PluginManager')
+    def test_client_publish_dup(self):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                broker = Broker(test_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                self.assertTrue(broker.transitions.is_started())
+
+                conn_reader, conn_writer = \
+                    yield from asyncio.open_connection('localhost', 1883, loop=self.loop)
+                reader = StreamReaderAdapter(conn_reader)
+                writer = StreamWriterAdapter(conn_writer)
+
+                vh = ConnectVariableHeader()
+                payload = ConnectPayload()
+
+                vh.keep_alive = 10
+                vh.clean_session_flag = False
+                vh.will_retain_flag = False
+                payload.client_id = 'test_id'
+                connect = ConnectPacket(vh=vh, payload=payload)
+                yield from connect.to_stream(writer)
+                yield from ConnackPacket.from_stream(reader)
+
+                publish_1 = PublishPacket.build('/test', b'data', 1, False, QOS_2, False)
+                yield from publish_1.to_stream(writer)
+                ensure_future(PubrecPacket.from_stream(reader), loop=self.loop)
+
+                yield from asyncio.sleep(2)
+
+                publish_dup = PublishPacket.build('/test', b'data', 1, True, QOS_2, False)
+                yield from publish_dup.to_stream(writer)
+                pubrec2 = yield from PubrecPacket.from_stream(reader)
+                pubrel = PubrelPacket.build(1)
+                yield from pubrel.to_stream(writer)
+                pubcomp = yield from PubcompPacket.from_stream(reader)
+
+                disconnect = DisconnectPacket()
+                yield from disconnect.to_stream(writer)
+
+                yield from asyncio.sleep(0.1)
+                yield from broker.shutdown()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)

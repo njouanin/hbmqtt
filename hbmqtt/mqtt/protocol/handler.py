@@ -333,22 +333,26 @@ class ProtocolHandler:
             # Wait PUBREL
             if app_message.packet_id in self._pubrel_waiters and not self._pubrel_waiters[app_message.packet_id].done():
                 # PUBREL waiter already exists for this packet ID
-                message = "Can't add PUBREL waiter, a waiter already exists for message Id '%s'" \
+                message = "A waiter already exists for message Id '%s', canceling it" \
                           % app_message.packet_id
                 self.logger.warning(message)
-                raise HBMQTTException(message)
-            waiter = asyncio.Future(loop=self._loop)
-            self._pubrel_waiters[app_message.packet_id] = waiter
-            yield from waiter
-            del self._pubrel_waiters[app_message.packet_id]
-            app_message.pubrel_packet = waiter.result()
-            # Initiate delivery and discard message
-            yield from self.session.delivered_message_queue.put(app_message)
-            del self.session.inflight_in[app_message.packet_id]
-            # Send pubcomp
-            pubcomp_packet = PubcompPacket.build(app_message.packet_id)
-            yield from self._send_packet(pubcomp_packet)
-            app_message.pubcomp_packet = pubcomp_packet
+                self._pubrel_waiters[app_message.packet_id].cancel()
+            try:
+                waiter = asyncio.Future(loop=self._loop)
+                self._pubrel_waiters[app_message.packet_id] = waiter
+                yield from waiter
+                del self._pubrel_waiters[app_message.packet_id]
+                app_message.pubrel_packet = waiter.result()
+                # Initiate delivery and discard message
+                yield from self.session.delivered_message_queue.put(app_message)
+                del self.session.inflight_in[app_message.packet_id]
+                # Send pubcomp
+                pubcomp_packet = PubcompPacket.build(app_message.packet_id)
+                yield from self._send_packet(pubcomp_packet)
+                app_message.pubcomp_packet = pubcomp_packet
+            except asyncio.CancelledError:
+                self.logger.debug("Message flow cancelled")
+
 
     @asyncio.coroutine
     def _reader_loop(self):
