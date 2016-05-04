@@ -548,8 +548,9 @@ class Broker:
             self._retained_messages[topic_name] = retained_message
         else:
             # [MQTT-3.3.1-10]
-            self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
-            del self._retained_messages[topic_name]
+            if topic_name in self._retained_messages:
+                self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
+                del self._retained_messages[topic_name]
 
     def add_subscription(self, subscription, session):
         import re
