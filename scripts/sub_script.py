@@ -39,10 +39,7 @@ from hbmqtt.errors import MQTTException
 from hbmqtt.version import get_version
 from docopt import docopt
 from hbmqtt.mqtt.constants import QOS_0
-try:
-    from .utils import read_yaml_config
-except:
-    from utils import read_yaml_config
+from hbmqtt.utils import read_yaml_config
 
 logger = logging.getLogger(__name__)
 
