@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+0.7.1
+.....
+
+* Fix `duplicated $SYS topic name <https://github.com/beerfactory/hbmqtt/issues/37>`_ .
+
 0.7.0
 .....
 
