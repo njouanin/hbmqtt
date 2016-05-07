@@ -49,7 +49,7 @@ class BrokerSysPlugin:
 
     @asyncio.coroutine
     def _broadcast_sys_topic(self, topic_basename, data):
-        return (yield from self.context.broadcast_message(DOLLAR_SYS_ROOT + topic_basename, data))
+        return (yield from self.context.broadcast_message(topic_basename, data))
 
     def schedule_broadcast_sys_topic(self, topic_basename, data):
         return ensure_future(self._broadcast_sys_topic(DOLLAR_SYS_ROOT + topic_basename, data),
