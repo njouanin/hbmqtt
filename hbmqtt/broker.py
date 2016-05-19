@@ -721,7 +721,7 @@ class Broker:
         except KeyError:
             session = None
         if session is None:
-            self.logger.warn("Delete session : session %s doesn't exist" % client_id)
+            self.logger.debug("Delete session : session %s doesn't exist" % client_id)
             return
 
         # Delete subscriptions
