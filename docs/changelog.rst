@@ -1,6 +1,14 @@
 Changelog
 ---------
 
+0.7.3
+.....
+
+* fix deliver message client method to raise TimeoutError (`#40 <https://github.com/beerfactory/hbmqtt/issues/40>`_)
+* fix topic filter matching in broker (`#41 <https://github.com/beerfactory/hbmqtt/issues/41>`_)
+
+Version 0.7.2 has been jumped due to troubles with pypi...
+
 0.7.1
 .....
 

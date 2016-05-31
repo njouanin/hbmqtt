@@ -325,18 +325,19 @@ class MQTTClient:
 
             :param timeout: maximum number of seconds to wait before returning. If timeout is not specified or None, there is no limit to the wait time until next message arrives.
             :return: instance of :class:`hbmqtt.session.ApplicationMessage` containing received message information flow.
+            :raises: :class:`asyncio.TimeoutError` if timeout occurs before a message is delivered
         """
         deliver_task = ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
         self.client_tasks.append(deliver_task)
         self.logger.debug("Waiting message delivery")
         done, pending = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
-        if pending:
+        if deliver_task in done:
+            self.client_tasks.pop()
+            return deliver_task.result()
+        else:
             #timeout occured before message received
             deliver_task.cancel()
-        if deliver_task.exception():
-            raise deliver_task.exception()
-        self.client_tasks.pop()
-        return deliver_task.result()
+            raise asyncio.TimeoutError
 
     @asyncio.coroutine
     def _connect_coro(self):

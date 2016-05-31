@@ -6,6 +6,7 @@ import ssl
 import websockets
 import asyncio
 import sys
+import re
 from asyncio import Queue, CancelledError
 if sys.version_info < (3, 5):
     from asyncio import async as ensure_future
@@ -619,12 +620,13 @@ class Broker:
                 del self._subscriptions[topic]
 
     def matches(self, topic, a_filter):
-        import re
-        match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[/\$\s\w\d]+'))
-        if match_pattern.match(topic):
-            return True
+        if "#" not in a_filter and "+" not in a_filter:
+            # if filter doesn't contain wildcard, return exact match
+            return a_filter == topic
         else:
-            return False
+            # else use regex
+            match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[/\$\s\w\d]+'))
+            return match_pattern.match(topic)
 
     @asyncio.coroutine
     def _broadcast_loop(self):
@@ -721,7 +723,7 @@ class Broker:
         except KeyError:
             session = None
         if session is None:
-            self.logger.warn("Delete session : session %s doesn't exist" % client_id)
+            self.logger.debug("Delete session : session %s doesn't exist" % client_id)
             return
 
         # Delete subscriptions
