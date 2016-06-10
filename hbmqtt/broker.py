@@ -248,8 +248,14 @@ class Broker:
                             raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
                                                   (listener['certfile'], listener['keyfile'], fnfe))
 
+                    address, s_port = listener['bind'].split(':')
+                    port = 0
+                    try:
+                        port = int(s_port)
+                    except ValueError as ve:
+                        raise BrokerException("Invalid port value in bind value: %s" % listener['bind'])
+
                     if listener['type'] == 'tcp':
-                        address, port = listener['bind'].split(':')
                         cb_partial = partial(self.stream_connected, listener_name=listener_name)
                         instance = yield from asyncio.start_server(cb_partial,
                                                                    address,
@@ -258,7 +264,6 @@ class Broker:
                                                                    loop=self._loop)
                         self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
                     elif listener['type'] == 'ws':
-                        address, port = listener['bind'].split(':')
                         cb_partial = partial(self.ws_connected, listener_name=listener_name)
                         instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop,
                                                                subprotocols=['mqtt'])
