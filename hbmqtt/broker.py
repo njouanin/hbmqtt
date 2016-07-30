@@ -237,7 +237,13 @@ class Broker:
 
                     # SSL Context
                     sc = None
-                    if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+
+                    # accept string "on" / "off" or boolean
+                    ssl_active = listener.get('ssl', False)
+                    if isinstance(ssl_active, str):
+                        ssl_active = ssl_active.upper() == 'ON'
+
+                    if ssl_active:
                         try:
                             sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                             sc.load_cert_chain(listener['certfile'], listener['keyfile'])
