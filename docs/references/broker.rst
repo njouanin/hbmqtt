@@ -15,8 +15,9 @@ The following example shows how to start a broker using the default configuratio
     import os
     from hbmqtt.broker import Broker
 
+
     @asyncio.coroutine
-    def test_coro():
+    def broker_coro():
         broker = Broker()
         yield from broker.start()
 
@@ -58,10 +59,10 @@ The :class:`~hbmqtt.broker.Broker` ``__init__`` method accepts a ``config`` para
         my-tcp-1:
             bind: 127.0.0.1:1883
         my-tcp-2:
-            bind: 1.2.3.4:1883
+            bind: 1.2.3.4:1884
             max-connections: 1000
         my-tcp-ssl-1:
-            bind: 127.0.0.1:8883
+            bind: 127.0.0.1:8885
             ssl: on
             cafile: /some/cafile
             capath: /some/folder
