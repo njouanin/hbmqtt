@@ -14,6 +14,12 @@ The example below shows how to write a simple MQTT client which subscribes a top
 
 .. code-block:: python
 
+    import logging
+    import asyncio
+
+    from hbmqtt.client import MQTTClient, ClientException
+    from hbmqtt.mqtt.constants import QOS_1, QOS_2
+
     @asyncio.coroutine
     def uptime_coro():
         C = MQTTClient()
@@ -52,6 +58,12 @@ For the purposes of the test, each message is published with a different Quality
 This example also shows to method for publishing message asynchronously.
 
 .. code-block:: python
+
+    import logging
+    import asyncio
+
+    from hbmqtt.client import MQTTClient
+    from hbmqtt.mqtt.constants import QOS_1, QOS_2
 
     @asyncio.coroutine
     def test_coro():
