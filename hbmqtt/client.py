@@ -375,6 +375,8 @@ class MQTTClient:
                 cadata=self.session.cadata)
             if 'certfile' in self.config and 'keyfile' in self.config:
                 sc.load_cert_chain(self.config['certfile'], self.config['keyfile'])
+            if 'check_hostname' in self.config and isinstance(self.config['check_hostname'], bool):
+                sc.check_hostname = self.config['check_hostname']
             kwargs['ssl'] = sc
 
         try:
