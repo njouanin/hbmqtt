@@ -6,6 +6,7 @@ import ssl
 import websockets
 import asyncio
 import sys
+import re
 from asyncio import Queue, CancelledError
 if sys.version_info < (3, 5):
     from asyncio import async as ensure_future
@@ -236,7 +237,13 @@ class Broker:
 
                     # SSL Context
                     sc = None
-                    if 'ssl' in listener and listener['ssl'].upper() == 'ON':
+
+                    # accept string "on" / "off" or boolean
+                    ssl_active = listener.get('ssl', False)
+                    if isinstance(ssl_active, str):
+                        ssl_active = ssl_active.upper() == 'ON'
+
+                    if ssl_active:
                         try:
                             sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                             sc.load_cert_chain(listener['certfile'], listener['keyfile'])
@@ -247,8 +254,14 @@ class Broker:
                             raise BrokerException("Can't read cert files '%s' or '%s' : %s" %
                                                   (listener['certfile'], listener['keyfile'], fnfe))
 
+                    address, s_port = listener['bind'].split(':')
+                    port = 0
+                    try:
+                        port = int(s_port)
+                    except ValueError as ve:
+                        raise BrokerException("Invalid port value in bind value: %s" % listener['bind'])
+
                     if listener['type'] == 'tcp':
-                        address, port = listener['bind'].split(':')
                         cb_partial = partial(self.stream_connected, listener_name=listener_name)
                         instance = yield from asyncio.start_server(cb_partial,
                                                                    address,
@@ -257,7 +270,6 @@ class Broker:
                                                                    loop=self._loop)
                         self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
                     elif listener['type'] == 'ws':
-                        address, port = listener['bind'].split(':')
                         cb_partial = partial(self.ws_connected, listener_name=listener_name)
                         instance = yield from websockets.serve(cb_partial, address, port, ssl=sc, loop=self._loop,
                                                                subprotocols=['mqtt'])
@@ -619,12 +631,13 @@ class Broker:
                 del self._subscriptions[topic]
 
     def matches(self, topic, a_filter):
-        import re
-        match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[/\$\s\w\d]+'))
-        if match_pattern.match(topic):
-            return True
+        if "#" not in a_filter and "+" not in a_filter:
+            # if filter doesn't contain wildcard, return exact match
+            return a_filter == topic
         else:
-            return False
+            # else use regex
+            match_pattern = re.compile(a_filter.replace('#', '.*').replace('$', '\$').replace('+', '[/\$\s\w\d]+'))
+            return match_pattern.match(topic)
 
     @asyncio.coroutine
     def _broadcast_loop(self):
@@ -721,7 +734,7 @@ class Broker:
         except KeyError:
             session = None
         if session is None:
-            self.logger.warn("Delete session : session %s doesn't exist" % client_id)
+            self.logger.debug("Delete session : session %s doesn't exist" % client_id)
             return
 
         # Delete subscriptions

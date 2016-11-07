@@ -2,6 +2,7 @@ import logging
 import asyncio
 
 from hbmqtt.client import MQTTClient
+from hbmqtt.mqtt.constants import QOS_1, QOS_2
 
 
 
@@ -28,8 +29,8 @@ def test_coro():
     yield from C.connect('mqtts://test.mosquitto.org/', cafile='mosquitto.org.crt')
     tasks = [
         asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_0')),
-        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)),
-        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=QOS_1)),
+        asyncio.ensure_future(C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=QOS_2)),
     ]
     yield from asyncio.wait(tasks)
     logger.info("messages published")
