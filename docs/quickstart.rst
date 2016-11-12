@@ -67,9 +67,9 @@ Here are some examples of URL:
 
     mqtt://localhost
     mqtt://localhost:1884
-    mqtt://user@password:localhost
+    mqtt://user:password@localhost
     ws://test.mosquitto.org
-    wss://user@password:localhost
+    wss://user:password@localhost
 
 .. _MQTT URL scheme: https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme
 
