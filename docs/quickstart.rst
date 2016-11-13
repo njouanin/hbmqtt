@@ -81,6 +81,6 @@ Running a broker
 ::
 
     $ hbmqtt
-    [2015-11-06 22:45:16,470] :: INFO - Listener 'default' bind to 0.0.0.0:1883 (max_connecionts=-1)
+    [2015-11-06 22:45:16,470] :: INFO - Listener 'default' bind to 0.0.0.0:1883 (max_connections=-1)
 
 See :doc:`references/hbmqtt` reference documentation for details about available options and settings.
