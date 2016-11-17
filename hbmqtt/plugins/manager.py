@@ -142,6 +142,7 @@ class PluginManager:
             if tasks:
                 yield from asyncio.wait(tasks, loop=self._loop)
         else:
+            self._fired_events = [e for e in self._fired_events if not e.done()]
             self._fired_events.extend(tasks)
 
     @asyncio.coroutine
