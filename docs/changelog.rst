@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+0.8.0
+.....
+
+* fix a `serie of issues <https://github.com/beerfactory/hbmqtt/milestone/7?closed=1>`_
+
 0.7.3
 .....
 
