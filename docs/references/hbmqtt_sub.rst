@@ -64,7 +64,7 @@ Examples
 Examples below are adapted from `mosquitto_sub`_ documentation.
 
 
-Subscribe with QoS 0 to all messages plublish under $SYS/:
+Subscribe with QoS 0 to all messages published under $SYS/:
 ::
 
     hbmqtt_sub --url mqtt://localhost -t '$SYS/#' -q 0
