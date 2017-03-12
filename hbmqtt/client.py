@@ -104,7 +104,7 @@ class MQTTClient:
         self.session = None
         self._handler = None
         self._disconnect_task = None
-        self._connected_state = asyncio.Event()
+        self._connected_state = asyncio.Event(loop=self._loop)
 
         # Init plugins manager
         context = ClientContext()
