@@ -1,3 +1,4 @@
+sudo: false
 language: python
 python:
   - "3.5"
@@ -5,7 +6,7 @@ python:
   - "nightly"
 install:
   - pip install -r requirements.txt
-  - pip install tox tox-travis
+  - pip install tox-travis
   - pip install coveralls
 # command to run tests
 script:
