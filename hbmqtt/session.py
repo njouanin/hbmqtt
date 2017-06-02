@@ -2,13 +2,11 @@
 #
 # See the file license.txt for copying permission.
 import asyncio
-from transitions import Machine, MachineError
+from transitions import Machine
 from asyncio import Queue
 from collections import OrderedDict
-from hbmqtt.mqtt.constants import *
 from hbmqtt.mqtt.publish import PublishPacket
-from hbmqtt.mqtt.puback import PubackPacket
-
+from hbmqtt.errors import HBMQTTException
 
 OUTGOING = 0
 INCOMING = 1
@@ -132,6 +130,13 @@ class Session:
     @property
     def next_packet_id(self):
         self._packet_id += 1
+        if self._packet_id > 65535:
+            self._packet_id = 1
+        while self._packet_id in self.inflight_in or self._packet_id in self.inflight_out:
+            self._packet_id += 1
+            if self._packet_id > 65535:
+                raise HBMQTTException("More than 65525 messages pending. No free packet ID")
+
         return self._packet_id
 
     @property
