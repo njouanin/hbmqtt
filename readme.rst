@@ -24,10 +24,10 @@ HBMQTT implements the full set of `MQTT 3.1.1`_ protocol specifications and prov
 Build status
 ------------
 
-.. image:: https://travis-ci.org/beerfactory/hbmqtt.svg?branch=develop
+.. image:: https://travis-ci.org/beerfactory/hbmqtt.svg?branch=master
     :target: https://travis-ci.org/beerfactory/hbmqtt
 
-.. image:: https://coveralls.io/repos/beerfactory/hbmqtt/badge.svg?branch=develop&service=github
+.. image:: https://coveralls.io/repos/beerfactory/hbmqtt/badge.svg?branch=master&service=github
     :target: https://coveralls.io/github/beerfactory/hbmqtt?branch=develop
 
 Project status
