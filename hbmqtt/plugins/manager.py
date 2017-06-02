@@ -134,16 +134,24 @@ class PluginManager:
             event_method = getattr(plugin.object, event_method_name, None)
             if event_method:
                 try:
-                    tasks.append(self._schedule_coro(event_method(*args, **kwargs)))
+                    task = self._schedule_coro(event_method(*args, **kwargs))
+                    tasks.append(task)
+
+                    def clean_fired_events(future):
+                        try:
+                            self._fired_events.remove(task)
+                        except KeyError:
+                            pass
+
+                    task.add_done_callback(clean_fired_events)
                 except AssertionError:
                     self.logger.error("Method '%s' on plugin '%s' is not a coroutine" %
                                       (event_method_name, plugin.name))
+
+        self._fired_events.extend(tasks)
         if wait:
             if tasks:
                 yield from asyncio.wait(tasks, loop=self._loop)
-        else:
-            self._fired_events = [e for e in self._fired_events if not e.done()]
-            self._fired_events.extend(tasks)
 
     @asyncio.coroutine
     def map(self, coro, *args, **kwargs):
