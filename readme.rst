@@ -28,7 +28,7 @@ Build status
     :target: https://travis-ci.org/beerfactory/hbmqtt
 
 .. image:: https://coveralls.io/repos/beerfactory/hbmqtt/badge.svg?branch=master&service=github
-    :target: https://coveralls.io/github/beerfactory/hbmqtt?branch=develop
+    :target: https://coveralls.io/github/beerfactory/hbmqtt?branch=master
 
 Project status
 --------------
@@ -39,10 +39,6 @@ Project status
 
 .. image:: https://badge.fury.io/py/hbmqtt.svg
     :target: https://badge.fury.io/py/hbmqtt
-
-.. image:: https://badge.waffle.io/beerfactory/hbmqtt.svg?label=ready&title=Ready
-    :target: https://waffle.io/beerfactory/hbmqtt
-    :alt: 'Stories in Ready'
 
 Getting started
 ---------------
