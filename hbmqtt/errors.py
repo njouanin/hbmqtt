@@ -2,25 +2,29 @@
 #
 # See the file license.txt for copying permission.
 
-class HBMQTTException(BaseException):
+
+class HBMQTTException(Exception):
     """
     HBMQTT base exception
     """
     pass
 
-class MQTTException(HBMQTTException):
+
+class MQTTException(Exception):
     """
     Base class for all errors refering to MQTT specifications
     """
     pass
 
-class CodecException(HBMQTTException):
+
+class CodecException(Exception):
     """
     Exceptions thrown by packet encode/decode functions
     """
     pass
 
-class NoDataException(HBMQTTException):
+
+class NoDataException(Exception):
     """
     Exceptions thrown by packet encode/decode functions
     """

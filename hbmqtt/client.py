@@ -37,7 +37,7 @@ _defaults = {
 }
 
 
-class ClientException(BaseException):
+class ClientException(Exception):
     pass
 
 
