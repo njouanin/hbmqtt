@@ -430,6 +430,13 @@ class MQTTClient:
 
     @asyncio.coroutine
     def handle_connection_close(self):
+
+        def cancel_tasks(self):
+            while self.client_tasks:
+                task = self.client_tasks.popleft()
+                if not task.done():
+                    task.set_exception(ClientException("Connection lost"))
+
         self.logger.debug("Watch broker disconnection")
         # Wait for disconnection from broker (like connection lost)
         yield from self._handler.wait_disconnect()
@@ -450,12 +457,10 @@ class MQTTClient:
                 yield from self.reconnect()
             except ConnectException:
                 # Cancel client pending tasks
-                while self.client_tasks:
-                    self.client_tasks.popleft().set_exception(ClientException("Connection lost"))
+                cancel_tasks(self)
         else:
             # Cancel client pending tasks
-            while self.client_tasks:
-                self.client_tasks.popleft().set_exception(ClientException("Connection lost"))
+            cancel_tasks()
 
     def _initsession(
             self,
