@@ -25,6 +25,11 @@ broker_config = {
             'bind': 'localhost:8080',
             'max_connections': 10
         },
+        'wss': {
+            'type': 'ws',
+            'bind': 'localhost:8081',
+            'max_connections': 10
+        },
     },
     'sys_interval': 0,
     'auth': {
@@ -62,7 +67,7 @@ class MQTTClientTest(unittest.TestCase):
         @asyncio.coroutine
         def test_coro():
             try:
-                client = MQTTClient()
+                client = MQTTClient(config={'check_hostname':False})
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
                 ret = yield from client.connect('mqtts://test.mosquitto.org/', cafile=ca)
                 self.assertIsNotNone(client.session)
@@ -98,7 +103,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('ws://localhost:8080/')
+                yield from client.connect('ws://localhost:8081/')
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 yield from broker.shutdown()
@@ -115,11 +120,14 @@ class MQTTClientTest(unittest.TestCase):
         @asyncio.coroutine
         def test_coro():
             try:
+                broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
                 client = MQTTClient()
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
-                yield from client.connect('wss://test.mosquitto.org:8081/', cafile=ca)
+                yield from client.connect('ws://localhost:8081/', cafile=ca)
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
+                yield from broker.shutdown()
                 future.set_result(True)
             except Exception as ae:
                 future.set_exception(ae)
