@@ -32,6 +32,7 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Topic :: Communications',
         'Topic :: Internet'
     ],
