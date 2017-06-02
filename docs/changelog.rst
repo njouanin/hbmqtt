@@ -1,6 +1,14 @@
 Changelog
 ---------
 
+0.9.0
+.....
+
+* fix a `serie of issues <https://github.com/beerfactory/hbmqtt/milestone/8?closed=1>`_
+* improve plugin performance
+* support Python 3.6
+* upgrade to ``websockets`` 3.3.0
+
 0.8.0
 .....
 
