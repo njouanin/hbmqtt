@@ -1,2 +1,17 @@
-recursive-include scripts *.yaml
+include *.rst
+include *.txt
 include license.txt
+include samples/passwd
+include tests/plugins/passwd
+include tox.ini
+
+recursive-include docs *.css
+recursive-include docs *.html
+recursive-include docs *.py
+recursive-include docs *.rst
+recursive-include docs Makefile
+recursive-include samples *.crt
+recursive-include samples *.py
+recursive-include scripts *.yaml
+recursive-include tests *.crt
+recursive-include tests *.py
