@@ -216,9 +216,10 @@ class Broker:
             self._retained_messages = dict()
             self.transitions.start()
             self.logger.debug("Broker starting")
-        except MachineError as me:
-            self.logger.warn("[WARN-0001] Invalid method call at this moment: %s" % me)
-            raise BrokerException("Broker instance can't be started: %s" % me)
+        except (MachineError, ValueError) as exc:
+            # Backwards compat: MachineError is raised by transitions < 0.5.0.
+            self.logger.warning("[WARN-0001] Invalid method call at this moment: %s" % exc)
+            raise BrokerException("Broker instance can't be started: %s" % exc)
 
         yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_START)
         try:
@@ -302,9 +303,10 @@ class Broker:
             self._subscriptions = dict()
             self._retained_messages = dict()
             self.transitions.shutdown()
-        except MachineError as me:
-            self.logger.debug("Invalid method call at this moment: %s" % me)
-            raise BrokerException("Broker instance can't be stopped: %s" % me)
+        except (MachineError, ValueError) as exc:
+            # Backwards compat: MachineError is raised by transitions < 0.5.0.
+            self.logger.debug("Invalid method call at this moment: %s" % exc)
+            raise BrokerException("Broker instance can't be stopped: %s" % exc)
 
         # Fire broker_shutdown event to plugins
         yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_SHUTDOWN)
@@ -393,7 +395,8 @@ class Broker:
             try:
                 client_session.transitions.connect()
                 break
-            except MachineError:
+            except (MachineError, ValueError):
+                # Backwards compat: MachineError is raised by transitions < 0.5.0.
                 self.logger.warning("Client %s is reconnecting too quickly, make it wait" % client_session.client_id)
                 # Wait a bit may be client is reconnecting too fast
                 yield from asyncio.sleep(1, loop=self._loop)
