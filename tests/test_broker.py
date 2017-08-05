@@ -193,10 +193,10 @@ class BrokerTest(unittest.TestCase):
                 # Test if the client test client subscription is registered
                 self.assertIn('/topic', broker._subscriptions)
                 subs = broker._subscriptions['/topic']
-                self.assertEquals(len(subs), 1)
+                self.assertEqual(len(subs), 1)
                 (s, qos) = subs[0]
-                self.assertEquals(s, client.session)
-                self.assertEquals(qos, QOS_0)
+                self.assertEqual(s, client.session)
+                self.assertEqual(qos, QOS_0)
 
                 yield from client.disconnect()
                 yield from asyncio.sleep(0.1)
@@ -231,16 +231,16 @@ class BrokerTest(unittest.TestCase):
                 # Test if the client test client subscription is registered
                 self.assertIn('/topic', broker._subscriptions)
                 subs = broker._subscriptions['/topic']
-                self.assertEquals(len(subs), 1)
+                self.assertEqual(len(subs), 1)
                 (s, qos) = subs[0]
-                self.assertEquals(s, client.session)
-                self.assertEquals(qos, QOS_0)
+                self.assertEqual(s, client.session)
+                self.assertEqual(qos, QOS_0)
 
                 yield from client.subscribe([('/topic', QOS_0)])
-                self.assertEquals(len(subs), 1)
+                self.assertEqual(len(subs), 1)
                 (s, qos) = subs[0]
-                self.assertEquals(s, client.session)
-                self.assertEquals(qos, QOS_0)
+                self.assertEqual(s, client.session)
+                self.assertEqual(qos, QOS_0)
 
                 yield from client.disconnect()
                 yield from asyncio.sleep(0.1)
@@ -275,14 +275,14 @@ class BrokerTest(unittest.TestCase):
                 # Test if the client test client subscription is registered
                 self.assertIn('/topic', broker._subscriptions)
                 subs = broker._subscriptions['/topic']
-                self.assertEquals(len(subs), 1)
+                self.assertEqual(len(subs), 1)
                 (s, qos) = subs[0]
-                self.assertEquals(s, client.session)
-                self.assertEquals(qos, QOS_0)
+                self.assertEqual(s, client.session)
+                self.assertEqual(qos, QOS_0)
 
                 yield from client.unsubscribe(['/topic'])
                 yield from asyncio.sleep(0.1)
-                self.assertEquals(broker._subscriptions['/topic'], [])
+                self.assertEqual(broker._subscriptions['/topic'], [])
                 yield from client.disconnect()
                 yield from asyncio.sleep(0.1)
                 yield from broker.shutdown()
@@ -318,7 +318,7 @@ class BrokerTest(unittest.TestCase):
 
                 ret_message = yield from pub_client.publish('/topic', b'data', QOS_0)
                 yield from pub_client.disconnect()
-                self.assertEquals(broker._retained_messages, {})
+                self.assertEqual(broker._retained_messages, {})
 
                 yield from asyncio.sleep(0.1)
                 yield from broker.shutdown()
@@ -431,7 +431,7 @@ class BrokerTest(unittest.TestCase):
 
                 ret_message = yield from pub_client.publish('/topic', bytearray(b'\x99' * 256 * 1024), QOS_2)
                 yield from pub_client.disconnect()
-                self.assertEquals(broker._retained_messages, {})
+                self.assertEqual(broker._retained_messages, {})
 
                 yield from asyncio.sleep(0.1)
                 yield from broker.shutdown()
@@ -467,10 +467,10 @@ class BrokerTest(unittest.TestCase):
                 yield from asyncio.sleep(0.1)
                 self.assertIn('/topic', broker._retained_messages)
                 retained_message = broker._retained_messages['/topic']
-                self.assertEquals(retained_message.source_session, pub_client.session)
-                self.assertEquals(retained_message.topic, '/topic')
-                self.assertEquals(retained_message.data, b'data')
-                self.assertEquals(retained_message.qos, QOS_0)
+                self.assertEqual(retained_message.source_session, pub_client.session)
+                self.assertEqual(retained_message.topic, '/topic')
+                self.assertEqual(retained_message.data, b'data')
+                self.assertEqual(retained_message.qos, QOS_0)
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
                 future.set_result(True)
@@ -520,7 +520,7 @@ class BrokerTest(unittest.TestCase):
                 sub_client = MQTTClient()
                 yield from sub_client.connect('mqtt://localhost')
                 ret = yield from sub_client.subscribe([('/qos0', QOS_0), ('/qos1', QOS_1), ('/qos2', QOS_2)])
-                self.assertEquals(ret, [QOS_0, QOS_1, QOS_2])
+                self.assertEqual(ret, [QOS_0, QOS_1, QOS_2])
 
                 yield from self._client_publish('/qos0', b'data', QOS_0)
                 yield from self._client_publish('/qos1', b'data', QOS_1)
@@ -529,9 +529,9 @@ class BrokerTest(unittest.TestCase):
                 for qos in [QOS_0, QOS_1, QOS_2]:
                     message = yield from sub_client.deliver_message()
                     self.assertIsNotNone(message)
-                    self.assertEquals(message.topic, '/qos%s' % qos)
-                    self.assertEquals(message.data, b'data')
-                    self.assertEquals(message.qos, qos)
+                    self.assertEqual(message.topic, '/qos%s' % qos)
+                    self.assertEqual(message.data, b'data')
+                    self.assertEqual(message.qos, qos)
                 yield from sub_client.disconnect()
                 yield from asyncio.sleep(0.1)
                 yield from broker.shutdown()
@@ -557,7 +557,7 @@ class BrokerTest(unittest.TestCase):
                 yield from sub_client.connect('mqtt://localhost')
                 ret = yield from sub_client.subscribe(
                     [('+', QOS_0), ('+/tennis/#', QOS_0), ('sport+', QOS_0), ('sport/+/player1', QOS_0)])
-                self.assertEquals(ret, [QOS_0, QOS_0, 0x80, QOS_0])
+                self.assertEqual(ret, [QOS_0, QOS_0, 0x80, QOS_0])
 
                 yield from asyncio.sleep(0.1)
                 yield from sub_client.disconnect()
@@ -584,7 +584,7 @@ class BrokerTest(unittest.TestCase):
                 sub_client = MQTTClient()
                 yield from sub_client.connect('mqtt://localhost')
                 ret = yield from sub_client.subscribe([('#', QOS_0)])
-                self.assertEquals(ret, [QOS_0])
+                self.assertEqual(ret, [QOS_0])
 
                 yield from self._client_publish('/topic', b'data', QOS_0)
                 message = yield from sub_client.deliver_message()
@@ -622,7 +622,7 @@ class BrokerTest(unittest.TestCase):
                 sub_client = MQTTClient()
                 yield from sub_client.connect('mqtt://localhost')
                 ret = yield from sub_client.subscribe([('+/monitor/Clients', QOS_0)])
-                self.assertEquals(ret, [QOS_0])
+                self.assertEqual(ret, [QOS_0])
 
                 yield from self._client_publish('/test/monitor/Clients', b'data', QOS_0)
                 message = yield from sub_client.deliver_message()
@@ -660,7 +660,7 @@ class BrokerTest(unittest.TestCase):
                 sub_client = MQTTClient()
                 yield from sub_client.connect('mqtt://localhost', cleansession=False)
                 ret = yield from sub_client.subscribe([('/qos0', QOS_0), ('/qos1', QOS_1), ('/qos2', QOS_2)])
-                self.assertEquals(ret, [QOS_0, QOS_1, QOS_2])
+                self.assertEqual(ret, [QOS_0, QOS_1, QOS_2])
                 yield from sub_client.disconnect()
                 yield from asyncio.sleep(0.1)
 
@@ -673,9 +673,9 @@ class BrokerTest(unittest.TestCase):
                     message = yield from sub_client.deliver_message()
                     log.debug("Message: " + repr(message.publish_packet))
                     self.assertIsNotNone(message)
-                    self.assertEquals(message.topic, '/qos%s' % qos)
-                    self.assertEquals(message.data, b'data')
-                    self.assertEquals(message.qos, qos)
+                    self.assertEqual(message.topic, '/qos%s' % qos)
+                    self.assertEqual(message.data, b'data')
+                    self.assertEqual(message.qos, qos)
                 yield from sub_client.disconnect()
                 yield from asyncio.sleep(0.1)
                 yield from broker.shutdown()

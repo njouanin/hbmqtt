@@ -16,12 +16,12 @@ class SQLitePlugin:
             self.persistence_config = self.context.config['persistence']
             self.init_db()
         except KeyError:
-            self.context.logger.warn("'persistence' section not found in context configuration")
+            self.context.logger.warning("'persistence' section not found in context configuration")
 
     def init_db(self):
         self.db_file = self.persistence_config.get('file', None)
         if not self.db_file:
-            self.context.logger.warn("'file' persistence parameter not found")
+            self.context.logger.warning("'file' persistence parameter not found")
         else:
             try:
                 self.conn = sqlite3.connect(self.db_file)

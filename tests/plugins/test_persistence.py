@@ -56,4 +56,4 @@ class TestSQLitePlugin(unittest.TestCase):
     #     cursor = conn.cursor()
     #     row = cursor.execute("SELECT client_id FROM session where client_id = 'test_save_session'").fetchone()
     #     self.assertTrue(len(row) == 1)
-    #     self.assertEquals(row[0], s.client_id)
+    #     self.assertEqual(row[0], s.client_id)

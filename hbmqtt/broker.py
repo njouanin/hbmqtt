@@ -217,7 +217,7 @@ class Broker:
             self.transitions.start()
             self.logger.debug("Broker starting")
         except MachineError as me:
-            self.logger.warn("[WARN-0001] Invalid method call at this moment: %s" % me)
+            self.logger.warning("[WARN-0001] Invalid method call at this moment: %s" % me)
             raise BrokerException("Broker instance can't be started: %s" % me)
 
         yield from self.plugins_manager.fire_event(EVENT_BROKER_PRE_START)
@@ -350,7 +350,7 @@ class Broker:
         try:
             handler, client_session = yield from BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager, loop=self._loop)
         except HBMQTTException as exc:
-            self.logger.warn("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
+            self.logger.warning("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
                              (format_client_message(address=remote_address, port=remote_port), exc))
             #yield from writer.close()
             self.logger.debug("Connection closed")
@@ -474,10 +474,10 @@ class Broker:
                         self.logger.debug("%s handling message delivery" % client_session.client_id)
                     app_message = wait_deliver.result()
                     if not app_message.topic:
-                        self.logger.warn("[MQTT-4.7.3-1] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
+                        self.logger.warning("[MQTT-4.7.3-1] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
                         break
                     if "#" in app_message.topic or "+" in app_message.topic:
-                        self.logger.warn("[MQTT-3.3.2-2] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
+                        self.logger.warning("[MQTT-3.3.2-2] - %s invalid TOPIC sent in PUBLISH message, closing connection" % client_session.client_id)
                         break
                     yield from self.plugins_manager.fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
                                                                client_id=client_session.client_id,

@@ -167,7 +167,7 @@ class MQTTClient:
             yield from self._handler.stop()
             self.session.transitions.disconnect()
         else:
-            self.logger.warn("Client session is not currently connected, ignoring call")
+            self.logger.warning("Client session is not currently connected, ignoring call")
 
     @asyncio.coroutine
     def reconnect(self, cleansession=None):
@@ -185,7 +185,7 @@ class MQTTClient:
         """
 
         if self.session.transitions.is_connected():
-            self.logger.warn("Client already connected")
+            self.logger.warning("Client already connected")
             return CONNECTION_ACCEPTED
 
         if cleansession:
@@ -231,7 +231,7 @@ class MQTTClient:
         if self.session.transitions.is_connected():
             yield from self._handler.mqtt_ping()
         else:
-            self.logger.warn("MQTT PING request incompatible with current session state '%s'" %
+            self.logger.warning("MQTT PING request incompatible with current session state '%s'" %
                              self.session.transitions.state)
 
     @mqtt_connected
@@ -366,7 +366,7 @@ class MQTTClient:
 
         if secure:
             if self.session.cafile is None or self.session.cafile == '':
-                self.logger.warn("TLS connection can't be estabilshed, no certificate file (.cert) given")
+                self.logger.warning("TLS connection can't be estabilshed, no certificate file (.cert) given")
                 raise ClientException("TLS connection can't be estabilshed, no certificate file (.cert) given")
             sc = ssl.create_default_context(
                 ssl.Purpose.SERVER_AUTH,
@@ -416,15 +416,15 @@ class MQTTClient:
                 self.logger.debug("connected to %s:%s" % (self.session.remote_address, self.session.remote_port))
             return return_code
         except InvalidURI as iuri:
-            self.logger.warn("connection failed: invalid URI '%s'" % self.session.broker_uri)
+            self.logger.warning("connection failed: invalid URI '%s'" % self.session.broker_uri)
             self.session.transitions.disconnect()
             raise ConnectException("connection failed: invalid URI '%s'" % self.session.broker_uri, iuri)
         except InvalidHandshake as ihs:
-            self.logger.warn("connection failed: invalid websocket handshake")
+            self.logger.warning("connection failed: invalid websocket handshake")
             self.session.transitions.disconnect()
             raise ConnectException("connection failed: invalid websocket handshake", ihs)
         except (ProtocolHandlerException, ConnectionError, OSError) as e:
-            self.logger.warn("MQTT connection failed: %r" % e)
+            self.logger.warning("MQTT connection failed: %r" % e)
             self.session.transitions.disconnect()
             raise ConnectException(e)
 
