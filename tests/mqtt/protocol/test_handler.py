@@ -78,8 +78,8 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             try:
                 packet = yield from PublishPacket.from_stream(reader)
-                self.assertEquals(packet.variable_header.topic_name, '/topic')
-                self.assertEquals(packet.qos, QOS_0)
+                self.assertEqual(packet.variable_header.topic_name, '/topic')
+                self.assertEqual(packet.qos, QOS_0)
                 self.assertIsNone(packet.packet_id)
             except Exception as ae:
                 future.set_exception(ae)
@@ -119,8 +119,8 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             packet = yield from PublishPacket.from_stream(reader)
             try:
-                self.assertEquals(packet.variable_header.topic_name, '/topic')
-                self.assertEquals(packet.qos, QOS_1)
+                self.assertEqual(packet.variable_header.topic_name, '/topic')
+                self.assertEqual(packet.qos, QOS_1)
                 self.assertIsNotNone(packet.packet_id)
                 self.assertIn(packet.packet_id, self.session.inflight_out)
                 self.assertIn(packet.packet_id, self.handler._puback_waiters)
@@ -166,8 +166,8 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             try:
                 packet = yield from PublishPacket.from_stream(reader)
-                self.assertEquals(packet.topic_name, '/topic')
-                self.assertEquals(packet.qos, QOS_2)
+                self.assertEqual(packet.topic_name, '/topic')
+                self.assertEqual(packet.qos, QOS_2)
                 self.assertIsNotNone(packet.packet_id)
                 self.assertIn(packet.packet_id, self.session.inflight_out)
                 self.assertIn(packet.packet_id, self.handler._pubrec_waiters)
@@ -373,8 +373,8 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             packet = yield from PublishPacket.from_stream(reader)
             try:
-                self.assertEquals(packet.topic_name, '/topic')
-                self.assertEquals(packet.qos, QOS_1)
+                self.assertEqual(packet.topic_name, '/topic')
+                self.assertEqual(packet.qos, QOS_1)
                 self.assertIsNotNone(packet.packet_id)
                 self.assertIn(packet.packet_id, self.session.inflight_out)
                 self.assertIn(packet.packet_id, self.handler._puback_waiters)
@@ -416,8 +416,8 @@ class ProtocolHandlerTest(unittest.TestCase):
         def server_mock(reader, writer):
             try:
                 packet = yield from PublishPacket.from_stream(reader)
-                self.assertEquals(packet.topic_name, '/topic')
-                self.assertEquals(packet.qos, QOS_2)
+                self.assertEqual(packet.topic_name, '/topic')
+                self.assertEqual(packet.qos, QOS_2)
                 self.assertIsNotNone(packet.packet_id)
                 self.assertIn(packet.packet_id, self.session.inflight_out)
                 self.assertIn(packet.packet_id, self.handler._pubrec_waiters)

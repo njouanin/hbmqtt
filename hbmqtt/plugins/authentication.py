@@ -12,12 +12,12 @@ class BaseAuthPlugin:
         try:
             self.auth_config = self.context.config['auth']
         except KeyError:
-            self.context.logger.warn("'auth' section not found in context configuration")
+            self.context.logger.warning("'auth' section not found in context configuration")
 
     def authenticate(self, *args, **kwargs):
         if not self.auth_config:
             # auth config section not found
-            self.context.logger.warn("'auth' section not found in context configuration")
+            self.context.logger.warning("'auth' section not found in context configuration")
             return False
         return True
 
@@ -44,7 +44,7 @@ class AnonymousAuthPlugin(BaseAuthPlugin):
                         else:
                             self.context.logger.debug("Authentication failure: session has an empty username")
                 except KeyError:
-                    self.context.logger.warn("Session informations not available")
+                    self.context.logger.warning("Session informations not available")
                     authenticated = False
         return authenticated
 
@@ -70,7 +70,7 @@ class FileAuthPlugin(BaseAuthPlugin):
                                 self.context.logger.debug("user %s , hash=%s" % (username, pwd_hash))
                 self.context.logger.debug("%d user(s) read from file %s" % (len(self._users), password_file))
             except FileNotFoundError:
-                self.context.logger.warn("Password file %s not found" % password_file)
+                self.context.logger.warning("Password file %s not found" % password_file)
         else:
             self.context.logger.debug("Configuration parameter 'password_file' not found")
 

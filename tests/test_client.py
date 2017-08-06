@@ -173,9 +173,9 @@ class MQTTClientTest(unittest.TestCase):
                     ('$SYS/broker/uptime', QOS_1),
                     ('$SYS/broker/uptime', QOS_2),
                 ])
-                self.assertEquals(ret[0], QOS_0)
-                self.assertEquals(ret[1], QOS_1)
-                self.assertEquals(ret[2], QOS_2)
+                self.assertEqual(ret[0], QOS_0)
+                self.assertEqual(ret[1], QOS_1)
+                self.assertEqual(ret[2], QOS_2)
                 yield from client.disconnect()
                 yield from broker.shutdown()
                 future.set_result(True)
@@ -199,7 +199,7 @@ class MQTTClientTest(unittest.TestCase):
                 ret = yield from client.subscribe([
                     ('$SYS/broker/uptime', QOS_0),
                 ])
-                self.assertEquals(ret[0], QOS_0)
+                self.assertEqual(ret[0], QOS_0)
                 yield from client.unsubscribe(['$SYS/broker/uptime'])
                 yield from client.disconnect()
                 yield from broker.shutdown()
@@ -225,7 +225,7 @@ class MQTTClientTest(unittest.TestCase):
                 ret = yield from client.subscribe([
                     ('test_topic', QOS_0),
                 ])
-                self.assertEquals(ret[0], QOS_0)
+                self.assertEqual(ret[0], QOS_0)
                 client_pub = MQTTClient()
                 yield from client_pub.connect('mqtt://localhost/')
                 yield from client_pub.publish('test_topic', data, QOS_0)
@@ -233,7 +233,7 @@ class MQTTClientTest(unittest.TestCase):
                 message = yield from client.deliver_message()
                 self.assertIsNotNone(message)
                 self.assertIsNotNone(message.publish_packet)
-                self.assertEquals(message.data, data)
+                self.assertEqual(message.data, data)
                 yield from client.unsubscribe(['$SYS/broker/uptime'])
                 yield from client.disconnect()
                 yield from broker.shutdown()
@@ -258,7 +258,7 @@ class MQTTClientTest(unittest.TestCase):
                 ret = yield from client.subscribe([
                     ('test_topic', QOS_0),
                 ])
-                self.assertEquals(ret[0], QOS_0)
+                self.assertEqual(ret[0], QOS_0)
                 with self.assertRaises(asyncio.TimeoutError):
                     message = yield from client.deliver_message(timeout=2)
                 yield from client.unsubscribe(['$SYS/broker/uptime'])
