@@ -17,7 +17,7 @@ setup(
     include_package_data=True,
     platforms='all',
     install_requires=[
-        'transitions==0.2.5',
+        'transitions',
         'websockets',
         'passlib',
         'docopt',

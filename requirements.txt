@@ -1,4 +1,4 @@
-transitions==0.2.5
+transitions
 websockets==3.3.0
 passlib
 docopt
