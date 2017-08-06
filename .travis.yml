@@ -6,10 +6,8 @@ python:
   - "3.6"
   - "nightly"
 install:
-  - pip install -r requirements.txt
   - pip install tox-travis
   - pip install coveralls
-# command to run tests
 script:
   - tox
 after_success: coveralls

@@ -1,5 +1,0 @@
-transitions
-websockets==3.3.0
-passlib
-docopt
-pyyaml
