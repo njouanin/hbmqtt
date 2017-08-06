@@ -7,7 +7,7 @@ import websockets
 import asyncio
 import sys
 import re
-from asyncio import Queue, CancelledError
+from asyncio import CancelledError
 from collections import deque
 
 from functools import partial

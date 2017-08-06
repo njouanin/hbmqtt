@@ -8,7 +8,6 @@ import logging
 from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.broker import Broker
 from hbmqtt.mqtt.constants import *
-from hbmqtt.errors import HBMQTTException
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.ERROR, format=formatter)

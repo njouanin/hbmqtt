@@ -14,7 +14,7 @@ from hbmqtt.mqtt.connect import *
 from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSocketsReader, WebSocketsWriter
 from hbmqtt.plugins.manager import PluginManager, BaseContext
-from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED, ProtocolHandlerException
+from hbmqtt.mqtt.protocol.handler import ProtocolHandlerException
 from hbmqtt.mqtt.constants import *
 import websockets
 from websockets.uri import InvalidURI

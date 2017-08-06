@@ -2,7 +2,7 @@
 #
 # See the file license.txt for copying permission.
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, SUBSCRIBE, PacketIdVariableHeader, MQTTPayload, MQTTVariableHeader
-from hbmqtt.errors import HBMQTTException, MQTTException
+from hbmqtt.errors import HBMQTTException
 from hbmqtt.codecs import *
 
 

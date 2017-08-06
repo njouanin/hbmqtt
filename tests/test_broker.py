@@ -2,7 +2,7 @@
 #
 # See the file license.txt for copying permission.
 import unittest
-from unittest.mock import patch, call, MagicMock
+from unittest.mock import patch, call
 from hbmqtt.broker import *
 from hbmqtt.mqtt.constants import *
 from hbmqtt.client import MQTTClient, ConnectException
