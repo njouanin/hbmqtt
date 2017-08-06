@@ -8,10 +8,6 @@ import asyncio
 import sys
 import re
 from asyncio import Queue, CancelledError
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 from collections import deque
 
 from functools import partial
@@ -28,6 +24,11 @@ from hbmqtt.adapters import (
     WebSocketsReader,
     WebSocketsWriter)
 from .plugins.manager import PluginManager, BaseContext
+
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+else:
+    from asyncio import ensure_future
 
 _defaults = {
     'timeout-disconnect-delay': 2,

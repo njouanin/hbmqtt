@@ -4,10 +4,6 @@
 import asyncio
 from asyncio import futures
 import sys
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler, EVENT_MQTT_PACKET_RECEIVED
 from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.disconnect import DisconnectPacket
@@ -21,6 +17,11 @@ from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPayload, ConnectPa
 from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.session import Session
 from hbmqtt.plugins.manager import PluginManager
+
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+else:
+    from asyncio import ensure_future
 
 
 class ClientProtocolHandler(ProtocolHandler):

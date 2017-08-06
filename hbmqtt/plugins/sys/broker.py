@@ -6,11 +6,12 @@ from hbmqtt.mqtt.packet import PUBLISH
 from hbmqtt.codecs import int_to_bytes_str
 import asyncio
 import sys
+from collections import deque
+
 if sys.version_info < (3, 5):
     from asyncio import async as ensure_future
 else:
     from asyncio import ensure_future
-from collections import deque
 
 DOLLAR_SYS_ROOT = '$SYS/broker/'
 STAT_BYTES_SENT = 'bytes_sent'
