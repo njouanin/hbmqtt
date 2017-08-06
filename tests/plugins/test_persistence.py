@@ -27,7 +27,7 @@ class TestSQLitePlugin(unittest.TestCase):
                 'file': dbfile
             }
         }
-        sql_plugin = SQLitePlugin(context)
+        SQLitePlugin(context)
 
         conn = sqlite3.connect(dbfile)
         cursor = conn.cursor()

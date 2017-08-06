@@ -40,11 +40,10 @@ def test_coro():
 def test_coro2():
     try:
         C = MQTTClient()
-        ret = yield from C.connect('mqtt://test.mosquitto.org:1883/')
-        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_0', qos=0x00)
-        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)
-        message = yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)
-        #print(message)
+        yield from C.connect('mqtt://test.mosquitto.org:1883/')
+        yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_0', qos=0x00)
+        yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_1', qos=0x01)
+        yield from C.publish('a/b', b'TEST MESSAGE WITH QOS_2', qos=0x02)
         logger.info("messages published")
         yield from C.disconnect()
     except ConnectException as ce:

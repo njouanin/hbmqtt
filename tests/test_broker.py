@@ -393,10 +393,10 @@ class BrokerTest(unittest.TestCase):
 
                 publish_dup = PublishPacket.build('/test', b'data', 1, True, QOS_2, False)
                 yield from publish_dup.to_stream(writer)
-                pubrec2 = yield from PubrecPacket.from_stream(reader)
+                yield from PubrecPacket.from_stream(reader)
                 pubrel = PubrelPacket.build(1)
                 yield from pubrel.to_stream(writer)
-                pubcomp = yield from PubcompPacket.from_stream(reader)
+                yield from PubcompPacket.from_stream(reader)
 
                 disconnect = DisconnectPacket()
                 yield from disconnect.to_stream(writer)
@@ -424,7 +424,7 @@ class BrokerTest(unittest.TestCase):
                 ret = yield from pub_client.connect('mqtt://localhost/')
                 self.assertEqual(ret, 0)
 
-                ret_message = yield from pub_client.publish('/+', b'data', QOS_0)
+                yield from pub_client.publish('/+', b'data', QOS_0)
                 yield from asyncio.sleep(0.1)
                 yield from pub_client.disconnect()
 
@@ -486,7 +486,7 @@ class BrokerTest(unittest.TestCase):
                 pub_client = MQTTClient()
                 ret = yield from pub_client.connect('mqtt://localhost/')
                 self.assertEqual(ret, 0)
-                ret_message = yield from pub_client.publish('/topic', b'data', QOS_0, retain=True)
+                yield from pub_client.publish('/topic', b'data', QOS_0, retain=True)
                 yield from pub_client.disconnect()
                 yield from asyncio.sleep(0.1)
                 self.assertIn('/topic', broker._retained_messages)
@@ -518,7 +518,7 @@ class BrokerTest(unittest.TestCase):
                 pub_client = MQTTClient()
                 ret = yield from pub_client.connect('mqtt://localhost/')
                 self.assertEqual(ret, 0)
-                ret_message = yield from pub_client.publish('/topic', b'', QOS_0, retain=True)
+                yield from pub_client.publish('/topic', b'', QOS_0, retain=True)
                 yield from pub_client.disconnect()
                 yield from asyncio.sleep(0.1)
                 self.assertNotIn('/topic', broker._retained_messages)

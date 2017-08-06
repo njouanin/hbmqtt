@@ -51,7 +51,7 @@ class MQTTClientTest(unittest.TestCase):
         def test_coro():
             try:
                 client = MQTTClient()
-                ret = yield from client.connect('mqtt://test.mosquitto.org/')
+                yield from client.connect('mqtt://test.mosquitto.org/')
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 future.set_result(True)
@@ -69,7 +69,7 @@ class MQTTClientTest(unittest.TestCase):
             try:
                 client = MQTTClient(config={'check_hostname': False})
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
-                ret = yield from client.connect('mqtts://test.mosquitto.org/', cafile=ca)
+                yield from client.connect('mqtts://test.mosquitto.org/', cafile=ca)
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 future.set_result(True)
@@ -87,7 +87,7 @@ class MQTTClientTest(unittest.TestCase):
             try:
                 config = {'auto_reconnect': False}
                 client = MQTTClient(config=config)
-                ret = yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://localhost/')
             except ConnectException as e:
                 future.set_result(True)
 
@@ -144,7 +144,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                ret = yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://localhost/')
                 self.assertIsNotNone(client.session)
                 yield from client.ping()
                 yield from client.disconnect()
@@ -260,7 +260,7 @@ class MQTTClientTest(unittest.TestCase):
                 ])
                 self.assertEqual(ret[0], QOS_0)
                 with self.assertRaises(asyncio.TimeoutError):
-                    message = yield from client.deliver_message(timeout=2)
+                    yield from client.deliver_message(timeout=2)
                 yield from client.unsubscribe(['$SYS/broker/uptime'])
                 yield from client.disconnect()
                 yield from broker.shutdown()

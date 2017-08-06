@@ -568,8 +568,6 @@ class Broker:
                 del self._retained_messages[topic_name]
 
     def add_subscription(self, subscription, session):
-        import re
-        wildcard_pattern = re.compile('.*?/?\+/?.*?')
         try:
             a_filter = subscription[0]
             if '#' in a_filter and not a_filter.endswith('#'):
