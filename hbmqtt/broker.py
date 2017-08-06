@@ -375,7 +375,7 @@ class Broker:
             # Get session from cache
             if client_session.client_id in self._sessions:
                 self.logger.debug("Found old session %s" % repr(self._sessions[client_session.client_id]))
-                (client_session,h) = self._sessions[client_session.client_id]
+                (client_session, h) = self._sessions[client_session.client_id]
                 client_session.parent = 1
             else:
                 client_session.parent = 0
@@ -587,7 +587,7 @@ class Broker:
             if a_filter not in self._subscriptions:
                 self._subscriptions[a_filter] = []
             already_subscribed = next(
-                (s for (s,qos) in self._subscriptions[a_filter] if s.client_id == session.client_id), None)
+                (s for (s, qos) in self._subscriptions[a_filter] if s.client_id == session.client_id), None)
             if not already_subscribed:
                 self._subscriptions[a_filter].append((session, qos))
             else:

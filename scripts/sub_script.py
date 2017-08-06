@@ -69,7 +69,7 @@ def do_sub(client, arguments):
                                   capath=arguments['--ca-path'],
                                   cadata=arguments['--ca-data'])
         qos = _get_qos(arguments)
-        filters=[]
+        filters = []
         for topic in arguments['-t']:
             filters.append((topic, qos))
         yield from client.subscribe(filters)

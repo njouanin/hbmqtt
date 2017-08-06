@@ -127,7 +127,7 @@ class BrokerProtocolHandler(ProtocolHandler):
         connect = yield from ConnectPacket.from_stream(reader)
         yield from plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connect)
         if connect.payload.client_id is None:
-            raise MQTTException('[[MQTT-3.1.3-3]] : Client identifier must be present' )
+            raise MQTTException('[[MQTT-3.1.3-3]] : Client identifier must be present')
 
         if connect.variable_header.will_flag:
             if connect.payload.will_topic is None or connect.payload.will_message is None:

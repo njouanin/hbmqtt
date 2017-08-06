@@ -68,7 +68,7 @@ class MQTTClientTest(unittest.TestCase):
         @asyncio.coroutine
         def test_coro():
             try:
-                client = MQTTClient(config={'check_hostname':False})
+                client = MQTTClient(config={'check_hostname': False})
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
                 ret = yield from client.connect('mqtts://test.mosquitto.org/', cafile=ca)
                 self.assertIsNotNone(client.session)

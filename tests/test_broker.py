@@ -158,7 +158,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 client = MQTTClient(client_id="", config={'auto_reconnect': False})
-                return_code=None
+                return_code = None
                 try:
                     yield from client.connect('mqtt://localhost/', cleansession=False)
                 except ConnectException as ce:
