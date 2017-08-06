@@ -368,12 +368,13 @@ class ProtocolHandler:
                 if len(running_tasks) > 1:
                     self.logger.debug("handler running tasks: %d" % len(running_tasks))
 
-                fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.reader),
+                fixed_header = yield from asyncio.wait_for(
+                    MQTTFixedHeader.from_stream(self.reader),
                     keepalive_timeout, loop=self._loop)
                 if fixed_header:
                     if fixed_header.packet_type == RESERVED_0 or fixed_header.packet_type == RESERVED_15:
                         self.logger.warning("%s Received reserved packet, which is forbidden: closing connection" %
-                                         (self.session.client_id))
+                                            (self.session.client_id))
                         yield from self.handle_connection_closed()
                     else:
                         cls = packet_class(fixed_header)
@@ -411,7 +412,7 @@ class ProtocolHandler:
                             self.handle_connect(packet)
                         else:
                             self.logger.warning("%s Unhandled packet type: %s" %
-                                             (self.session.client_id, packet.fixed_header.packet_type))
+                                                (self.session.client_id, packet.fixed_header.packet_type))
                         if task:
                             running_tasks.append(task)
                 else:

@@ -84,10 +84,10 @@ class Server:
         self.conn_count += 1
         if self.max_connections > 0:
             self.logger.info("Listener '%s': %d/%d connections acquired" %
-                              (self.listener_name, self.conn_count, self.max_connections))
+                             (self.listener_name, self.conn_count, self.max_connections))
         else:
             self.logger.info("Listener '%s': %d connections acquired" %
-                              (self.listener_name, self.conn_count))
+                             (self.listener_name, self.conn_count))
 
     def release_connection(self):
         if self.semaphore:
@@ -95,10 +95,10 @@ class Server:
         self.conn_count -= 1
         if self.max_connections > 0:
             self.logger.info("Listener '%s': %d/%d connections acquired" %
-                              (self.listener_name, self.conn_count, self.max_connections))
+                             (self.listener_name, self.conn_count, self.max_connections))
         else:
             self.logger.info("Listener '%s': %d connections acquired" %
-                              (self.listener_name, self.conn_count))
+                             (self.listener_name, self.conn_count))
 
     @asyncio.coroutine
     def close_instance(self):
@@ -353,7 +353,7 @@ class Broker:
             handler, client_session = yield from BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager, loop=self._loop)
         except HBMQTTException as exc:
             self.logger.warning("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
-                             (format_client_message(address=remote_address, port=remote_port), exc))
+                                (format_client_message(address=remote_address, port=remote_port), exc))
             #yield from writer.close()
             self.logger.debug("Connection closed")
             return

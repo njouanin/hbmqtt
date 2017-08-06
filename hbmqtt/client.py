@@ -231,7 +231,7 @@ class MQTTClient:
             yield from self._handler.mqtt_ping()
         else:
             self.logger.warning("MQTT PING request incompatible with current session state '%s'" %
-                             self.session.transitions.state)
+                                self.session.transitions.state)
 
     @mqtt_connected
     @asyncio.coroutine

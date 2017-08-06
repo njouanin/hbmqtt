@@ -288,12 +288,13 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
                 MockPluginManager.assert_has_calls(
-                    [call().fire_event(EVENT_BROKER_CLIENT_SUBSCRIBED,
-                                       client_id=client.session.client_id,
-                                       topic='/topic', qos=QOS_0),
-                     call().fire_event(EVENT_BROKER_CLIENT_UNSUBSCRIBED,
-                                       client_id=client.session.client_id,
-                                       topic='/topic')
+                    [
+                        call().fire_event(EVENT_BROKER_CLIENT_SUBSCRIBED,
+                                          client_id=client.session.client_id,
+                                          topic='/topic', qos=QOS_0),
+                        call().fire_event(EVENT_BROKER_CLIENT_UNSUBSCRIBED,
+                                          client_id=client.session.client_id,
+                                          topic='/topic')
                     ], any_order=True)
                 future.set_result(True)
             except Exception as ae:
@@ -324,9 +325,10 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
                 MockPluginManager.assert_has_calls(
-                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
-                                       client_id=pub_client.session.client_id,
-                                       message=ret_message),
+                    [
+                        call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                                          client_id=pub_client.session.client_id,
+                                          message=ret_message),
                     ], any_order=True)
                 future.set_result(True)
             except Exception as ae:
@@ -437,9 +439,10 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
                 MockPluginManager.assert_has_calls(
-                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
-                                       client_id=pub_client.session.client_id,
-                                       message=ret_message),
+                    [
+                        call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                                          client_id=pub_client.session.client_id,
+                                          message=ret_message),
                     ], any_order=True)
                 future.set_result(True)
             except Exception as ae:

@@ -142,23 +142,23 @@ class BrokerProtocolHandler(ProtocolHandler):
         error_msg = None
         if connect.proto_level != 4:
             # only MQTT 3.1.1 supported
-            error_msg = 'Invalid protocol from %s: %d' % \
-                              (format_client_message(address=remote_address, port=remote_port), connect.proto_level)
+            error_msg = 'Invalid protocol from %s: %d' % (
+                format_client_message(address=remote_address, port=remote_port), connect.proto_level)
             connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
         elif not connect.username_flag and connect.password_flag:
             connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.1.2-22]
         elif connect.username_flag and not connect.password_flag:
             connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.1.2-22]
         elif connect.username_flag and connect.username is None:
-            error_msg = 'Invalid username from %s' % \
-                              (format_client_message(address=remote_address, port=remote_port))
+            error_msg = 'Invalid username from %s' % (
+                format_client_message(address=remote_address, port=remote_port))
             connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.password_flag and connect.password is None:
             error_msg = 'Invalid password %s' % (format_client_message(address=remote_address, port=remote_port))
             connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
         elif connect.clean_session_flag is False and (connect.payload.client_id is None or connect.payload.client_id == ""):
-            error_msg = '[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' % \
-                              format_client_message(address=remote_address, port=remote_port)
+            error_msg = '[MQTT-3.1.3-8] [MQTT-3.1.3-9] %s: No client Id provided (cleansession=0)' % (
+                format_client_message(address=remote_address, port=remote_port))
             connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
         if connack is not None:
             yield from plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
