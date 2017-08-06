@@ -1,14 +1,35 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import asyncio
+import logging
 import unittest
 from unittest.mock import patch, call
-from hbmqtt.broker import *
-from hbmqtt.mqtt.constants import *
+
+from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter
+from hbmqtt.broker import (
+    EVENT_BROKER_PRE_START,
+    EVENT_BROKER_POST_START,
+    EVENT_BROKER_PRE_SHUTDOWN,
+    EVENT_BROKER_POST_SHUTDOWN,
+    EVENT_BROKER_CLIENT_CONNECTED,
+    EVENT_BROKER_CLIENT_DISCONNECTED,
+    EVENT_BROKER_CLIENT_SUBSCRIBED,
+    EVENT_BROKER_CLIENT_UNSUBSCRIBED,
+    EVENT_BROKER_MESSAGE_RECEIVED,
+    Broker)
 from hbmqtt.client import MQTTClient, ConnectException
-from hbmqtt.mqtt import ConnectPacket, ConnackPacket, PublishPacket, PubrecPacket, \
-    PubrelPacket, PubcompPacket, DisconnectPacket
+from hbmqtt.mqtt import (
+    ConnectPacket, ConnackPacket, PublishPacket, PubrecPacket,
+    PubrelPacket, PubcompPacket, DisconnectPacket)
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPayload
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
+
+import sys
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+else:
+    from asyncio import ensure_future
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)

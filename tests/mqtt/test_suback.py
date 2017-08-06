@@ -1,12 +1,12 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import asyncio
 import unittest
 
 from hbmqtt.mqtt.suback import SubackPacket, SubackPayload
 from hbmqtt.mqtt.packet import PacketIdVariableHeader
 from hbmqtt.adapters import BufferReader
-from hbmqtt.codecs import *
 
 
 class SubackPacketTest(unittest.TestCase):

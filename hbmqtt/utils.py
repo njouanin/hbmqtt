@@ -1,7 +1,12 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import logging
+
 import yaml
+
+
+logger = logging.getLogger(__name__)
 
 
 def not_in_dict_or_none(dict, key):

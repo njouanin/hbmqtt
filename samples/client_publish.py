@@ -2,7 +2,7 @@ import logging
 import asyncio
 
 from hbmqtt.client import MQTTClient, ConnectException
-from hbmqtt.mqtt.constants import *
+from hbmqtt.mqtt.constants import QOS_1, QOS_2
 
 
 #

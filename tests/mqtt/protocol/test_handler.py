@@ -9,7 +9,7 @@ from hbmqtt.plugins.manager import PluginManager
 from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
 from hbmqtt.adapters import StreamWriterAdapter, StreamReaderAdapter
-from hbmqtt.mqtt.constants import *
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 from hbmqtt.mqtt.publish import PublishPacket
 from hbmqtt.mqtt.puback import PubackPacket
 from hbmqtt.mqtt.pubrec import PubrecPacket
