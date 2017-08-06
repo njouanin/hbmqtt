@@ -38,6 +38,7 @@ def gen_client_id():
         gen_id += chr(random.randint(0, 74) + 48)
     return gen_id
 
+
 def read_yaml_config(config_file):
     config = None
     try:

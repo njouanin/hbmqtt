@@ -13,6 +13,7 @@ from hbmqtt.mqtt.constants import QOS_1, QOS_2
 
 logger = logging.getLogger(__name__)
 
+
 @asyncio.coroutine
 def uptime_coro():
     C = MQTTClient()

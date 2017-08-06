@@ -18,6 +18,7 @@ config = {
 }
 C = MQTTClient(config=config)
 
+
 @asyncio.coroutine
 def test_coro():
     yield from C.connect('mqtt://test.mosquitto.org:1883/')

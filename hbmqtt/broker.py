@@ -500,7 +500,6 @@ class Broker:
         self.logger.debug("%s Client disconnected" % client_session.client_id)
         server.release_connection()
 
-
     def _init_handler(self, session, reader, writer):
         """
         Create a BrokerProtocolHandler and attach to a session

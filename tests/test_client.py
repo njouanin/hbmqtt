@@ -214,6 +214,7 @@ class MQTTClientTest(unittest.TestCase):
 
     def test_deliver(self):
         data = b'data'
+
         @asyncio.coroutine
         def test_coro():
             try:

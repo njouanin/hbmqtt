@@ -54,6 +54,7 @@ class ClientContext(BaseContext):
         super().__init__()
         self.config = None
 
+
 base_logger = logging.getLogger(__name__)
 
 
@@ -111,7 +112,6 @@ class MQTTClient:
         context.config = self.config
         self.plugins_manager = PluginManager('hbmqtt.client.plugins', context)
         self.client_tasks = deque()
-
 
     @asyncio.coroutine
     def connect(self,
@@ -209,7 +209,6 @@ class MQTTClient:
                 self.logger.debug("Waiting %d second before next attempt" % delay)
                 yield from asyncio.sleep(delay, loop=self._loop)
                 nb_attempt += 1
-
 
     @asyncio.coroutine
     def _do_connect(self):

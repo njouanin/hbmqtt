@@ -353,7 +353,6 @@ class ProtocolHandler:
             except asyncio.CancelledError:
                 self.logger.debug("Message flow cancelled")
 
-
     @asyncio.coroutine
     def _reader_loop(self):
         self.logger.debug("%s Starting reader coro" % self.session.client_id)
