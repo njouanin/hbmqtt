@@ -7,11 +7,7 @@ import websockets
 import asyncio
 import sys
 import re
-from asyncio import Queue, CancelledError
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
+from asyncio import CancelledError
 from collections import deque
 
 from functools import partial
@@ -28,6 +24,11 @@ from hbmqtt.adapters import (
     WebSocketsReader,
     WebSocketsWriter)
 from .plugins.manager import PluginManager, BaseContext
+
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+else:
+    from asyncio import ensure_future
 
 _defaults = {
     'timeout-disconnect-delay': 2,
@@ -84,10 +85,10 @@ class Server:
         self.conn_count += 1
         if self.max_connections > 0:
             self.logger.info("Listener '%s': %d/%d connections acquired" %
-                              (self.listener_name, self.conn_count, self.max_connections))
+                             (self.listener_name, self.conn_count, self.max_connections))
         else:
             self.logger.info("Listener '%s': %d connections acquired" %
-                              (self.listener_name, self.conn_count))
+                             (self.listener_name, self.conn_count))
 
     def release_connection(self):
         if self.semaphore:
@@ -95,10 +96,10 @@ class Server:
         self.conn_count -= 1
         if self.max_connections > 0:
             self.logger.info("Listener '%s': %d/%d connections acquired" %
-                              (self.listener_name, self.conn_count, self.max_connections))
+                             (self.listener_name, self.conn_count, self.max_connections))
         else:
             self.logger.info("Listener '%s': %d connections acquired" %
-                              (self.listener_name, self.conn_count))
+                             (self.listener_name, self.conn_count))
 
     @asyncio.coroutine
     def close_instance(self):
@@ -353,7 +354,7 @@ class Broker:
             handler, client_session = yield from BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager, loop=self._loop)
         except HBMQTTException as exc:
             self.logger.warning("[MQTT-3.1.0-1] %s: Can't read first packet an CONNECT: %s" %
-                             (format_client_message(address=remote_address, port=remote_port), exc))
+                                (format_client_message(address=remote_address, port=remote_port), exc))
             #yield from writer.close()
             self.logger.debug("Connection closed")
             return
@@ -375,7 +376,7 @@ class Broker:
             # Get session from cache
             if client_session.client_id in self._sessions:
                 self.logger.debug("Found old session %s" % repr(self._sessions[client_session.client_id]))
-                (client_session,h) = self._sessions[client_session.client_id]
+                (client_session, h) = self._sessions[client_session.client_id]
                 client_session.parent = 1
             else:
                 client_session.parent = 0
@@ -500,7 +501,6 @@ class Broker:
         self.logger.debug("%s Client disconnected" % client_session.client_id)
         server.release_connection()
 
-
     def _init_handler(self, session, reader, writer):
         """
         Create a BrokerProtocolHandler and attach to a session
@@ -568,8 +568,6 @@ class Broker:
                 del self._retained_messages[topic_name]
 
     def add_subscription(self, subscription, session):
-        import re
-        wildcard_pattern = re.compile('.*?/?\+/?.*?')
         try:
             a_filter = subscription[0]
             if '#' in a_filter and not a_filter.endswith('#'):
@@ -587,7 +585,7 @@ class Broker:
             if a_filter not in self._subscriptions:
                 self._subscriptions[a_filter] = []
             already_subscribed = next(
-                (s for (s,qos) in self._subscriptions[a_filter] if s.client_id == session.client_id), None)
+                (s for (s, qos) in self._subscriptions[a_filter] if s.client_id == session.client_id), None)
             if not already_subscribed:
                 self._subscriptions[a_filter].append((session, qos))
             else:

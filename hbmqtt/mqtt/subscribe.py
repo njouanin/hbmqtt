@@ -1,9 +1,11 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import asyncio
+
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, SUBSCRIBE, PacketIdVariableHeader, MQTTPayload, MQTTVariableHeader
-from hbmqtt.errors import HBMQTTException, MQTTException
-from hbmqtt.codecs import *
+from hbmqtt.errors import HBMQTTException, NoDataException
+from hbmqtt.codecs import bytes_to_int, decode_string, encode_string, int_to_bytes, read_or_raise
 
 
 class SubscribePayload(MQTTPayload):
@@ -46,7 +48,7 @@ class SubscribePacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PacketIdVariableHeader=None, payload=None):
         if fixed is None:
-            header = MQTTFixedHeader(SUBSCRIBE, 0x02) # [MQTT-3.8.1-1]
+            header = MQTTFixedHeader(SUBSCRIBE, 0x02)  # [MQTT-3.8.1-1]
         else:
             if fixed.packet_type is not SUBSCRIBE:
                 raise HBMQTTException("Invalid fixed packet type %s for SubscribePacket init" % fixed.packet_type)

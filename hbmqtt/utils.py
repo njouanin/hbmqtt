@@ -1,7 +1,12 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import logging
+
 import yaml
+
+
+logger = logging.getLogger(__name__)
 
 
 def not_in_dict_or_none(dict, key):
@@ -37,6 +42,7 @@ def gen_client_id():
     for i in range(7, 23):
         gen_id += chr(random.randint(0, 74) + 48)
     return gen_id
+
 
 def read_yaml_config(config_file):
     config = None

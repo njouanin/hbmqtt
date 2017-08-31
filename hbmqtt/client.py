@@ -2,6 +2,7 @@
 #
 # See the file license.txt for copying permission.
 
+import asyncio
 import logging
 import ssl
 from urllib.parse import urlparse, urlunparse
@@ -9,13 +10,12 @@ from functools import wraps
 
 from hbmqtt.utils import not_in_dict_or_none
 from hbmqtt.session import Session
-from hbmqtt.mqtt.connack import *
-from hbmqtt.mqtt.connect import *
+from hbmqtt.mqtt.connack import CONNECTION_ACCEPTED
 from hbmqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter, WebSocketsReader, WebSocketsWriter
 from hbmqtt.plugins.manager import PluginManager, BaseContext
-from hbmqtt.mqtt.protocol.handler import EVENT_MQTT_PACKET_SENT, EVENT_MQTT_PACKET_RECEIVED, ProtocolHandlerException
-from hbmqtt.mqtt.constants import *
+from hbmqtt.mqtt.protocol.handler import ProtocolHandlerException
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 import websockets
 from websockets.uri import InvalidURI
 from websockets.handshake import InvalidHandshake
@@ -53,6 +53,7 @@ class ClientContext(BaseContext):
     def __init__(self):
         super().__init__()
         self.config = None
+
 
 base_logger = logging.getLogger(__name__)
 
@@ -111,7 +112,6 @@ class MQTTClient:
         context.config = self.config
         self.plugins_manager = PluginManager('hbmqtt.client.plugins', context)
         self.client_tasks = deque()
-
 
     @asyncio.coroutine
     def connect(self,
@@ -210,7 +210,6 @@ class MQTTClient:
                 yield from asyncio.sleep(delay, loop=self._loop)
                 nb_attempt += 1
 
-
     @asyncio.coroutine
     def _do_connect(self):
         return_code = yield from self._connect_coro()
@@ -232,7 +231,7 @@ class MQTTClient:
             yield from self._handler.mqtt_ping()
         else:
             self.logger.warning("MQTT PING request incompatible with current session state '%s'" %
-                             self.session.transitions.state)
+                                self.session.transitions.state)
 
     @mqtt_connected
     @asyncio.coroutine
@@ -346,7 +345,7 @@ class MQTTClient:
         # Decode URI attributes
         uri_attributes = urlparse(self.session.broker_uri)
         scheme = uri_attributes.scheme
-        secure = True if scheme in ('mqtts', 'wss') else False        
+        secure = True if scheme in ('mqtts', 'wss') else False
         self.session.username = uri_attributes.username
         self.session.password = uri_attributes.password
         self.session.remote_address = uri_attributes.hostname

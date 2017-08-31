@@ -30,6 +30,7 @@ config = {
 
 broker = Broker(config)
 
+
 @asyncio.coroutine
 def test_coro():
     yield from broker.start()

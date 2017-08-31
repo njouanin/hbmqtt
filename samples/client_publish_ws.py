@@ -24,6 +24,7 @@ config = {
 C = MQTTClient(config=config)
 #C = MQTTClient()
 
+
 @asyncio.coroutine
 def test_coro():
     yield from C.connect('wss://test.mosquitto.org:8081/', cafile='mosquitto.org.crt')

@@ -5,12 +5,16 @@ import logging
 import collections
 import itertools
 
+import asyncio
 from asyncio import InvalidStateError
 
 from hbmqtt.mqtt import packet_class
-from hbmqtt.mqtt.packet import *
 from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.mqtt.connect import ConnectPacket
+from hbmqtt.mqtt.packet import (
+    RESERVED_0, CONNECT, CONNACK, PUBLISH, PUBACK, PUBREC, PUBREL, PUBCOMP,
+    SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK, PINGREQ, PINGRESP, DISCONNECT,
+    RESERVED_15, MQTTFixedHeader)
 from hbmqtt.mqtt.pingresp import PingRespPacket
 from hbmqtt.mqtt.pingreq import PingReqPacket
 from hbmqtt.mqtt.publish import PublishPacket
@@ -25,9 +29,9 @@ from hbmqtt.mqtt.unsuback import UnsubackPacket
 from hbmqtt.mqtt.disconnect import DisconnectPacket
 from hbmqtt.adapters import ReaderAdapter, WriterAdapter
 from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage, INCOMING, OUTGOING
-from hbmqtt.mqtt.constants import *
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 from hbmqtt.plugins.manager import PluginManager
-from hbmqtt.errors import HBMQTTException
+from hbmqtt.errors import HBMQTTException, MQTTException, NoDataException
 
 import sys
 if sys.version_info < (3, 5):
@@ -353,7 +357,6 @@ class ProtocolHandler:
             except asyncio.CancelledError:
                 self.logger.debug("Message flow cancelled")
 
-
     @asyncio.coroutine
     def _reader_loop(self):
         self.logger.debug("%s Starting reader coro" % self.session.client_id)
@@ -369,12 +372,13 @@ class ProtocolHandler:
                 if len(running_tasks) > 1:
                     self.logger.debug("handler running tasks: %d" % len(running_tasks))
 
-                fixed_header = yield from asyncio.wait_for(MQTTFixedHeader.from_stream(self.reader),
+                fixed_header = yield from asyncio.wait_for(
+                    MQTTFixedHeader.from_stream(self.reader),
                     keepalive_timeout, loop=self._loop)
                 if fixed_header:
                     if fixed_header.packet_type == RESERVED_0 or fixed_header.packet_type == RESERVED_15:
                         self.logger.warning("%s Received reserved packet, which is forbidden: closing connection" %
-                                         (self.session.client_id))
+                                            (self.session.client_id))
                         yield from self.handle_connection_closed()
                     else:
                         cls = packet_class(fixed_header)
@@ -412,7 +416,7 @@ class ProtocolHandler:
                             self.handle_connect(packet)
                         else:
                             self.logger.warning("%s Unhandled packet type: %s" %
-                                             (self.session.client_id, packet.fixed_header.packet_type))
+                                                (self.session.client_id, packet.fixed_header.packet_type))
                         if task:
                             running_tasks.append(task)
                 else:

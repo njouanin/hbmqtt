@@ -1,9 +1,11 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import asyncio
+
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, UNSUBSCRIBE, PacketIdVariableHeader, MQTTPayload, MQTTVariableHeader
-from hbmqtt.errors import HBMQTTException
-from hbmqtt.codecs import *
+from hbmqtt.errors import HBMQTTException, NoDataException
+from hbmqtt.codecs import decode_string, encode_string
 
 
 class UnubscribePayload(MQTTPayload):
@@ -40,7 +42,7 @@ class UnsubscribePacket(MQTTPacket):
 
     def __init__(self, fixed: MQTTFixedHeader=None, variable_header: PacketIdVariableHeader=None, payload=None):
         if fixed is None:
-            header = MQTTFixedHeader(UNSUBSCRIBE, 0x02) # [MQTT-3.10.1-1]
+            header = MQTTFixedHeader(UNSUBSCRIBE, 0x02)  # [MQTT-3.10.1-1]
         else:
             if fixed.packet_type is not UNSUBSCRIBE:
                 raise HBMQTTException("Invalid fixed packet type %s for UnsubscribePacket init" % fixed.packet_type)

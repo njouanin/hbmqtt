@@ -9,7 +9,6 @@ import asyncio
 import sqlite3
 from hbmqtt.plugins.manager import BaseContext
 from hbmqtt.plugins.persistence import SQLitePlugin
-from hbmqtt.session import Session
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)
@@ -28,7 +27,7 @@ class TestSQLitePlugin(unittest.TestCase):
                 'file': dbfile
             }
         }
-        sql_plugin = SQLitePlugin(context)
+        SQLitePlugin(context)
 
         conn = sqlite3.connect(dbfile)
         cursor = conn.cursor()

@@ -9,12 +9,13 @@ import logging
 import asyncio
 import copy
 import sys
+
+from collections import namedtuple
+
 if sys.version_info < (3, 5):
     from asyncio import async as ensure_future
 else:
     from asyncio import ensure_future
-
-from collections import namedtuple
 
 Plugin = namedtuple('Plugin', ['name', 'ep', 'object'])
 

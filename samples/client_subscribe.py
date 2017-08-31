@@ -13,15 +13,16 @@ from hbmqtt.mqtt.constants import QOS_1, QOS_2
 
 logger = logging.getLogger(__name__)
 
+
 @asyncio.coroutine
 def uptime_coro():
     C = MQTTClient()
     yield from C.connect('mqtt://test.mosquitto.org/')
     # Subscribe to '$SYS/broker/uptime' with QOS=1
     yield from C.subscribe([
-                ('$SYS/broker/uptime', QOS_1),
-                ('$SYS/broker/load/#', QOS_2),
-             ])
+        ('$SYS/broker/uptime', QOS_1),
+        ('$SYS/broker/load/#', QOS_2),
+    ])
     logger.info("Subscribed")
     try:
         for i in range(1, 100):

@@ -9,7 +9,7 @@ from hbmqtt.plugins.manager import PluginManager
 from hbmqtt.session import Session, OutgoingApplicationMessage, IncomingApplicationMessage
 from hbmqtt.mqtt.protocol.handler import ProtocolHandler
 from hbmqtt.adapters import StreamWriterAdapter, StreamReaderAdapter
-from hbmqtt.mqtt.constants import *
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 from hbmqtt.mqtt.publish import PublishPacket
 from hbmqtt.mqtt.puback import PubackPacket
 from hbmqtt.mqtt.pubrec import PubrecPacket
@@ -39,7 +39,7 @@ class ProtocolHandlerTest(unittest.TestCase):
         self.loop.close()
 
     def test_init_handler(self):
-        s = Session()
+        Session()
         handler = ProtocolHandler(self.plugin_manager, loop=self.loop)
         self.assertIsNone(handler.session)
         self.assertIs(handler._loop, self.loop)
@@ -174,7 +174,7 @@ class ProtocolHandlerTest(unittest.TestCase):
                 pubrec = PubrecPacket.build(packet.packet_id)
                 yield from pubrec.to_stream(writer)
 
-                pubrel = yield from PubrelPacket.from_stream(reader)
+                yield from PubrelPacket.from_stream(reader)
                 self.assertIn(packet.packet_id, self.handler._pubcomp_waiters)
                 pubcomp = PubcompPacket.build(packet.packet_id)
                 yield from pubcomp.to_stream(writer)
@@ -424,7 +424,7 @@ class ProtocolHandlerTest(unittest.TestCase):
                 pubrec = PubrecPacket.build(packet.packet_id)
                 yield from pubrec.to_stream(writer)
 
-                pubrel = yield from PubrelPacket.from_stream(reader)
+                yield from PubrelPacket.from_stream(reader)
                 self.assertIn(packet.packet_id, self.handler._pubcomp_waiters)
                 pubcomp = PubcompPacket.build(packet.packet_id)
                 yield from pubcomp.to_stream(writer)

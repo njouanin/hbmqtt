@@ -1,14 +1,35 @@
 # Copyright (c) 2015 Nicolas JOUANIN
 #
 # See the file license.txt for copying permission.
+import asyncio
+import logging
 import unittest
-from unittest.mock import patch, call, MagicMock
-from hbmqtt.broker import *
-from hbmqtt.mqtt.constants import *
+from unittest.mock import patch, call
+
+from hbmqtt.adapters import StreamReaderAdapter, StreamWriterAdapter
+from hbmqtt.broker import (
+    EVENT_BROKER_PRE_START,
+    EVENT_BROKER_POST_START,
+    EVENT_BROKER_PRE_SHUTDOWN,
+    EVENT_BROKER_POST_SHUTDOWN,
+    EVENT_BROKER_CLIENT_CONNECTED,
+    EVENT_BROKER_CLIENT_DISCONNECTED,
+    EVENT_BROKER_CLIENT_SUBSCRIBED,
+    EVENT_BROKER_CLIENT_UNSUBSCRIBED,
+    EVENT_BROKER_MESSAGE_RECEIVED,
+    Broker)
 from hbmqtt.client import MQTTClient, ConnectException
-from hbmqtt.mqtt import ConnectPacket, ConnackPacket, PublishPacket, PubrecPacket, \
-    PubrelPacket, PubcompPacket, DisconnectPacket
+from hbmqtt.mqtt import (
+    ConnectPacket, ConnackPacket, PublishPacket, PubrecPacket,
+    PubrelPacket, PubcompPacket, DisconnectPacket)
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPayload
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
+
+import sys
+if sys.version_info < (3, 5):
+    from asyncio import async as ensure_future
+else:
+    from asyncio import ensure_future
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)
@@ -158,7 +179,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 client = MQTTClient(client_id="", config={'auto_reconnect': False})
-                return_code=None
+                return_code = None
                 try:
                     yield from client.connect('mqtt://localhost/', cleansession=False)
                 except ConnectException as ce:
@@ -288,12 +309,13 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
                 MockPluginManager.assert_has_calls(
-                    [call().fire_event(EVENT_BROKER_CLIENT_SUBSCRIBED,
-                                       client_id=client.session.client_id,
-                                       topic='/topic', qos=QOS_0),
-                     call().fire_event(EVENT_BROKER_CLIENT_UNSUBSCRIBED,
-                                       client_id=client.session.client_id,
-                                       topic='/topic')
+                    [
+                        call().fire_event(EVENT_BROKER_CLIENT_SUBSCRIBED,
+                                          client_id=client.session.client_id,
+                                          topic='/topic', qos=QOS_0),
+                        call().fire_event(EVENT_BROKER_CLIENT_UNSUBSCRIBED,
+                                          client_id=client.session.client_id,
+                                          topic='/topic')
                     ], any_order=True)
                 future.set_result(True)
             except Exception as ae:
@@ -324,9 +346,10 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
                 MockPluginManager.assert_has_calls(
-                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
-                                       client_id=pub_client.session.client_id,
-                                       message=ret_message),
+                    [
+                        call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                                          client_id=pub_client.session.client_id,
+                                          message=ret_message),
                     ], any_order=True)
                 future.set_result(True)
             except Exception as ae:
@@ -370,10 +393,10 @@ class BrokerTest(unittest.TestCase):
 
                 publish_dup = PublishPacket.build('/test', b'data', 1, True, QOS_2, False)
                 yield from publish_dup.to_stream(writer)
-                pubrec2 = yield from PubrecPacket.from_stream(reader)
+                yield from PubrecPacket.from_stream(reader)
                 pubrel = PubrelPacket.build(1)
                 yield from pubrel.to_stream(writer)
-                pubcomp = yield from PubcompPacket.from_stream(reader)
+                yield from PubcompPacket.from_stream(reader)
 
                 disconnect = DisconnectPacket()
                 yield from disconnect.to_stream(writer)
@@ -401,7 +424,7 @@ class BrokerTest(unittest.TestCase):
                 ret = yield from pub_client.connect('mqtt://localhost/')
                 self.assertEqual(ret, 0)
 
-                ret_message = yield from pub_client.publish('/+', b'data', QOS_0)
+                yield from pub_client.publish('/+', b'data', QOS_0)
                 yield from asyncio.sleep(0.1)
                 yield from pub_client.disconnect()
 
@@ -437,9 +460,10 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.shutdown()
                 self.assertTrue(broker.transitions.is_stopped())
                 MockPluginManager.assert_has_calls(
-                    [call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
-                                       client_id=pub_client.session.client_id,
-                                       message=ret_message),
+                    [
+                        call().fire_event(EVENT_BROKER_MESSAGE_RECEIVED,
+                                          client_id=pub_client.session.client_id,
+                                          message=ret_message),
                     ], any_order=True)
                 future.set_result(True)
             except Exception as ae:
@@ -462,7 +486,7 @@ class BrokerTest(unittest.TestCase):
                 pub_client = MQTTClient()
                 ret = yield from pub_client.connect('mqtt://localhost/')
                 self.assertEqual(ret, 0)
-                ret_message = yield from pub_client.publish('/topic', b'data', QOS_0, retain=True)
+                yield from pub_client.publish('/topic', b'data', QOS_0, retain=True)
                 yield from pub_client.disconnect()
                 yield from asyncio.sleep(0.1)
                 self.assertIn('/topic', broker._retained_messages)
@@ -494,7 +518,7 @@ class BrokerTest(unittest.TestCase):
                 pub_client = MQTTClient()
                 ret = yield from pub_client.connect('mqtt://localhost/')
                 self.assertEqual(ret, 0)
-                ret_message = yield from pub_client.publish('/topic', b'', QOS_0, retain=True)
+                yield from pub_client.publish('/topic', b'', QOS_0, retain=True)
                 yield from pub_client.disconnect()
                 yield from asyncio.sleep(0.1)
                 self.assertNotIn('/topic', broker._retained_messages)
