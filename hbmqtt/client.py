@@ -430,7 +430,7 @@ class MQTTClient:
     @asyncio.coroutine
     def handle_connection_close(self):
 
-        def cancel_tasks(self):
+        def cancel_tasks():
             while self.client_tasks:
                 task = self.client_tasks.popleft()
                 if not task.done():
@@ -456,7 +456,7 @@ class MQTTClient:
                 yield from self.reconnect()
             except ConnectException:
                 # Cancel client pending tasks
-                cancel_tasks(self)
+                cancel_tasks()
         else:
             # Cancel client pending tasks
             cancel_tasks()

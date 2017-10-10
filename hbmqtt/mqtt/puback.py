@@ -6,7 +6,6 @@ from hbmqtt.errors import HBMQTTException
 
 
 class PubackPacket(MQTTPacket):
-
     VARIABLE_HEADER = PacketIdVariableHeader
     PAYLOAD = None
 
