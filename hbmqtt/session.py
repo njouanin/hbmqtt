@@ -13,9 +13,16 @@ INCOMING = 1
 
 
 class ApplicationMessage:
+
     """
         ApplicationMessage and subclasses are used to store published message information flow. These objects can contain different information depending on the way they were created (incoming or outgoing) and the quality of service used between peers.
     """
+
+    __slots__ = (
+        'packet_id', 'topic', 'qos', 'data', 'retain', 'publish_packet',
+        'puback_packet', 'pubrec_packet', 'pubrel_packet', 'pubcomp_packet',
+    )
+
     def __init__(self, packet_id, topic, qos, data, retain):
         self.packet_id = packet_id
         """ Publish message `packet identifier <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718025>`_"""
@@ -61,18 +68,26 @@ class ApplicationMessage:
 
 
 class IncomingApplicationMessage(ApplicationMessage):
+
     """
         Incoming :class:`~hbmqtt.session.ApplicationMessage`.
     """
+
+    __slots__ = ('direction',)
+
     def __init__(self, packet_id, topic, qos, data, retain):
         super().__init__(packet_id, topic, qos, data, retain)
         self.direction = INCOMING
 
 
 class OutgoingApplicationMessage(ApplicationMessage):
+
     """
         Outgoing :class:`~hbmqtt.session.ApplicationMessage`.
     """
+
+    __slots__ = ('direction',)
+
     def __init__(self, packet_id, topic, qos, data, retain):
         super().__init__(packet_id, topic, qos, data, retain)
         self.direction = OUTGOING

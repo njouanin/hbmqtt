@@ -54,6 +54,9 @@ class BrokerException(BaseException):
 
 
 class RetainedApplicationMessage:
+
+    __slots__ = ('source_session', 'topic', 'data', 'qos')
+
     def __init__(self, source_session, topic, data, qos=None):
         self.source_session = source_session
         self.topic = topic
