@@ -9,6 +9,9 @@ from hbmqtt.codecs import bytes_to_int, decode_string, encode_string, int_to_byt
 
 
 class SubscribePayload(MQTTPayload):
+
+    __slots__ = ('topics',)
+
     def __init__(self, topics=[]):
         super().__init__()
         self.topics = topics

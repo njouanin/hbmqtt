@@ -10,6 +10,9 @@ from hbmqtt.codecs import bytes_to_int, int_to_bytes, read_or_raise
 
 
 class SubackPayload(MQTTPayload):
+
+    __slots__ = ('return_codes',)
+
     RETURN_CODE_00 = 0x00
     RETURN_CODE_01 = 0x01
     RETURN_CODE_02 = 0x02

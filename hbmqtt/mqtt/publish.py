@@ -9,6 +9,9 @@ from hbmqtt.codecs import decode_packet_id, decode_string, encode_string, int_to
 
 
 class PublishVariableHeader(MQTTVariableHeader):
+
+    __slots__ = ('topic_name', 'packet_id')
+
     def __init__(self, topic_name: str, packet_id: int=None):
         super().__init__()
         if '*' in topic_name:
@@ -39,6 +42,9 @@ class PublishVariableHeader(MQTTVariableHeader):
 
 
 class PublishPayload(MQTTPayload):
+
+    __slots__ = ('data',)
+
     def __init__(self, data: bytes=None):
         super().__init__()
         self.data = data

@@ -16,6 +16,9 @@ NOT_AUTHORIZED = 0x05
 
 
 class ConnackVariableHeader(MQTTVariableHeader):
+
+    __slots__ = ('session_parent', 'return_code')
+
     def __init__(self, session_parent=None, return_code=None):
         super().__init__()
         self.session_parent = session_parent

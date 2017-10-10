@@ -9,6 +9,9 @@ from hbmqtt.codecs import decode_string, encode_string
 
 
 class UnubscribePayload(MQTTPayload):
+
+    __slots__ = ('topics',)
+
     def __init__(self, topics=[]):
         super().__init__()
         self.topics = topics

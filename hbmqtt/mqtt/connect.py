@@ -10,6 +10,9 @@ from hbmqtt.adapters import ReaderAdapter
 
 
 class ConnectVariableHeader(MQTTVariableHeader):
+
+    __slots__ = ('proto_name', 'proto_level', 'flags', 'keep_alive')
+
     USERNAME_FLAG = 0x80
     PASSWORD_FLAG = 0x40
     WILL_RETAIN_FLAG = 0x20
@@ -130,6 +133,11 @@ class ConnectVariableHeader(MQTTVariableHeader):
 
 
 class ConnectPayload(MQTTPayload):
+
+    __slots__ = (
+        'client_id', 'will_topic', 'will_message', 'username', 'password'
+    )
+
     def __init__(self, client_id=None, will_topic=None, will_message=None, username=None, password=None):
         super().__init__()
         self.client_id = client_id
