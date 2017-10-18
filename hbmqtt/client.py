@@ -309,7 +309,7 @@ class MQTTClient:
             Example of ``topics`` argument expected structure:
             ::
 
-                ['$SYS/broker/uptime', QOS_1), '$SYS/broker/load/#', QOS_2]
+                ['$SYS/broker/uptime', '$SYS/broker/load/#']
         """
         yield from self._handler.mqtt_unsubscribe(topics, self.session.next_packet_id)
 

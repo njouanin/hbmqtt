@@ -155,8 +155,8 @@ The :class:`~hbmqtt.client.MQTTClient` ``__init__`` method accepts a ``config`` 
 
 * ``keep_alive``: keep alive (in seconds) to send when connecting to the broker (defaults to ``10`` seconds). :class:`~hbmqtt.client.MQTTClient` will *auto-ping* the broker if not message is sent within the keep-alive interval. This avoids disconnection from the broker.
 * ``ping_delay``: *auto-ping* delay before keep-alive times out (defaults to ``1`` seconds).
-* ``default_qos``: Default QoS used by :meth:`~hbmqtt.client.MQTTClient.publish` if ``qos`` argument is not given.
-* ``default_retain``: Default retain used by :meth:`~hbmqtt.client.MQTTClient.publish` if ``qos`` argument is not given.,
+* ``default_qos``: Default QoS (``0``) used by :meth:`~hbmqtt.client.MQTTClient.publish` if ``qos`` argument is not given.
+* ``default_retain``: Default retain (``False``) used by :meth:`~hbmqtt.client.MQTTClient.publish` if ``qos`` argument is not given.,
 * ``auto_reconnect``: enable or disable auto-reconnect feature (defaults to ``True``).
 * ``reconnect_max_interval``: maximum interval (in seconds) to wait before two connection retries (defaults to ``10``).
 * ``reconnect_retries``: maximum number of connect retries (defaults to ``2``).
