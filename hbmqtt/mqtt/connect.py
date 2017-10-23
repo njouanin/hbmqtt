@@ -7,6 +7,7 @@ from hbmqtt.codecs import bytes_to_int, decode_data_with_length, decode_string, 
 from hbmqtt.mqtt.packet import MQTTPacket, MQTTFixedHeader, CONNECT, MQTTVariableHeader, MQTTPayload
 from hbmqtt.errors import HBMQTTException, NoDataException
 from hbmqtt.adapters import ReaderAdapter
+from hbmqtt.utils import gen_client_id
 
 
 class ConnectVariableHeader(MQTTVariableHeader):
@@ -160,6 +161,9 @@ class ConnectPayload(MQTTPayload):
             payload.client_id = yield from decode_string(reader)
         except NoDataException:
             payload.client_id = None
+
+        if (payload.client_id is None or payload.client_id == ""):
+            payload.client_id=gen_client_id();
 
         # Read will topic, username and password
         if variable_header.will_flag:
