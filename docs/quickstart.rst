@@ -9,7 +9,7 @@ A quick way for getting started with ``HBMQTT`` is to use console scripts provid
 
 These scripts are installed automatically when installing ``HBMQTT`` with the following command ::
 
-  (venv) $ pip install hbmqtt
+  (venv) $ pip3 install hbmqtt
 
 Publishing messages
 -------------------
