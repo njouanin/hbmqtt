@@ -140,7 +140,11 @@ class StreamReaderAdapter(ReaderAdapter):
 
     @asyncio.coroutine
     def read(self, n=-1) -> bytes:
-        return (yield from self._reader.read(n))
+        if n == -1:
+            data = yield from self._reader.read(n)
+        else:
+            data = yield from self._reader.readexactly(n)
+        return data
 
     def feed_eof(self):
         return self._reader.feed_eof()
