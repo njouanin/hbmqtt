@@ -141,7 +141,7 @@ class PluginManager:
                     def clean_fired_events(future):
                         try:
                             self._fired_events.remove(task)
-                        except ValueError:
+                        except (KeyError, ValueError):
                             pass
 
                     task.add_done_callback(clean_fired_events)
