@@ -103,7 +103,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('ws://localhost:8081/')
+                yield from client.connect('ws://localhost:8080/')
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 yield from broker.shutdown()
