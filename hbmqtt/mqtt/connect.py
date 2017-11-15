@@ -171,10 +171,9 @@ class ConnectPayload(MQTTPayload):
         if (payload.client_id is None or payload.client_id == ""):
             # A Server MAY allow a Client to supply a ClientId that has a length of zero bytes
             # [MQTT-3.1.3-6]
-            payload.client_id=gen_client_id();
+            payload.client_id = gen_client_id()
             # indicator to trow exception in case CLEAN_SESSION_FLAG is set to False
-            payload.client_id_is_random=True;
- 
+            payload.client_id_is_random = True
 
         # Read will topic, username and password
         if variable_header.will_flag:
@@ -306,7 +305,7 @@ class ConnectPacket(MQTTPacket):
         return self.payload.client_id_is_random
 
     @client_id_is_random.setter
-    def client_id_is_random(self, client_id_is_random:bool):
+    def client_id_is_random(self, client_id_is_random: bool):
         self.payload.client_id_is_random = client_id_is_random
 
     @property
