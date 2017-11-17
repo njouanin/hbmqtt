@@ -136,11 +136,17 @@ class ConnectVariableHeader(MQTTVariableHeader):
 class ConnectPayload(MQTTPayload):
 
     __slots__ = (
-        'client_id', 'will_topic', 'will_message', 'username', 'password'
+        'client_id',
+        'will_topic',
+        'will_message',
+        'username',
+        'password',
+        'client_id_is_random',
     )
 
     def __init__(self, client_id=None, will_topic=None, will_message=None, username=None, password=None):
         super().__init__()
+        self.client_id_is_random = False
         self.client_id = client_id
         self.will_topic = will_topic
         self.will_message = will_message
@@ -163,7 +169,11 @@ class ConnectPayload(MQTTPayload):
             payload.client_id = None
 
         if (payload.client_id is None or payload.client_id == ""):
-            payload.client_id=gen_client_id();
+            # A Server MAY allow a Client to supply a ClientId that has a length of zero bytes
+            # [MQTT-3.1.3-6]
+            payload.client_id = gen_client_id()
+            # indicator to trow exception in case CLEAN_SESSION_FLAG is set to False
+            payload.client_id_is_random = True
 
         # Read will topic, username and password
         if variable_header.will_flag:
@@ -289,6 +299,14 @@ class ConnectPacket(MQTTPacket):
     @client_id.setter
     def client_id(self, client_id):
         self.payload.client_id = client_id
+
+    @property
+    def client_id_is_random(self) -> bool:
+        return self.payload.client_id_is_random
+
+    @client_id_is_random.setter
+    def client_id_is_random(self, client_id_is_random: bool):
+        self.payload.client_id_is_random = client_id_is_random
 
     @property
     def will_topic(self):

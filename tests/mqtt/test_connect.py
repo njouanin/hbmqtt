@@ -61,7 +61,7 @@ class ConnectPacketTest(unittest.TestCase):
         data = b'\x10\x0a\x00\x04MQTT\x04\xce\x00\x00'
         stream = BufferReader(data)
         message = self.loop.run_until_complete(ConnectPacket.from_stream(stream))
-        self.assertIs(message.payload.client_id, None)
+        self.assertIsNot(message.payload.client_id, None)
 
     def test_decode_fail_miss_willtopic(self):
         data = b'\x10\x16\x00\x04MQTT\x04\xce\x00\x00\x00\x0a0123456789'
