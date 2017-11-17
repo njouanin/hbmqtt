@@ -17,17 +17,17 @@ broker_config = {
     'listeners': {
         'default': {
             'type': 'tcp',
-            'bind': 'localhost:1883',
+            'bind': '127.0.0.1:1883',
             'max_connections': 10
         },
         'ws': {
             'type': 'ws',
-            'bind': 'localhost:8080',
+            'bind': '127.0.0.1:8080',
             'max_connections': 10
         },
         'wss': {
             'type': 'ws',
-            'bind': 'localhost:8081',
+            'bind': '127.0.0.1:8081',
             'max_connections': 10
         },
     },
@@ -87,7 +87,7 @@ class MQTTClientTest(unittest.TestCase):
             try:
                 config = {'auto_reconnect': False}
                 client = MQTTClient(config=config)
-                yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://127.0.0.1/')
             except ConnectException as e:
                 future.set_result(True)
 
@@ -103,7 +103,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('ws://localhost:8080/')
+                yield from client.connect('ws://127.0.0.1:8080/')
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 yield from broker.shutdown()
@@ -124,7 +124,7 @@ class MQTTClientTest(unittest.TestCase):
                 yield from broker.start()
                 client = MQTTClient()
                 ca = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mosquitto.org.crt')
-                yield from client.connect('ws://localhost:8081/', cafile=ca)
+                yield from client.connect('ws://127.0.0.1:8081/', cafile=ca)
                 self.assertIsNotNone(client.session)
                 yield from client.disconnect()
                 yield from broker.shutdown()
@@ -144,7 +144,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://127.0.0.1/')
                 self.assertIsNotNone(client.session)
                 yield from client.ping()
                 yield from client.disconnect()
@@ -165,7 +165,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://127.0.0.1/')
                 self.assertIsNotNone(client.session)
                 ret = yield from client.subscribe([
                     ('$SYS/broker/uptime', QOS_0),
@@ -193,7 +193,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://127.0.0.1/')
                 self.assertIsNotNone(client.session)
                 ret = yield from client.subscribe([
                     ('$SYS/broker/uptime', QOS_0),
@@ -220,14 +220,14 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://127.0.0.1/')
                 self.assertIsNotNone(client.session)
                 ret = yield from client.subscribe([
                     ('test_topic', QOS_0),
                 ])
                 self.assertEqual(ret[0], QOS_0)
                 client_pub = MQTTClient()
-                yield from client_pub.connect('mqtt://localhost/')
+                yield from client_pub.connect('mqtt://127.0.0.1/')
                 yield from client_pub.publish('test_topic', data, QOS_0)
                 yield from client_pub.disconnect()
                 message = yield from client.deliver_message()
@@ -253,7 +253,7 @@ class MQTTClientTest(unittest.TestCase):
                 broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
                 yield from broker.start()
                 client = MQTTClient()
-                yield from client.connect('mqtt://localhost/')
+                yield from client.connect('mqtt://127.0.0.1/')
                 self.assertIsNotNone(client.session)
                 ret = yield from client.subscribe([
                     ('test_topic', QOS_0),

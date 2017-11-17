@@ -39,7 +39,7 @@ test_config = {
     'listeners': {
         'default': {
             'type': 'tcp',
-            'bind': 'localhost:1883',
+            'bind': '127.0.0.1:1883',
             'max_connections': 10
         },
     },
@@ -102,7 +102,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 client = MQTTClient()
-                ret = yield from client.connect('mqtt://localhost/')
+                ret = yield from client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
                 self.assertIn(client.session.client_id, broker._sessions)
                 yield from client.disconnect()
@@ -133,7 +133,7 @@ class BrokerTest(unittest.TestCase):
                 self.assertTrue(broker.transitions.is_started())
 
                 conn_reader, conn_writer = \
-                    yield from asyncio.open_connection('localhost', 1883, loop=self.loop)
+                    yield from asyncio.open_connection('127.0.0.1', 1883, loop=self.loop)
                 reader = StreamReaderAdapter(conn_reader)
                 writer = StreamWriterAdapter(conn_writer)
 
@@ -181,7 +181,7 @@ class BrokerTest(unittest.TestCase):
                 client = MQTTClient(client_id="", config={'auto_reconnect': False})
                 return_code = None
                 try:
-                    yield from client.connect('mqtt://localhost/', cleansession=False)
+                    yield from client.connect('mqtt://127.0.0.1/', cleansession=False)
                 except ConnectException as ce:
                     return_code = ce.return_code
                 self.assertEqual(return_code, 0x02)
@@ -207,7 +207,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 client = MQTTClient()
-                ret = yield from client.connect('mqtt://localhost/')
+                ret = yield from client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
                 yield from client.subscribe([('/topic', QOS_0)])
 
@@ -245,7 +245,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 client = MQTTClient()
-                ret = yield from client.connect('mqtt://localhost/')
+                ret = yield from client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
                 yield from client.subscribe([('/topic', QOS_0)])
 
@@ -289,7 +289,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 client = MQTTClient()
-                ret = yield from client.connect('mqtt://localhost/')
+                ret = yield from client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
                 yield from client.subscribe([('/topic', QOS_0)])
 
@@ -335,7 +335,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 pub_client = MQTTClient()
-                ret = yield from pub_client.connect('mqtt://localhost/')
+                ret = yield from pub_client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
 
                 ret_message = yield from pub_client.publish('/topic', b'data', QOS_0)
@@ -370,7 +370,7 @@ class BrokerTest(unittest.TestCase):
                 self.assertTrue(broker.transitions.is_started())
 
                 conn_reader, conn_writer = \
-                    yield from asyncio.open_connection('localhost', 1883, loop=self.loop)
+                    yield from asyncio.open_connection('127.0.0.1', 1883, loop=self.loop)
                 reader = StreamReaderAdapter(conn_reader)
                 writer = StreamWriterAdapter(conn_writer)
 
@@ -421,7 +421,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 pub_client = MQTTClient()
-                ret = yield from pub_client.connect('mqtt://localhost/')
+                ret = yield from pub_client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
 
                 yield from pub_client.publish('/+', b'data', QOS_0)
@@ -449,7 +449,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 pub_client = MQTTClient()
-                ret = yield from pub_client.connect('mqtt://localhost/')
+                ret = yield from pub_client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
 
                 ret_message = yield from pub_client.publish('/topic', bytearray(b'\x99' * 256 * 1024), QOS_2)
@@ -484,7 +484,7 @@ class BrokerTest(unittest.TestCase):
                 self.assertTrue(broker.transitions.is_started())
 
                 pub_client = MQTTClient()
-                ret = yield from pub_client.connect('mqtt://localhost/')
+                ret = yield from pub_client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
                 yield from pub_client.publish('/topic', b'data', QOS_0, retain=True)
                 yield from pub_client.disconnect()
@@ -516,7 +516,7 @@ class BrokerTest(unittest.TestCase):
                 self.assertTrue(broker.transitions.is_started())
 
                 pub_client = MQTTClient()
-                ret = yield from pub_client.connect('mqtt://localhost/')
+                ret = yield from pub_client.connect('mqtt://127.0.0.1/')
                 self.assertEqual(ret, 0)
                 yield from pub_client.publish('/topic', b'', QOS_0, retain=True)
                 yield from pub_client.disconnect()
@@ -542,7 +542,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 sub_client = MQTTClient()
-                yield from sub_client.connect('mqtt://localhost')
+                yield from sub_client.connect('mqtt://127.0.0.1')
                 ret = yield from sub_client.subscribe([('/qos0', QOS_0), ('/qos1', QOS_1), ('/qos2', QOS_2)])
                 self.assertEqual(ret, [QOS_0, QOS_1, QOS_2])
 
@@ -578,7 +578,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 sub_client = MQTTClient()
-                yield from sub_client.connect('mqtt://localhost')
+                yield from sub_client.connect('mqtt://127.0.0.1')
                 ret = yield from sub_client.subscribe(
                     [('+', QOS_0), ('+/tennis/#', QOS_0), ('sport+', QOS_0), ('sport/+/player1', QOS_0)])
                 self.assertEqual(ret, [QOS_0, QOS_0, 0x80, QOS_0])
@@ -606,7 +606,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 sub_client = MQTTClient()
-                yield from sub_client.connect('mqtt://localhost')
+                yield from sub_client.connect('mqtt://127.0.0.1')
                 ret = yield from sub_client.subscribe([('#', QOS_0)])
                 self.assertEqual(ret, [QOS_0])
 
@@ -644,7 +644,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 sub_client = MQTTClient()
-                yield from sub_client.connect('mqtt://localhost')
+                yield from sub_client.connect('mqtt://127.0.0.1')
                 ret = yield from sub_client.subscribe([('+/monitor/Clients', QOS_0)])
                 self.assertEqual(ret, [QOS_0])
 
@@ -682,7 +682,7 @@ class BrokerTest(unittest.TestCase):
                 yield from broker.start()
                 self.assertTrue(broker.transitions.is_started())
                 sub_client = MQTTClient()
-                yield from sub_client.connect('mqtt://localhost', cleansession=False)
+                yield from sub_client.connect('mqtt://127.0.0.1', cleansession=False)
                 ret = yield from sub_client.subscribe([('/qos0', QOS_0), ('/qos1', QOS_1), ('/qos2', QOS_2)])
                 self.assertEqual(ret, [QOS_0, QOS_1, QOS_2])
                 yield from sub_client.disconnect()
@@ -716,7 +716,7 @@ class BrokerTest(unittest.TestCase):
     @asyncio.coroutine
     def _client_publish(self, topic, data, qos, retain=False):
         pub_client = MQTTClient()
-        ret = yield from pub_client.connect('mqtt://localhost/')
+        ret = yield from pub_client.connect('mqtt://127.0.0.1/')
         self.assertEqual(ret, 0)
         ret = yield from pub_client.publish(topic, data, qos, retain)
         yield from pub_client.disconnect()
