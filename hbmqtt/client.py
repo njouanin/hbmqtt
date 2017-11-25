@@ -364,9 +364,6 @@ class MQTTClient:
         self._handler = ClientProtocolHandler(self.plugins_manager, loop=self._loop)
 
         if secure:
-            if self.session.cafile is None or self.session.cafile == '':
-                self.logger.warning("TLS connection can't be estabilshed, no certificate file (.cert) given")
-                raise ClientException("TLS connection can't be estabilshed, no certificate file (.cert) given")
             sc = ssl.create_default_context(
                 ssl.Purpose.SERVER_AUTH,
                 cafile=self.session.cafile,
