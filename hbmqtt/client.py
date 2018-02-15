@@ -331,6 +331,9 @@ class MQTTClient:
         self.logger.debug("Waiting message delivery")
         done, pending = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
         if deliver_task in done:
+            if deliver_task.exception() is not None:
+                # deliver_task raised an exception, pass it on to our caller
+                raise deliver_task.exception()
             self.client_tasks.pop()
             return deliver_task.result()
         else:
