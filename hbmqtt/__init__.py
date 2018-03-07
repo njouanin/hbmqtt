@@ -2,4 +2,4 @@
 #
 # See the file license.txt for copying permission.
 
-VERSION = (0, 9, 2, 'alpha', 0)
+VERSION = (0, 9, 2, 'final', 0)
