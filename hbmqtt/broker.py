@@ -393,6 +393,7 @@ class Broker:
         authenticated = yield from self.authenticate(client_session, self.listeners_config[listener_name])
         if not authenticated:
             yield from writer.close()
+            server.release_connection()  # Delete client from connections list
             return
 
         while True:
