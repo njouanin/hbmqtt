@@ -465,7 +465,8 @@ class Broker:
                     subscriptions = subscribe_waiter.result()
                     return_codes = []
                     for subscription in subscriptions['topics']:
-                        return_codes.append(self.add_subscription(subscription, client_session))
+                        result = yield from self.add_subscription(subscription, client_session)
+                        return_codes.append(result)
                     yield from handler.mqtt_acknowledge_subscription(subscriptions['packet_id'], return_codes)
                     for index, subscription in enumerate(subscriptions['topics']):
                         if return_codes[index] != 0x80:
@@ -559,6 +560,41 @@ class Broker:
         # If all plugins returned True, authentication is success
         return auth_result
 
+    @asyncio.coroutine
+    def topic_filtering(self, session: Session, topic):
+        """
+        This method call the topic_filtering method on registered plugins to check that the subscription is allowed.
+        User is considered allowed if all plugins called return True.
+        Plugins topic_filtering() method are supposed to return :
+         - True if MQTT client can be subscribed to the topic
+         - False if MQTT client is not allowed to subscribe to the topic
+         - None if topic filtering can't be achieved (then plugin result is then ignored)
+        :param session:
+        :param listener:
+        :param topic: Topic in which the client wants to subscribe
+        :return:
+        """
+        topic_plugins = None
+        topic_config = self.config.get('topic-check', None)
+        if topic_config and topic_config.get('enabled', False):
+            topic_plugins = topic_config.get('plugins', None)
+        returns = yield from self.plugins_manager.map_plugin_coro(
+            "topic_filtering",
+            session=session,
+            topic=topic,
+            filter_plugins=topic_plugins)
+        topic_result = True
+        if returns:
+            for plugin in returns:
+                res = returns[plugin]
+                if res is False:
+                    topic_result = False
+                    self.logger.debug("Topic filtering failed due to '%s' plugin result: %s" % (plugin.name, res))
+                else:
+                    self.logger.debug("'%s' plugin result: %s" % (plugin.name, res))
+        # If all plugins returned True, authentication is success
+        return topic_result
+
     def retain_message(self, source_session, topic_name, data, qos=None):
         if data is not None and data != b'':
             # If retained flag set, store the message for further subscriptions
@@ -571,6 +607,7 @@ class Broker:
                 self.logger.debug("Clear retained messages for topic '%s'" % topic_name)
                 del self._retained_messages[topic_name]
 
+    @asyncio.coroutine
     def add_subscription(self, subscription, session):
         try:
             a_filter = subscription[0]
@@ -582,7 +619,10 @@ class Broker:
                     if "/+" not in a_filter and "+/" not in a_filter:
                         # [MQTT-4.7.1-3] + wildcard character must occupy entire level
                         return 0x80
-
+            # Check if the client is authorised to connect to the topic
+            permitted = yield from self.topic_filtering(session, topic=a_filter)
+            if not permitted:
+                return 0x80
             qos = subscription[1]
             if 'max-qos' in self.config and qos > self.config['max-qos']:
                 qos = self.config['max-qos']
