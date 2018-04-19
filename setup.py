@@ -8,7 +8,7 @@ from hbmqtt.version import get_version
 setup(
     name="hbmqtt",
     version=get_version(),
-    description="MQTT client/brocker using Python 3.4 asyncio library",
+    description="MQTT client/broker using Python 3.4 asyncio library",
     author="Nicolas Jouanin",
     author_email='nico@beerfactory.org',
     url="https://github.com/beerfactory/hbmqtt",
