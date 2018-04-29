@@ -370,7 +370,7 @@ class Broker:
 
         if client_session.clean_session:
             # Delete existing session and create a new one
-            if client_session.client_id is not None:
+            if client_session.client_id is not None and client_session.client_id != "":
                 self.delete_session(client_session.client_id)
             else:
                 client_session.client_id = gen_client_id()
