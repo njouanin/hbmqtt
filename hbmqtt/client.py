@@ -18,7 +18,7 @@ from hbmqtt.mqtt.protocol.handler import ProtocolHandlerException
 from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 import websockets
 from websockets.uri import InvalidURI
-from websockets.handshake import InvalidHandshake
+from websockets.exceptions import InvalidHandshake
 from collections import deque
 import sys
 if sys.version_info < (3, 5):
