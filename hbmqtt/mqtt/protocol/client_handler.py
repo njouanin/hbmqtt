@@ -17,11 +17,6 @@ from hbmqtt.mqtt.connack import ConnackPacket
 from hbmqtt.session import Session
 from hbmqtt.plugins.manager import PluginManager
 
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
-
 
 class ClientProtocolHandler(ProtocolHandler):
     def __init__(self, plugins_manager: PluginManager, session: Session=None, loop=None):
@@ -94,7 +89,7 @@ class ClientProtocolHandler(ProtocolHandler):
         try:
             if not self._ping_task:
                 self.logger.debug("Scheduling Ping")
-                self._ping_task = ensure_future(self.mqtt_ping())
+                self._ping_task = asyncio.ensure_future(self.mqtt_ping())
         except BaseException as be:
             self.logger.debug("Exception ignored in ping task: %r" % be)
 

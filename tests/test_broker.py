@@ -25,11 +25,6 @@ from hbmqtt.mqtt import (
 from hbmqtt.mqtt.connect import ConnectVariableHeader, ConnectPayload
 from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 
-import sys
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.DEBUG, format=formatter)
@@ -387,7 +382,7 @@ class BrokerTest(unittest.TestCase):
 
                 publish_1 = PublishPacket.build('/test', b'data', 1, False, QOS_2, False)
                 yield from publish_1.to_stream(writer)
-                ensure_future(PubrecPacket.from_stream(reader), loop=self.loop)
+                asyncio.ensure_future(PubrecPacket.from_stream(reader), loop=self.loop)
 
                 yield from asyncio.sleep(2)
 

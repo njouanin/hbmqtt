@@ -42,10 +42,6 @@ from hbmqtt.version import get_version
 from docopt import docopt
 from hbmqtt.utils import read_yaml_config
 
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +103,7 @@ def do_pub(client, arguments):
         retain = arguments['-r']
         for message in _get_message(arguments):
             logger.info("%s Publishing to '%s'" % (client.client_id, topic))
-            task = ensure_future(client.publish(topic, message, qos, retain))
+            task = asyncio.ensure_future(client.publish(topic, message, qos, retain))
             running_tasks.append(task)
         if running_tasks:
             yield from asyncio.wait(running_tasks)
