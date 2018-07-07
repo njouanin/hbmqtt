@@ -6,11 +6,15 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
-  - "3.7"
   - "nightly"
 matrix:
   allow_failures:
     - python: "nightly"
+  include:
+    - python: "3.7"
+      env: TOXENV=py37
+      dist: xenial
+      sudo: true
 
 install:
   - pip install coveralls tox-travis
