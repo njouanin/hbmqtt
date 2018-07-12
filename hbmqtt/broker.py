@@ -250,7 +250,12 @@ class Broker:
 
                     if ssl_active:
                         try:
-                            sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                            sc = ssl.create_default_context(
+                                ssl.Purpose.CLIENT_AUTH,
+                                cafile=listener.get('cafile'),
+                                capath=listener.get('capath'),
+                                cadata=listener.get('cadata')
+                            )
                             sc.load_cert_chain(listener['certfile'], listener['keyfile'])
                             sc.verify_mode = ssl.CERT_OPTIONAL
                         except KeyError as ke:
