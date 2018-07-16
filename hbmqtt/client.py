@@ -20,11 +20,7 @@ import websockets
 from websockets.uri import InvalidURI
 from websockets.exceptions import InvalidHandshake
 from collections import deque
-import sys
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
+
 
 _defaults = {
     'keep_alive': 10,
@@ -216,7 +212,7 @@ class MQTTClient:
     @asyncio.coroutine
     def _do_connect(self):
         return_code = yield from self._connect_coro()
-        self._disconnect_task = ensure_future(self.handle_connection_close(), loop=self._loop)
+        self._disconnect_task = asyncio.ensure_future(self.handle_connection_close(), loop=self._loop)
         return return_code
 
     @mqtt_connected
@@ -329,7 +325,7 @@ class MQTTClient:
             :return: instance of :class:`hbmqtt.session.ApplicationMessage` containing received message information flow.
             :raises: :class:`asyncio.TimeoutError` if timeout occurs before a message is delivered
         """
-        deliver_task = ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
+        deliver_task = asyncio.ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
         self.client_tasks.append(deliver_task)
         self.logger.debug("Waiting message delivery")
         done, pending = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)

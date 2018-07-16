@@ -12,10 +12,6 @@ import sys
 
 from collections import namedtuple
 
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 
 Plugin = namedtuple('Plugin', ['name', 'ep', 'object'])
 
@@ -113,7 +109,7 @@ class PluginManager:
         return self._plugins
 
     def _schedule_coro(self, coro):
-        return ensure_future(coro, loop=self._loop)
+        return asyncio.ensure_future(coro, loop=self._loop)
 
     @asyncio.coroutine
     def fire_event(self, event_name, wait=False, *args, **kwargs):
