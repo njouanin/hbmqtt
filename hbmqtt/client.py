@@ -5,6 +5,7 @@
 import asyncio
 import logging
 import ssl
+import copy
 from urllib.parse import urlparse, urlunparse
 from functools import wraps
 
@@ -86,7 +87,7 @@ class MQTTClient:
 
     def __init__(self, client_id=None, config=None, loop=None):
         self.logger = logging.getLogger(__name__)
-        self.config = _defaults
+        self.config = copy.deepcopy(_defaults)
         if config is not None:
             self.config.update(config)
         if client_id is not None:
