@@ -349,8 +349,8 @@ class MQTTClient:
         uri_attributes = urlparse(self.session.broker_uri)
         scheme = uri_attributes.scheme
         secure = True if scheme in ('mqtts', 'wss') else False
-        self.session.username = uri_attributes.username
-        self.session.password = uri_attributes.password
+        self.session.username = self.session.username if self.session.username else uri_attributes.username
+        self.session.password = self.session.password if self.session.password else uri_attributes.password
         self.session.remote_address = uri_attributes.hostname
         self.session.remote_port = uri_attributes.port
         if scheme in ('mqtt', 'mqtts') and not self.session.remote_port:
