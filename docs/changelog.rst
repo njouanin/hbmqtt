@@ -1,6 +1,12 @@
 Changelog
 ---------
 
+0.9.5
+.....
+
+* fix `more issues <https://github.com/beerfactory/hbmqtt/milestone/11?closed=1>`_
+* fix a `few issues <https://github.com/beerfactory/hbmqtt/milestone/10?closed=1>`_
+
 0.9.2
 .....
 
