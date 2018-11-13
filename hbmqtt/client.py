@@ -66,7 +66,7 @@ def mqtt_connected(func):
     def wrapper(self, *args, **kwargs):
         if not self._connected_state.is_set():
             base_logger.warning("Client not connected, waiting for it")
-            asyncio.wait([self._connected_state.wait(), self._no_more_connections.wait()], return_when=asyncio.FIRST_COMPLETED)
+            yield from asyncio.wait([self._connected_state.wait(), self._no_more_connections.wait()], return_when=asyncio.FIRST_COMPLETED)
             if self._no_more_connections.is_set():
                 raise ClientException("Will not reconnect")
         return (yield from func(self, *args, **kwargs))
