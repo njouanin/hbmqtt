@@ -106,6 +106,7 @@ class MQTTClient:
         self._disconnect_task = None
         self._connected_state = asyncio.Event(loop=self._loop)
         self._no_more_connections = asyncio.Event(loop=self._loop)
+        self.extra_headers = {}
 
         # Init plugins manager
         context = ClientContext()
@@ -119,7 +120,8 @@ class MQTTClient:
                 cleansession=None,
                 cafile=None,
                 capath=None,
-                cadata=None):
+                cadata=None,
+                extra_headers={}):
         """
             Connect to a remote broker.
 
@@ -137,6 +139,7 @@ class MQTTClient:
         """
 
         self.session = self._initsession(uri, cleansession, cafile, capath, cadata)
+        self.extra_headers = extra_headers;
         self.logger.debug("Connect to: %s" % uri)
 
         try:
@@ -395,6 +398,7 @@ class MQTTClient:
                     self.session.broker_uri,
                     subprotocols=['mqtt'],
                     loop=self._loop,
+                    extra_headers=self.extra_headers,
                     **kwargs)
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
