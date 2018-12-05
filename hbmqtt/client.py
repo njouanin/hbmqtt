@@ -134,7 +134,7 @@ class MQTTClient:
             :param cafile: server certificate authority file (optional, used for secured connection)
             :param capath: server certificate authority path (optional, used for secured connection)
             :param cadata: server certificate authority data (optional, used for secured connection)
-			:param extra_headers: a dictionary with additional http headers that should be sent on the initial connection (optional, used only with websocket connections)
+            :param extra_headers: a dictionary with additional http headers that should be sent on the initial connection (optional, used only with websocket connections)
             :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
             :raise: :class:`hbmqtt.client.ConnectException` if connection fails
         """
