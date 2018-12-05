@@ -38,6 +38,7 @@ import sys
 import logging
 import asyncio
 import os
+import json
 from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.version import get_version
 from docopt import docopt
