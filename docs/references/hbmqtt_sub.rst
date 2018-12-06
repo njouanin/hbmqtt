@@ -13,6 +13,7 @@ Usage
   hbmqtt_sub --url BROKER_URL -t TOPIC... [-n COUNT] [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d]
              [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA]
              [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
+             [--extra-headers HEADER]
 
 Note that for simplicity, ``hbmqtt_sub`` uses mostly the same argument syntax as `mosquitto_sub`_.
 
@@ -37,6 +38,7 @@ Options
 --will-message      Specify a message that will be stored by the broker and sent out if this client disconnects unexpectedly. This must be used in conjunction with ``--will-topic``.
 --will-qos          The QoS to use for the Will. Defaults to 0. This must be used in conjunction with ``--will-topic``.
 --will-retain       If given, if the client disconnects unexpectedly the message sent out will be treated as a retained message. This must be used in conjunction with ``--will-topic``.
+--extra-headers     Specify a JSON object string with key-value pairs representing additional headers that are transmitted on the initial connection, but only when using a websocket connection
 
 
 .. _MQTT URL scheme: https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme
@@ -77,3 +79,7 @@ Subscribe to 10 messages with QoS 2 from /#:
 
 .. _mosquitto_sub : http://mosquitto.org/man/mosquitto_sub-1.html
 
+Subscribe with QoS 0 to all messages published under $SYS/: over mqtt encapsulated in a websocket connection and additional headers:
+::
+
+    hbmqtt_sub --url wss://localhost -t '$SYS/#' -q 0 --extra-headers '{"Authorization": "Bearer <token>"}'
