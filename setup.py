@@ -48,6 +48,7 @@ setup(
             'auth_anonymous = hbmqtt.plugins.authentication:AnonymousAuthPlugin',
             'auth_file = hbmqtt.plugins.authentication:FileAuthPlugin',
             'topic_taboo = hbmqtt.plugins.topic_checking:TopicTabooPlugin',
+            'topic_acl = hbmqtt.plugins.topic_checking:TopicAccessControlListPlugin',
             'broker_sys = hbmqtt.plugins.sys.broker:BrokerSysPlugin',
         ],
         'hbmqtt.client.plugins': [

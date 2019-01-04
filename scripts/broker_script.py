@@ -40,6 +40,9 @@ default_config = {
         'plugins': [
             'auth_file', 'auth_anonymous'
         ]
+    },
+    'topic-check': {
+        'enabled': False
     }
 }
 

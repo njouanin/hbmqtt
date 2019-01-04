@@ -19,6 +19,9 @@ def test_coro():
         yield from C.connect('mqtt://0.0.0.0:1883')
         yield from C.publish('data/classified', b'TOP SECRET', qos=0x01)
         yield from C.publish('data/memes', b'REAL FUN', qos=0x01)
+        yield from C.publish('repositories/hbmqtt/master', b'NEW STABLE RELEASE', qos=0x01)
+        yield from C.publish('repositories/hbmqtt/devel', b'THIS NEEDS TO BE CHECKED', qos=0x01)
+        yield from C.publish('calendar/hbmqtt/releases', b'NEW RELEASE', qos=0x01)
         logger.info("messages published")
         yield from C.disconnect()
     except ConnectException as ce:
