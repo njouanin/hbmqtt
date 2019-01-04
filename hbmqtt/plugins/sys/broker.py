@@ -8,10 +8,6 @@ import asyncio
 import sys
 from collections import deque
 
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 
 DOLLAR_SYS_ROOT = '$SYS/broker/'
 STAT_BYTES_SENT = 'bytes_sent'
@@ -53,8 +49,10 @@ class BrokerSysPlugin:
         return (yield from self.context.broadcast_message(topic_basename, data))
 
     def schedule_broadcast_sys_topic(self, topic_basename, data):
-        return ensure_future(self._broadcast_sys_topic(DOLLAR_SYS_ROOT + topic_basename, data),
-                             loop=self.context.loop)
+        return asyncio.ensure_future(
+            self._broadcast_sys_topic(DOLLAR_SYS_ROOT + topic_basename, data),
+            loop=self.context.loop
+        )
 
     @asyncio.coroutine
     def on_broker_pre_start(self, *args, **kwargs):

@@ -7,7 +7,7 @@ hbmqtt_pub - MQTT 3.1.1 publisher
 Usage:
     hbmqtt_pub --version
     hbmqtt_pub (-h | --help)
-    hbmqtt_pub --url BROKER_URL -t TOPIC (-f FILE | -l | -m MESSAGE | -n | -s) [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ] [-r]
+    hbmqtt_pub --url BROKER_URL -t TOPIC (-f FILE | -l | -m MESSAGE | -n | -s) [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ] [--extra-headers HEADER] [-r]
 
 Options:
     -h --help           Show this screen.
@@ -30,6 +30,7 @@ Options:
     --will-message WILL_MESSAGE
     --will-qos WILL_QOS
     --will-retain
+    --extra-headers EXTRA_HEADERS      JSON object with key-value pairs of additional headers for websocket connections
     -d                  Enable debug messages
 """
 
@@ -37,15 +38,12 @@ import sys
 import logging
 import asyncio
 import os
+import json
 from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.version import get_version
 from docopt import docopt
 from hbmqtt.utils import read_yaml_config
 
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +62,11 @@ def _get_qos(arguments):
     except:
         return None
 
+def _get_extra_headers(arguments):
+    try:
+        return json.loads(arguments['--extra-headers'])
+    except:
+        return {}
 
 def _get_message(arguments):
     if arguments['-n']:
@@ -101,13 +104,14 @@ def do_pub(client, arguments):
                                   cleansession=arguments['--clean-session'],
                                   cafile=arguments['--ca-file'],
                                   capath=arguments['--ca-path'],
-                                  cadata=arguments['--ca-data'])
+                                  cadata=arguments['--ca-data'],
+                                  extra_headers=_get_extra_headers(arguments))
         qos = _get_qos(arguments)
         topic = arguments['-t']
         retain = arguments['-r']
         for message in _get_message(arguments):
             logger.info("%s Publishing to '%s'" % (client.client_id, topic))
-            task = ensure_future(client.publish(topic, message, qos, retain))
+            task = asyncio.ensure_future(client.publish(topic, message, qos, retain))
             running_tasks.append(task)
         if running_tasks:
             yield from asyncio.wait(running_tasks)

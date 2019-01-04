@@ -7,7 +7,7 @@ hbmqtt_sub - MQTT 3.1.1 publisher
 Usage:
     hbmqtt_sub --version
     hbmqtt_sub (-h | --help)
-    hbmqtt_sub --url BROKER_URL -t TOPIC... [-n COUNT] [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ]
+    hbmqtt_sub --url BROKER_URL -t TOPIC... [-n COUNT] [-c CONFIG_FILE] [-i CLIENT_ID] [-q | --qos QOS] [-d] [-k KEEP_ALIVE] [--clean-session] [--ca-file CAFILE] [--ca-path CAPATH] [--ca-data CADATA] [ --will-topic WILL_TOPIC [--will-message WILL_MESSAGE] [--will-qos WILL_QOS] [--will-retain] ] [--extra-headers HEADER]
 
 Options:
     -h --help           Show this screen.
@@ -27,6 +27,7 @@ Options:
     --will-message WILL_MESSAGE
     --will-qos WILL_QOS
     --will-retain
+    --extra-headers EXTRA_HEADERS      JSON object with key-value pairs of additional headers for websocket connections
     -d                  Enable debug messages
 """
 
@@ -34,6 +35,7 @@ import sys
 import logging
 import asyncio
 import os
+import json
 from hbmqtt.client import MQTTClient, ConnectException
 from hbmqtt.errors import MQTTException
 from hbmqtt.version import get_version
@@ -58,6 +60,12 @@ def _get_qos(arguments):
     except:
         return QOS_0
 
+def _get_extra_headers(arguments):
+    try:
+        return json.loads(arguments['--extra-headers'])
+    except:
+        return {}
+
 
 @asyncio.coroutine
 def do_sub(client, arguments):
@@ -67,7 +75,8 @@ def do_sub(client, arguments):
                                   cleansession=arguments['--clean-session'],
                                   cafile=arguments['--ca-file'],
                                   capath=arguments['--ca-path'],
-                                  cadata=arguments['--ca-data'])
+                                  cadata=arguments['--ca-data'],
+                                  extra_headers=_get_extra_headers(arguments))
         qos = _get_qos(arguments)
         filters = []
         for topic in arguments['-t']:

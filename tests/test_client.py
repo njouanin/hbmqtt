@@ -115,6 +115,31 @@ class MQTTClientTest(unittest.TestCase):
         self.loop.run_until_complete(test_coro())
         if future.exception():
             raise future.exception()
+            raise future.exception()
+
+    def test_reconnect_ws_retain_username_password(self):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                broker = Broker(broker_config, plugin_namespace="hbmqtt.test.plugins")
+                yield from broker.start()
+                client = MQTTClient()
+                yield from client.connect('ws://fred:password@127.0.0.1:8080/')
+                self.assertIsNotNone(client.session)
+                yield from client.disconnect()
+                yield from client.reconnect()
+
+                self.assertIsNotNone(client.session.username)
+                self.assertIsNotNone(client.session.password)
+                yield from broker.shutdown()
+                future.set_result(True)
+            except Exception as ae:
+                future.set_exception(ae)
+
+        future = asyncio.Future(loop=self.loop)
+        self.loop.run_until_complete(test_coro())
+        if future.exception():
+            raise future.exception()
 
     def test_connect_ws_secure(self):
         @asyncio.coroutine

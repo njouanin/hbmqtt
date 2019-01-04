@@ -25,10 +25,6 @@ from hbmqtt.adapters import (
     WebSocketsWriter)
 from .plugins.manager import PluginManager, BaseContext
 
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
 
 _defaults = {
     'timeout-disconnect-delay': 2,
@@ -250,7 +246,12 @@ class Broker:
 
                     if ssl_active:
                         try:
-                            sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                            sc = ssl.create_default_context(
+                                ssl.Purpose.CLIENT_AUTH,
+                                cafile=listener.get('cafile'),
+                                capath=listener.get('capath'),
+                                cadata=listener.get('cadata')
+                            )
                             sc.load_cert_chain(listener['certfile'], listener['keyfile'])
                             sc.verify_mode = ssl.CERT_OPTIONAL
                         except KeyError as ke:
@@ -287,7 +288,7 @@ class Broker:
             yield from self.plugins_manager.fire_event(EVENT_BROKER_POST_START)
 
             #Start broadcast loop
-            self._broadcast_task = ensure_future(self._broadcast_loop(), loop=self._loop)
+            self._broadcast_task = asyncio.ensure_future(self._broadcast_loop(), loop=self._loop)
 
             self.logger.debug("Broker started")
         except Exception as e:
@@ -370,7 +371,7 @@ class Broker:
 
         if client_session.clean_session:
             # Delete existing session and create a new one
-            if client_session.client_id is not None:
+            if client_session.client_id is not None and client_session.client_id != "":
                 self.delete_session(client_session.client_id)
             else:
                 client_session.client_id = gen_client_id()
@@ -415,10 +416,10 @@ class Broker:
         yield from self.publish_session_retained_messages(client_session)
 
         # Init and start loop for handling client messages (publish, subscribe/unsubscribe, disconnect)
-        disconnect_waiter = ensure_future(handler.wait_disconnect(), loop=self._loop)
-        subscribe_waiter = ensure_future(handler.get_next_pending_subscription(), loop=self._loop)
-        unsubscribe_waiter = ensure_future(handler.get_next_pending_unsubscription(), loop=self._loop)
-        wait_deliver = ensure_future(handler.mqtt_deliver_next_message(), loop=self._loop)
+        disconnect_waiter = asyncio.ensure_future(handler.wait_disconnect(), loop=self._loop)
+        subscribe_waiter = asyncio.ensure_future(handler.get_next_pending_subscription(), loop=self._loop)
+        unsubscribe_waiter = asyncio.ensure_future(handler.get_next_pending_unsubscription(), loop=self._loop)
+        wait_deliver = asyncio.ensure_future(handler.mqtt_deliver_next_message(), loop=self._loop)
         connected = True
         while connected:
             try:
@@ -707,7 +708,7 @@ class Broker:
                                                   (format_client_message(session=broadcast['session']),
                                                    broadcast['topic'], format_client_message(session=target_session)))
                                 handler = self._get_handler(target_session)
-                                task = ensure_future(
+                                task = asyncio.ensure_future(
                                     handler.mqtt_publish(broadcast['topic'], broadcast['data'], qos, retain=False),
                                     loop=self._loop)
                                 running_tasks.append(task)
@@ -743,7 +744,7 @@ class Broker:
         handler = self._get_handler(session)
         while not session.retained_messages.empty():
             retained = yield from session.retained_messages.get()
-            publish_tasks.append(ensure_future(
+            publish_tasks.append(asyncio.ensure_future(
                 handler.mqtt_publish(
                     retained.topic, retained.data, retained.qos, True), loop=self._loop))
         if publish_tasks:

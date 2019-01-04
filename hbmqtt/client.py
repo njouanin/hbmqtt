@@ -5,6 +5,7 @@
 import asyncio
 import logging
 import ssl
+import copy
 from urllib.parse import urlparse, urlunparse
 from functools import wraps
 
@@ -18,13 +19,9 @@ from hbmqtt.mqtt.protocol.handler import ProtocolHandlerException
 from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 import websockets
 from websockets.uri import InvalidURI
-from websockets.handshake import InvalidHandshake
+from websockets.exceptions import InvalidHandshake
 from collections import deque
-import sys
-if sys.version_info < (3, 5):
-    from asyncio import async as ensure_future
-else:
-    from asyncio import ensure_future
+
 
 _defaults = {
     'keep_alive': 10,
@@ -69,7 +66,9 @@ def mqtt_connected(func):
     def wrapper(self, *args, **kwargs):
         if not self._connected_state.is_set():
             base_logger.warning("Client not connected, waiting for it")
-            yield from self._connected_state.wait()
+            asyncio.wait([self._connected_state.wait(), self._no_more_connections.wait()], return_when=asyncio.FIRST_COMPLETED)
+            if self._no_more_connections.is_set():
+                raise ClientException("Will not reconnect")
         return (yield from func(self, *args, **kwargs))
     return wrapper
 
@@ -88,7 +87,7 @@ class MQTTClient:
 
     def __init__(self, client_id=None, config=None, loop=None):
         self.logger = logging.getLogger(__name__)
-        self.config = _defaults
+        self.config = copy.deepcopy(_defaults)
         if config is not None:
             self.config.update(config)
         if client_id is not None:
@@ -106,6 +105,8 @@ class MQTTClient:
         self._handler = None
         self._disconnect_task = None
         self._connected_state = asyncio.Event(loop=self._loop)
+        self._no_more_connections = asyncio.Event(loop=self._loop)
+        self.extra_headers = {}
 
         # Init plugins manager
         context = ClientContext()
@@ -119,7 +120,8 @@ class MQTTClient:
                 cleansession=None,
                 cafile=None,
                 capath=None,
-                cadata=None):
+                cadata=None,
+                extra_headers={}):
         """
             Connect to a remote broker.
 
@@ -132,11 +134,13 @@ class MQTTClient:
             :param cafile: server certificate authority file (optional, used for secured connection)
             :param capath: server certificate authority path (optional, used for secured connection)
             :param cadata: server certificate authority data (optional, used for secured connection)
+            :param extra_headers: a dictionary with additional http headers that should be sent on the initial connection (optional, used only with websocket connections)
             :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
             :raise: :class:`hbmqtt.client.ConnectException` if connection fails
         """
 
         self.session = self._initsession(uri, cleansession, cafile, capath, cadata)
+        self.extra_headers = extra_headers;
         self.logger.debug("Connect to: %s" % uri)
 
         try:
@@ -213,7 +217,7 @@ class MQTTClient:
     @asyncio.coroutine
     def _do_connect(self):
         return_code = yield from self._connect_coro()
-        self._disconnect_task = ensure_future(self.handle_connection_close(), loop=self._loop)
+        self._disconnect_task = asyncio.ensure_future(self.handle_connection_close(), loop=self._loop)
         return return_code
 
     @mqtt_connected
@@ -326,7 +330,7 @@ class MQTTClient:
             :return: instance of :class:`hbmqtt.session.ApplicationMessage` containing received message information flow.
             :raises: :class:`asyncio.TimeoutError` if timeout occurs before a message is delivered
         """
-        deliver_task = ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
+        deliver_task = asyncio.ensure_future(self._handler.mqtt_deliver_next_message(), loop=self._loop)
         self.client_tasks.append(deliver_task)
         self.logger.debug("Waiting message delivery")
         done, pending = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
@@ -349,8 +353,8 @@ class MQTTClient:
         uri_attributes = urlparse(self.session.broker_uri)
         scheme = uri_attributes.scheme
         secure = True if scheme in ('mqtts', 'wss') else False
-        self.session.username = uri_attributes.username
-        self.session.password = uri_attributes.password
+        self.session.username = self.session.username if self.session.username else uri_attributes.username
+        self.session.password = self.session.password if self.session.password else uri_attributes.password
         self.session.remote_address = uri_attributes.hostname
         self.session.remote_port = uri_attributes.port
         if scheme in ('mqtt', 'mqtts') and not self.session.remote_port:
@@ -395,6 +399,7 @@ class MQTTClient:
                     self.session.broker_uri,
                     subprotocols=['mqtt'],
                     loop=self._loop,
+                    extra_headers=self.extra_headers,
                     **kwargs)
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
@@ -431,6 +436,7 @@ class MQTTClient:
     def handle_connection_close(self):
 
         def cancel_tasks():
+            self._no_more_connections.set()
             while self.client_tasks:
                 task = self.client_tasks.popleft()
                 if not task.done():
