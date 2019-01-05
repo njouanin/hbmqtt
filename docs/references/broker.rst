@@ -81,6 +81,7 @@ The :class:`~hbmqtt.broker.Broker` ``__init__`` method accepts a ``config`` para
         enabled: true / false  # Set to False if topic filtering is not needed
         plugins: ['topic_acl'] #List of plugins to activate for topic filtering among all registered plugins
         acl:
+            # username: [list of allowed topics]
             username1: ['repositories/+/master', 'calendar/#', 'data/memes']  # List of topics on which client1 can publish and subscribe
             username2: ...
             anonymous: []  # List of topics on which an anonymous client can publish and subscribe
@@ -104,9 +105,9 @@ The ``topic-check`` section setup access control policies for publishing and sub
 
 * ``enabled``: set to true if you want to impose an access control policy. Otherwise, set it to false.
 * ``plugins``: defines the list of activated plugins. Note the plugins must be defined in the ``hbmqtt.broker.plugins`` `entry point <https://pythonhosted.org/setuptools/setuptools.html#dynamic-discovery-of-services-and-plugins>`_.
-* aditional parameters: depending on the plugin used for access control, additional parameters should be added.
+* additional parameters: depending on the plugin used for access control, additional parameters should be added.
     * In case of ``topic_acl`` plugin, the Access Control List (ACL) must be defined in the parameter ``acl``.
-        * For each of the usernames, a list with the allowed topics must be defined.
+        * For each username, a list with the allowed topics must be defined.
         * If the client logs in anonymously, the ``anonymous`` entry within the ACL is used in order to grant/deny subscriptions.
 
 

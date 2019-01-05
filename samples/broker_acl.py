@@ -32,6 +32,7 @@ config = {
             'topic_acl'
         ],
         'acl': {
+            # username: [list of allowed topics]
             'test': ['repositories/+/master', 'calendar/#', 'data/memes'],
             'anonymous': []
         }
