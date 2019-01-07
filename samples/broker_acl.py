@@ -24,9 +24,18 @@ config = {
         'plugins': [
             'auth_file', 'auth_anonymous'
         ]
+
     },
     'topic-check': {
-        'enabled': False
+        'enabled': True,
+        'plugins': [
+            'topic_acl'
+        ],
+        'acl': {
+            # username: [list of allowed topics]
+            'test': ['repositories/+/master', 'calendar/#', 'data/memes'],
+            'anonymous': []
+        }
     }
 }
 
@@ -36,13 +45,10 @@ broker = Broker(config)
 @asyncio.coroutine
 def test_coro():
     yield from broker.start()
-    #yield from asyncio.sleep(5)
-    #yield from broker.shutdown()
 
 
 if __name__ == '__main__':
     formatter = "[%(asctime)s] :: %(levelname)s :: %(name)s :: %(message)s"
-    #formatter = "%(asctime)s :: %(levelname)s :: %(message)s"
     logging.basicConfig(level=logging.INFO, format=formatter)
     asyncio.get_event_loop().run_until_complete(test_coro())
     asyncio.get_event_loop().run_forever()

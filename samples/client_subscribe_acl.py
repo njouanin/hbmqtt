@@ -18,10 +18,14 @@ logger = logging.getLogger(__name__)
 def uptime_coro():
     C = MQTTClient()
     yield from C.connect('mqtt://test:test@0.0.0.0:1883')
+    # yield from C.connect('mqtt://0.0.0.0:1883')
     # Subscribe to '$SYS/broker/uptime' with QOS=1
     yield from C.subscribe([
         ('data/memes', QOS_1),  # Topic allowed
         ('data/classified', QOS_1),  # Topic forbidden
+        ('repositories/hbmqtt/master', QOS_1),  # Topic allowed
+        ('repositories/hbmqtt/devel', QOS_1),  # Topic forbidden
+        ('calendar/hbmqtt/releases', QOS_1),  # Topic allowed
     ])
     logger.info("Subscribed")
     try:
