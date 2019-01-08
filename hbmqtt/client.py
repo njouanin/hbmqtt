@@ -239,7 +239,7 @@ class MQTTClient:
 
     @mqtt_connected
     @asyncio.coroutine
-    def publish(self, topic, message, qos=None, retain=None):
+    def publish(self, topic, message, qos=None, retain=None, ack_timeout=None):
         """
             Publish a message to the broker.
 
@@ -273,7 +273,7 @@ class MQTTClient:
                     pass
             return _qos, _retain
         (app_qos, app_retain) = get_retain_and_qos()
-        return (yield from self._handler.mqtt_publish(topic, message, app_qos, app_retain))
+        return (yield from self._handler.mqtt_publish(topic, message, app_qos, app_retain, ack_timeout))
 
     @mqtt_connected
     @asyncio.coroutine
