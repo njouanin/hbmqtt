@@ -19,6 +19,8 @@ The example below shows how to write a simple MQTT client which subscribes a top
 
     from hbmqtt.client import MQTTClient, ClientException
     from hbmqtt.mqtt.constants import QOS_1, QOS_2
+    
+    logger = logging.getLogger(__name__)
 
     @asyncio.coroutine
     def uptime_coro():
@@ -41,6 +43,8 @@ The example below shows how to write a simple MQTT client which subscribes a top
             logger.error("Client exception: %s" % ce)
 
     if __name__ == '__main__':
+        formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+        logging.basicConfig(level=logging.DEBUG, format=formatter)
         asyncio.get_event_loop().run_until_complete(uptime_coro())
 
 When executed, this script gets the default event loop and asks it to run the ``uptime_coro`` until it completes.
@@ -63,8 +67,10 @@ This example also shows to method for publishing message asynchronously.
     import asyncio
 
     from hbmqtt.client import MQTTClient
-    from hbmqtt.mqtt.constants import QOS_1, QOS_2
+    from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 
+    logger = logging.getLogger(__name__)
+    
     @asyncio.coroutine
     def test_coro():
         C = MQTTClient()
