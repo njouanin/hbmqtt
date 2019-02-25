@@ -165,8 +165,7 @@ The :class:`~hbmqtt.client.MQTTClient` ``__init__`` method accepts a ``config`` 
 * ``default_retain``: Default retain (``False``) used by :meth:`~hbmqtt.client.MQTTClient.publish` if ``qos`` argument is not given.,
 * ``auto_reconnect``: enable or disable auto-reconnect feature (defaults to ``True``).
 * ``reconnect_max_interval``: maximum interval (in seconds) to wait before two connection retries (defaults to ``10``).
-* ``reconnect_retries``: maximum number of connect retries (defaults to ``2``).
-
+* ``reconnect_retries``: maximum number of connect retries (defaults to ``2``). Negative value will cause client to reconnect infinietly.
 Default QoS and default retain can also be overriden by adding a ``topics`` with may contain QoS and retain values for specific topics. See the following example:
 
 .. code-block:: python

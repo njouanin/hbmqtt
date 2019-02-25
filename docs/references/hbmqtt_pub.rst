@@ -61,7 +61,7 @@ If ``-c`` argument is given, ``hbmqtt_pub`` will read specific MQTT settings for
 * ``default_qos`` : Default QoS for messages published. Defaults to 0.
 * ``default_retain`` : Default retain value to messages published. Defaults to ``false``.
 * ``auto_reconnect`` : Enable or disable auto-reconnect if connectection with the broker is interrupted. Defaults to ``false``.
-* ``reconnect_retries`` : Maximum reconnection retries. Defaults to ``2``.
+* ``reconnect_retries`` : Maximum reconnection retries. Defaults to ``2``. Negative value will cause client to reconnect infinietly.
 * ``reconnect_max_interval`` : Maximum interval between 2 connection retry. Defaults to ``10``.
 
 
