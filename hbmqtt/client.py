@@ -205,7 +205,7 @@ class MQTTClient:
                 return (yield from self._do_connect())
             except BaseException as e:
                 self.logger.warning("Reconnection attempt failed: %r" % e)
-                if nb_attempt > reconnect_retries:
+                if reconnect_retries >= 0 and nb_attempt > reconnect_retries:
                     self.logger.error("Maximum number of connection attempts reached. Reconnection aborted")
                     raise ConnectException("Too many connection attempts failed")
                 exp = 2 ** nb_attempt
