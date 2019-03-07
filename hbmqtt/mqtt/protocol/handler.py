@@ -71,6 +71,8 @@ class ProtocolHandler:
         self._pubrel_waiters = dict()
         self._pubcomp_waiters = dict()
 
+        self._write_lock = asyncio.Lock(loop=self._loop)
+
     def _init_session(self, session: Session):
         assert session
         log = logging.getLogger(__name__)
@@ -440,7 +442,8 @@ class ProtocolHandler:
     @asyncio.coroutine
     def _send_packet(self, packet):
         try:
-            yield from packet.to_stream(self.writer)
+            with (yield from self._write_lock):
+                yield from packet.to_stream(self.writer)
             if self._keepalive_task:
                 self._keepalive_task.cancel()
                 self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
