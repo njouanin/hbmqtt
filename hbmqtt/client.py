@@ -183,7 +183,7 @@ class MQTTClient:
         """
         try:
             while True:
-                task: asyncio.Future = self.client_tasks.pop()
+                task = self.client_tasks.pop()
                 task.cancel()
         except IndexError as err:
             pass
