@@ -164,7 +164,7 @@ class MQTTClient:
 
             This method is a *coroutine*.
         """
-
+        yield from self.cancel_tasks()
         if self.session.transitions.is_connected():
             if not self._disconnect_task.done():
                 self._disconnect_task.cancel()
@@ -174,6 +174,19 @@ class MQTTClient:
             self.session.transitions.disconnect()
         else:
             self.logger.warning("Client session is not currently connected, ignoring call")
+
+    @asyncio.coroutine
+    def cancel_tasks(self):
+        """
+        Before disconnection need to cancel all pending tasks
+        :return:
+        """
+        try:
+            while True:
+                task = self.client_tasks.pop()
+                task.cancel()
+        except IndexError as err:
+            pass
 
     @asyncio.coroutine
     def reconnect(self, cleansession=None):
