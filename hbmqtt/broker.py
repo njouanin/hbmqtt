@@ -272,6 +272,7 @@ class Broker:
                         instance = yield from asyncio.start_server(cb_partial,
                                                                    address,
                                                                    port,
+                                                                   reuse_address=True,
                                                                    ssl=sc,
                                                                    loop=self._loop)
                         self._servers[listener_name] = Server(listener_name, instance, max_connections, self._loop)
