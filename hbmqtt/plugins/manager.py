@@ -136,7 +136,7 @@ class PluginManager:
 
                     def clean_fired_events(future):
                         try:
-                            self._fired_events.remove(task)
+                            self._fired_events.remove(future)
                         except (KeyError, ValueError):
                             pass
 
@@ -149,6 +149,7 @@ class PluginManager:
         if wait:
             if tasks:
                 yield from asyncio.wait(tasks, loop=self._loop)
+        self.logger.debug("Plugins len(_fired_events)=%d" % (len(self._fired_events)))
 
     @asyncio.coroutine
     def map(self, coro, *args, **kwargs):
