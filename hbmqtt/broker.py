@@ -692,7 +692,9 @@ class Broker:
         try:
             while True:
                 while running_tasks and running_tasks[0].done():
-                    running_tasks.popleft()
+                    task = running_tasks.popleft()
+                    try: task.result() # make asyncio happy and collect results
+                    except Exception: pass
                 broadcast = yield from self._broadcast_queue.get()
                 if self.logger.isEnabledFor(logging.DEBUG):
                     self.logger.debug("broadcasting %r" % broadcast)
@@ -724,6 +726,7 @@ class Broker:
             # Wait until current broadcasting tasks end
             if running_tasks:
                 yield from asyncio.wait(running_tasks, loop=self._loop)
+            raise # reraise per CancelledError semantics
 
     @asyncio.coroutine
     def _broadcast_message(self, session, topic, data, force_qos=None):

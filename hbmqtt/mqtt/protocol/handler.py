@@ -449,9 +449,8 @@ class ProtocolHandler:
                 self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
             yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
-        except ConnectionResetError as cre:
+        except (ConnectionResetError, BrokenPipeError):
             yield from self.handle_connection_closed()
-            raise
         except BaseException as e:
             self.logger.warning("Unhandled exception: %s" % e)
             raise

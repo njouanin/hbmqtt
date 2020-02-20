@@ -158,13 +158,16 @@ class StreamWriterAdapter(WriterAdapter):
     def __init__(self, writer: StreamWriter):
         self.logger = logging.getLogger(__name__)
         self._writer = writer
+        self.is_closed = False # StreamWriter has no test for closed...we use our own
 
     def write(self, data):
-        self._writer.write(data)
+        if not self.is_closed:
+            self._writer.write(data)
 
     @asyncio.coroutine
     def drain(self):
-        yield from self._writer.drain()
+        if not self.is_closed:
+            yield from self._writer.drain()
 
     def get_peer_info(self):
         extra_info = self._writer.get_extra_info('peername')
@@ -172,10 +175,14 @@ class StreamWriterAdapter(WriterAdapter):
 
     @asyncio.coroutine
     def close(self):
-        yield from self._writer.drain()
-        if self._writer.can_write_eof():
-            self._writer.write_eof()
-        self._writer.close()
+        if not self.is_closed:
+            yield from self._writer.drain()
+            if self._writer.can_write_eof():
+                self._writer.write_eof()
+            self._writer.close()
+            try: yield from self._writer.wait_closed() # py37+
+            except AttributeError: pass
+            self.is_closed = True
 
 
 class BufferReader(ReaderAdapter):
