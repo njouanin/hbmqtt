@@ -176,13 +176,13 @@ class StreamWriterAdapter(WriterAdapter):
     @asyncio.coroutine
     def close(self):
         if not self.is_closed:
+            self.is_closed = True # we first mark this closed so yields below don't cause races with waiting writes
             yield from self._writer.drain()
             if self._writer.can_write_eof():
                 self._writer.write_eof()
             self._writer.close()
             try: yield from self._writer.wait_closed() # py37+
             except AttributeError: pass
-            self.is_closed = True
 
 
 class BufferReader(ReaderAdapter):

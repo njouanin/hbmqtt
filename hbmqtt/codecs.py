@@ -51,7 +51,7 @@ def read_or_raise(reader, n=-1):
     """
     try:
         data = yield from reader.read(n)
-    except (asyncio.IncompleteReadError, ConnectionResetError):
+    except (asyncio.IncompleteReadError, ConnectionResetError, BrokenPipeError):
         data = None
     if not data:
         raise NoDataException("No more data")
