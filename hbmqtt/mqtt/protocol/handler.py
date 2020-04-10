@@ -417,7 +417,7 @@ class ProtocolHandler:
                         if task:
                             running_tasks.append(task)
                 else:
-                    self.logger.debug("%s No more data (EOF received), stopping reader coro" % self.session.client_id)
+                    self.logger.debug("No more data (EOF received), stopping reader coro")
                     break
             except MQTTException:
                 self.logger.debug("Message discarded")
@@ -425,10 +425,10 @@ class ProtocolHandler:
                 self.logger.debug("Task cancelled, reader loop ending")
                 break
             except asyncio.TimeoutError:
-                self.logger.debug("%s Input stream read timeout" % self.session.client_id)
+                self.logger.debug("Input stream read timeout")
                 self.handle_read_timeout()
             except NoDataException:
-                self.logger.debug("%s No data available" % self.session.client_id)
+                self.logger.debug("No data available")
             except BaseException as e:
                 self.logger.warning("%s Unhandled exception in reader coro: %r" % (type(self).__name__, e))
                 break
@@ -436,7 +436,7 @@ class ProtocolHandler:
             running_tasks.popleft().cancel()
         yield from self.handle_connection_closed()
         self._reader_stopped.set()
-        self.logger.debug("%s Reader coro stopped" % self.session.client_id)
+        self.logger.debug("Reader coro stopped")
         yield from self.stop()
 
     @asyncio.coroutine
@@ -449,8 +449,9 @@ class ProtocolHandler:
                 self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
             yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
-        except ConnectionResetError as cre:
+        except (ConnectionResetError, BrokenPipeError):
             yield from self.handle_connection_closed()
+        except asyncio.CancelledError:
             raise
         except BaseException as e:
             self.logger.warning("Unhandled exception: %s" % e)
@@ -458,6 +459,8 @@ class ProtocolHandler:
 
     @asyncio.coroutine
     def mqtt_deliver_next_message(self):
+        if not self._is_attached():
+            return None
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug("%d message(s) available for delivery" % self.session.delivered_message_queue.qsize())
         try:

@@ -692,7 +692,9 @@ class Broker:
         try:
             while True:
                 while running_tasks and running_tasks[0].done():
-                    running_tasks.popleft()
+                    task = running_tasks.popleft()
+                    try: task.result() # make asyncio happy and collect results
+                    except Exception: pass
                 broadcast = yield from self._broadcast_queue.get()
                 if self.logger.isEnabledFor(logging.DEBUG):
                     self.logger.debug("broadcasting %r" % broadcast)
@@ -705,25 +707,30 @@ class Broker:
                             if 'qos' in broadcast:
                                 qos = broadcast['qos']
                             if target_session.transitions.state == 'connected':
-                                self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
-                                                  (format_client_message(session=broadcast['session']),
-                                                   broadcast['topic'], format_client_message(session=target_session)))
+                                if self.logger.isEnabledFor(logging.DEBUG):
+                                    self.logger.debug("broadcasting application message from %s on topic '%s' to %s" %
+                                                      (format_client_message(session=broadcast['session']),
+                                                       broadcast['topic'], format_client_message(session=target_session)))
                                 handler = self._get_handler(target_session)
                                 task = asyncio.ensure_future(
                                     handler.mqtt_publish(broadcast['topic'], broadcast['data'], qos, retain=False),
                                     loop=self._loop)
                                 running_tasks.append(task)
-                            else:
-                                self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
-                                                  (format_client_message(session=broadcast['session']),
-                                                   broadcast['topic'], format_client_message(session=target_session)))
+                            elif qos is not None and qos > 0:
+                                if self.logger.isEnabledFor(logging.DEBUG):
+                                    self.logger.debug("retaining application message from %s on topic '%s' to client '%s'" %
+                                                      (format_client_message(session=broadcast['session']),
+                                                       broadcast['topic'], format_client_message(session=target_session)))
                                 retained_message = RetainedApplicationMessage(
                                     broadcast['session'], broadcast['topic'], broadcast['data'], qos)
                                 yield from target_session.retained_messages.put(retained_message)
+                                if self.logger.isEnabledFor(logging.DEBUG):
+                                    self.logger.debug(f'target_session.retained_messages={target_session.retained_messages.qsize()}')
         except CancelledError:
             # Wait until current broadcasting tasks end
             if running_tasks:
                 yield from asyncio.wait(running_tasks, loop=self._loop)
+            raise # reraise per CancelledError semantics
 
     @asyncio.coroutine
     def _broadcast_message(self, session, topic, data, force_qos=None):

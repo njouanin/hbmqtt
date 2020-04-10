@@ -182,7 +182,7 @@ class MQTTClient:
         :return:
         """
         try:
-            while True:
+            while self.client_tasks:
                 task = self.client_tasks.pop()
                 task.cancel()
         except IndexError as err:
@@ -349,16 +349,16 @@ class MQTTClient:
         self.client_tasks.append(deliver_task)
         self.logger.debug("Waiting message delivery")
         done, pending = yield from asyncio.wait([deliver_task], loop=self._loop, return_when=asyncio.FIRST_EXCEPTION, timeout=timeout)
+        if self.client_tasks:
+            self.client_tasks.pop()
         if deliver_task in done:
             if deliver_task.exception() is not None:
                 # deliver_task raised an exception, pass it on to our caller
                 raise deliver_task.exception()
-            self.client_tasks.pop()
             return deliver_task.result()
         else:
             #timeout occured before message received
             deliver_task.cancel()
-            self.client_tasks.pop()
             raise asyncio.TimeoutError
 
     @asyncio.coroutine
@@ -456,7 +456,7 @@ class MQTTClient:
             while self.client_tasks:
                 task = self.client_tasks.popleft()
                 if not task.done():
-                    task.set_exception(ClientException("Connection lost"))
+                    task.cancel()
 
         self.logger.debug("Watch broker disconnection")
         # Wait for disconnection from broker (like connection lost)
